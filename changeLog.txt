@@ -1,0 +1,84 @@
+2.0.2	Reduce console logging to only error cases when retrieving favicons
+2.0.1	Initial release version
+
+
+LIMitations / TODO's:
+---------------------
+- BUG: When drawing a tab to bookmark it and it goes over results rows, apparently getting
+  TypeError: row is undefined  panel.js:1972:9 -> bkmkDragEnterHandler
+  TypeError: row is undefined  panel.js:2008:9 -> bkmkDragOverHandler
+  TypeError: row is undefined  panel.js:2075:9 -> bkmkDragExitHandler
+  TypeError: row is undefined  panel.js:2045:9 -> bkmkDragLeaveHandler
+
+- TODO: Internationalization (i18n) of the UI with users who want to help.
+  Currently only english available.
+
+- TODO: more tests under Linux ? Indeed, some behavior (and Firefox bugs ...) are different
+  from Windows.
+
+- TODO: I have no Mac nor Open/FreeBSD, cannot verify how this is behaving under them, and if
+  there are also variations / different bugs there .. I am hoping that since these are all
+  BSD UNIX, this is similar or not far from Linux .. Have to rely solely on user feedback
+  for that piece.
+
+- TODO: Android and Chrome OS also ? Are mobile users going to have that many bookmarks and
+  install + make use of that extension ?? Again, will wait for user feedback.
+
+- TODO: Resize of search results pane is not yet retained / displayed as an option.
+  So it is reset at each sidebar reload.
+
+- TODO: Ignore favicon links when they are in comments when retrieving favicons from a page
+  (since I am using a quick parser of my own, it is not semantical, and therefore it is misled
+   when there are such rel= links inside comments <!-- -->, as it takes them for real).
+   This is a rare case, but it happens.
+   For examble: https://sol-resine.ooreka.fr/comprendre/resine-sol-garage
+ 
+- TODO: Add massive refresh of all favicons, apart from the initial load at first start of the
+  sidebar just after installing the add-on.
+  For now, this can only be done individually by right clicking on bookmark items, one by one.
+
+- TODO: Add section to show the current tab as a "simili bookmark", allowing:
+    - local (inside sidebar, more practical) drag & drop for bookmark creation,
+    - on double click or right click menu, expands as a tabs panel for switching very quickly when we
+      large number of open tabs (similar to "Tab Sidebar" and "Vertical Tabs Reloaded" add-ons),
+    - double click back or right click menu on it to restore the Bookmarks view,
+    - and most of all to search on them (not available in the two mentioned add-ons).
+
+- TODO: Use topSites API to fill the Most visited part of bookmarks (currently just a special
+  icon / bookmark item without any href, should become a folder with up to 10 items inside).
+
+- TODO: Use bookmarks.getRecent() to fill the Recently bookmarked part of bookmarks (currently
+  just a special icon / bookmark item without any href, should become a folder with up to 10 items
+  inside).
+
+- TODO: Be able to select and manipulate multiple bookmark items with Shift+arrow-up/down,
+  Shift-hold+click and Ctrl-hold+click.
+
+
+
+- LIM: When retrieving favicons, it seems that following redirects in fetch() is not perfect,
+  and so we end up with Network errors where the normal browser on such a page gets to some
+  other page and finds a favicon ..
+  Tried {redirect: "follow"} without success ... :-(
+
+- LIM: Pasting a folder and its object is slow. It has the approximate rhythm of 1 item by second.
+  That appears inherent to the Firefox bookmarks.create() method (bug ??).
+  I couldn't find any way to accelerate it, and there is no other available method to
+  create BookmarkTreeNode subtrees in one shot.
+
+- LIM: Did not find a way in Web Extension API's to open modal dialogs for "New bookmark.." and
+  "New folder.." actions on context menus.
+  So these are normal popups .. hope this won't be too much trouble. 
+
+- LIM: No access to the sqlite db of favicons. So I had to code myself the fetch of favicons
+  from pages, and then save them into local storage for next time the sidebar is loaded.
+  This could make initial load of the add-on quite active, and so I spaced retrieval actions
+  so as to not overload the normal browser process.
+  On next loads after initial, things are retrieved from local storage, so this is fast.
+  Note: the web retrieval process is not based on 'http://www.google.com/s2/favicons?domain_url='
+    as some other add-ons do, as I it can be seen as a privacy issue leaking info to google.
+    Instead, I am retrieving the favicon URL from inside the bookmarked HTML page with my own
+    quick parser as said above.
+
+- LIM: No management / display of bookmark tags, keywords, description field .. as Firefox does
+  not expose those fields through its Web Extension API's.
