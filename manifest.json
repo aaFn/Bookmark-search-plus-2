@@ -1,22 +1,22 @@
 {
   "manifest_version": 2,
 
-  "name": "Bookmark search plus 2",
+  "name": "BSP2 evol",
   "description": "Displays and filters bookmarks on search string, show parent folders.",
   "author": "aaFn",
 
-  "version": "2.0.2",
+  "version": "2.0.5",
 
   "applications": {
     "gecko": {
-      "id": "bookmarksearchplus2@aafn.org",
+      "id": "bookmarksearchplus2evol@aafn.org",
       "strict_min_version": "54.0a1"
     }
   },
 
   "sidebar_action": {
     "default_icon": "icons/star2.png",
-    "default_title" : "Bookmark search plus 2",
+    "default_title" : "BSP2 evol",
     "default_panel": "sidebar/panel.html"
   },
 
@@ -32,7 +32,9 @@
   "commands": {
     "_execute_sidebar_action": {
       "suggested_key": {
-        "default": "Alt+B"
+        "default": "Ctrl+Q",
+        "linux": "Ctrl+Shift+B",
+        "mac": "Alt+B"
       }
     }
   }
