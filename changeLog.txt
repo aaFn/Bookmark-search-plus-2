@@ -1,20 +1,109 @@
-2.0.2	Reduce console logging to only error cases when retrieving favicons
-2.0.1	Initial release version
+Release notes:
+--------------
+- 2.0.5 Bugs and improvements
+    - Added support for drag and dropping the (i) icon of the Location bar
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/8
+    - Changed shortcut for MacOS to Alt+B
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/4
+    - Corrected a bug when copy-pasting into a folder
+    - Changed cut behavior to leave bookmark in place, but dimmed, until it is
+      pasted (moved) into its new place.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/15
+    - Changed menu "Paste" action to "paste before" to make it more obvious, compared
+      to "Paste into".
+    - Removed a limitation that inserting/creating a bookmark was not visible immediately
+      when under a closed folder which was however expanded because of a show result in bookmark
+      pane.
+    - Corrected a bug when dragging a link to the bookmark tree and its title had special
+      characters like "|", which made the properties panel showing trunked information.
+    - Changed order of actions in search result context menu for a bookmark to ensure the default
+      action is always at top.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/3
+    - Revamped a little the Options panel.
+    - Changed default behavior on search results to always "Show bookmark" only (unless Shift is
+      pressed at same time, which is opening the result bookmark in active tab at same time).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/14
+    - Added an Advanced mode preference for users who want to keep a varying behavior when clicking on
+      different parts of a search result bookmark, like was the case in old "Sidebar Bookmark
+      Search Plus" (default being not checked, in line with previous item):
+      - "Show bookmark" only when clicking outside favicon and text,
+      - "Show bookmark" + "Open" in active tab when clicking on favicon or text.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/14 
+    - Improved context menu in Advanced mode on search result bookmarks, to highlight "Show bookmark"
+      as default action when right clicking outside of favicon and text, and "Open" when
+      right clicking on favicon or text.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/3
+    - Added quit context menu through Esc key without selecting anything when the sidebar has
+      focus
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/9 
+    - Added close search on pressing Esc key when the search input has focus
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/10
+    - Added a preference <[ ] On "Show bookmark", force state to open for all ancestor folders of shown
+      bookmark> to set to open state all folders leading to the bookmark being shown from a search
+      result.
+      Default value of the preference is unchecked = those folder have their current state untouched,
+      showing all bookmarks on the path to the selected one independent of close or open state
+      of their folders. When checked, those folders are forced to open state.
+      In both cases, checked or unchecked, the user can modify the state of folders by clicking
+      on twisties.
+      And when closing the search, the tree is reset to the state of each folder at moment of
+      search close: open folders remain open, and closed folders have their bookmarks hidden again.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/6
+- 2.0.4 Bugs and improvements
+    - Display text besides the animated waiting image at add-on load, to explain this is is for
+      loading and preparing bookmarks pane.
+    - Added some perf measurements in traces about loading & displaying, to prepare for
+      assessing any perfs impact or display improvements of true asynchronous load when coming.
+    - Display in traces font-family and size used by the platform to prepare for adding an option
+      later of setting fonts.
+    - Cosmetics on row highlighting
+    - Streamlined display structure to gain a few marginal perfs.
+    - Removed a weird effect on continuous window actions (= drag, move vertical scroll bar ..)
+      being delayed or perturbed while loading favicons = hashed move, non responsive for some
+      time, action registered but happening much later ..
+      Looks ok now, but not sure of the exact cause, signal me if there is still some problems.
+    - Added "Show bookmark" action in results context menu in search pane, as another
+      way to show the source row, in addition to clicking outside favicon or text part.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/3 
+    - Added Shift+Click to systematically open a bookmark or search result in current tab,
+      wherever we click on the row (without Shift, this is only when clicking on the favicon
+      or on the text).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/3 
+    - Configured Middle click on bookmarks to open in a new tab next to current bookmark.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/3 
+    - Corrected a bug when dragging a tab over results rows and going to bookmarks pane,
+      triggering a TypeError: row is undefined.
+    - Corrected a bug where menu entries in bold (= default) in a context menu were not actioned.
+    - Corrected a few minor bugs, no effect, but cleaner without them.
+- 2.0.3 Bugs and improvements
+    - Corrected bug on search result highlight showing all items under first open ancestor,
+      and not just the ones at higher level on the path to that ancestor
+    	https://github.com/aaFn/Bookmark-search-plus-2/issues/6
+    - Corrected behavior of insert (right click) so as to insert a new item into a folder and
+      not before it, to better mimick the native FF Bookmark sidebar behavior.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/5
+    - Changed the keyboard shortcut to Ctrl+Shift+B in Linux and to Ctrl+Q for other platforms,
+      for not hitting already existing combinations on FF .. (which vary by platform)
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/4
+    - Changed default state of folders when no info on them (add-on install, or new folder)
+      so that the folder is now closed by default.
+      That should make life easier for people with large number of bookmarks, and is also
+      preparing for visual perf improvement with asynchronous/background load and display,
+      an improvement to come later.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/6
+- 2.0.2	Reduce console logging to only error cases when retrieving favicons
+- 2.0.1	Initial release version
 
 
 LIMitations / TODO's:
 ---------------------
-- BUG: When drawing a tab to bookmark it and it goes over results rows, apparently getting
-  TypeError: row is undefined  panel.js:1972:9 -> bkmkDragEnterHandler
-  TypeError: row is undefined  panel.js:2008:9 -> bkmkDragOverHandler
-  TypeError: row is undefined  panel.js:2075:9 -> bkmkDragExitHandler
-  TypeError: row is undefined  panel.js:2045:9 -> bkmkDragLeaveHandler
-
+- TODO: Start to display even when not all is loaded/ready. Enable search, but identify
+  those search result rows which cannot be shown yet, because not yet loaded/displayed,
+  and disable the "Show" action from context menu.
+    https://github.com/aaFn/Bookmark-search-plus-2/issues/2
+ 
 - TODO: Internationalization (i18n) of the UI with users who want to help.
   Currently only english available.
-
-- TODO: more tests under Linux ? Indeed, some behavior (and Firefox bugs ...) are different
-  from Windows.
 
 - TODO: I have no Mac nor Open/FreeBSD, cannot verify how this is behaving under them, and if
   there are also variations / different bugs there .. I am hoping that since these are all
@@ -40,7 +129,7 @@ LIMitations / TODO's:
 - TODO: Add section to show the current tab as a "simili bookmark", allowing:
     - local (inside sidebar, more practical) drag & drop for bookmark creation,
     - on double click or right click menu, expands as a tabs panel for switching very quickly when we
-      large number of open tabs (similar to "Tab Sidebar" and "Vertical Tabs Reloaded" add-ons),
+      have large number of open tabs (similar to "Tab Sidebar" and "Vertical Tabs Reloaded" add-ons),
     - double click back or right click menu on it to restore the Bookmarks view,
     - and most of all to search on them (not available in the two mentioned add-ons).
 
@@ -82,3 +171,6 @@ LIMitations / TODO's:
 
 - LIM: No management / display of bookmark tags, keywords, description field .. as Firefox does
   not expose those fields through its Web Extension API's.
+
+- LIM: No way to synchronize the folders open state with the native FF bookmarks sidebar,
+  or with the "All bookmarks" window, as this is not exposed by the Web Extension API's.
