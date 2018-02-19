@@ -3,6 +3,8 @@
 /*
  * Constants
  */
+const AdvancedClick = document.querySelector("#advanced");
+const OpenTree = document.querySelector("#opentree");
 const AsyncLoadInput = document.querySelector("#asyncLoad");
 const TraceEnabledInput = document.querySelector("#traceEnabled");
 
@@ -16,18 +18,29 @@ const TraceEnabledInput = document.querySelector("#traceEnabled");
  * Save options in storage
  */
 function saveOptions(e) {
-  var checked1;
-  if (AsyncLoadInput.checked)   checked1 = "true";
-  else   checked1 = "false";
+  var checked;
+  if (AdvancedClick.checked)   checked = "true";
+  else   checked = "false";
   browser.storage.local.set({
-	asyncLoad_option: checked1
+	advanced_option: checked
   });
 
-  var checked2;
-  if (TraceEnabledInput.checked)   checked2 = "true";
-  else   checked2 = "false";
+  if (OpenTree.checked)   checked = "true";
+  else   checked = "false";
   browser.storage.local.set({
-	traceEnabled_option: checked2
+	opentree_option: checked
+  });
+
+  if (AsyncLoadInput.checked)   checked = "true";
+  else   checked = "false";
+  browser.storage.local.set({
+	asyncLoad_option: checked
+  });
+
+  if (TraceEnabledInput.checked)   checked = "true";
+  else   checked = "false";
+  browser.storage.local.set({
+	traceEnabled_option: checked
   });
 }
 
@@ -35,16 +48,35 @@ function saveOptions(e) {
  * Restore options from storage
  */
 function restoreOptions() {
-  var gettingItem1 = browser.storage.local.get("asyncLoad_option");
-  gettingItem1.then((res) => {
+  var gettingItem;
+  gettingItem = browser.storage.local.get("advanced_option");
+  gettingItem.then((res) => {
+    if (res.advanced_option != undefined) {
+      // Unchecked by default
+      if (res.advanced_option == "true")   AdvancedClick.checked = true;
+    }
+  });
+
+  gettingItem = browser.storage.local.get("opentree_option");
+  gettingItem.then((res) => {
+    if (res.opentree_option != undefined) {
+      // Unchecked by default
+      if (res.opentree_option == "true")   OpenTree.checked = true;
+    }
+  });
+
+  gettingItem = browser.storage.local.get("asyncLoad_option");
+  gettingItem.then((res) => {
     if (res.asyncLoad_option != undefined) {
+      // Unchecked by default
       if (res.asyncLoad_option == "true")   AsyncLoadInput.checked = true;
     }
   });
 
-  var gettingItem2 = browser.storage.local.get("traceEnabled_option");
-  gettingItem2.then((res) => {
+  gettingItem = browser.storage.local.get("traceEnabled_option");
+  gettingItem.then((res) => {
     if (res.traceEnabled_option != undefined) {
+      // Unchecked by default
       if (res.traceEnabled_option == "true")   TraceEnabledInput.checked = true;
     }
   });
@@ -59,5 +91,7 @@ function restoreOptions() {
 document.addEventListener('DOMContentLoaded', restoreOptions);
 
 // When there is an update to an option, save the new value
+document.querySelector("#advanced").addEventListener("click", saveOptions);
+document.querySelector("#opentree").addEventListener("click", saveOptions);
 document.querySelector("#asyncLoad").addEventListener("click", saveOptions);
 document.querySelector("#traceEnabled").addEventListener("click", saveOptions);
