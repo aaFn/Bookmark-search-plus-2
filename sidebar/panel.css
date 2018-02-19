@@ -9,8 +9,6 @@ html, body {
 
 body {
   font: caption;
-/*  font: 12px "Segoe UI"; */
-/*  font: 12px "Sans"; */
   background-color: white;
   display: flex;
   flex-direction: column;
@@ -43,24 +41,11 @@ p {
   flex: 1;
   background-color: white;
   border: 0;
-/*  border: 1px solid #7A7A7A; */	
 }
 
 #cancelsearch {
   cursor: default;
 }
-
-/*
-#cancelsearch:enabled {
-  border: 1px solid blue;
-  background-image: url(/icond/cancel.png);	
-}
-
-#cancelsearch:disabled {
-  border: 1px solid red;	
-  background-image: url(/icond/search.png);	
-}
-*/
 
 #searchresult {
   height: 20%;
@@ -77,6 +62,16 @@ p {
 
 #waiting, #waitingsearch {
   margin-left: 20px;
+}
+
+#trace {
+  width: 200px;
+  resize: none;
+  font-size: x-small;
+  white-space: pre;
+  overflow: visible;
+  flex: none;
+  margin-left: 4px;
 }
 
 #bookmarks {
@@ -98,14 +93,8 @@ row {
   min-width: 100%;
 }
 
-#trace {
-  width: 200px;
-  resize: none;
-  font-size: x-small;
-  white-space: pre;
-  overflow: visible;
-  flex: none;
-  margin-left: 4px;
+.cut {
+  opacity: 0.5;
 }
 
 .brow {
@@ -113,14 +102,23 @@ row {
   background-color: white;
   border: 1px solid white;
   padding: 0;
+  min-height: 16px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
 }
 
 .resbrow {
+  min-width: 100%;
   background-color: #D9D9D9;
-  border-color: #D9D9D9;
-  border-bottom-color: #CCCCCC;
-  border: 1px solid white;
+  border-color: #D9D9D9 #D9D9D9 #CCCCCC;
+  border-width: 1px;
+  border-style: solid;
   padding: 0;
+  min-height: 16px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
 }
 
 .brow:hover, .resbrow:hover {
@@ -130,8 +128,7 @@ row {
 
 .brow:focus, .resbrow:focus {
   background-color: #D9D9D9;
-  border-color: #D9D9D9;
-  border-bottom-color: #CCCCCC;
+  border-color: #D9D9D9 #D9D9D9 #CCCCCC;
 }
 
 .brow:focus:hover, .resbrow:focus:hover {
@@ -139,15 +136,7 @@ row {
   border-color: #7BC3FF;
 }
 
-.bkmkitem {
-  min-height: 17px;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-}
-
 .twistiena {
-/*  border: 1px solid #DDE4E9;*/
   height: 16px;
   width: 16px;
   flex: none;
@@ -155,7 +144,6 @@ row {
 }
 
 .twistieac {
-/*  border: 1px solid #DDE4E9;*/
   height: 16px;
   width: 16px;
   flex: none;
@@ -167,7 +155,6 @@ row {
 }
 
 .twistieao {
-/*  border: 1px solid #DDE4E9;*/
   height: 16px;
   width: 16px;
   flex: none;
@@ -178,23 +165,20 @@ row {
   background-image: url("/icons/twistieaof.png");
 }
 
-.bkmkitem_s, .bkmkitem_f, .bkmkitem_b {
-/*  border: 1px solid #DDE4E9; */
-  flex: auto;
-  display: flex;
-  flex-direction: row;
-}
-
 .bkmkitem_b {
-  all: inherit;
+  flex: none;
+  border: 0;
   cursor: pointer;
 }
 
-.bkmkitem_s, .bkmkitem_b {
-  margin-left: 16px;
+.bkmkitem_f {
+  flex: auto;
 }
 
 .bkmkitem_s {
+  flex: auto;
+  display: flex;
+  flex-direction: row;
   align-items: center;
 }
 
@@ -210,32 +194,26 @@ row {
 }
 
 .favicon {
-/*  border: 1px solid #DDE4E9;*/
   height: 16px;
   width: 16px;
   vertical-align: text-bottom;
 }
 
 .favtext {
-/*  border: 1px solid #DDE4E9; */
   margin-left: 3px;
-  flex: auto;
+  flex: none;
 }
 
 .mymenu {
   position: fixed;
-  z-index: 9999; /* Most times is 2000 used as middle */
+  z-index: 9999;
   visibility: hidden;
   opacity: 1;
   overflow-x: hidden;
-  
   padding: 2px;
   background: #F0F0F0;
   color: #000000;
   border: 1px solid #CCCCCC;
-  
-/*  -webkit-box-shadow: 2px 2px 2px 0px rgba(143, 144, 145, 1);
-  -moz-box-shadow: 2px 2px 2px 0px rgba(143, 144, 145, 1); */
   box-shadow: 4px 4px 3px -2px #808080FF;
 }
 
@@ -256,12 +234,16 @@ row {
   margin: 2px 3px 2px 20px;
 }
 
-.mymenu .menupasted,
-.mymenu .menupastedinto {
+.menupasted,
+.menupastedinto {
   color: #6D6D6D;
 }
 
-.mymenu .menupasted:hover,
-.mymenu .menupastedinto:hover {
+.menupasted:hover,
+.menupastedinto:hover {
   background: #E5E5E5;
+}
+
+.menudefault {
+  font-weight: bold;
 }

@@ -60,6 +60,10 @@ const WaitingImg = document.querySelector("#waiting");
 const MyRBkmkMenu = document.querySelector("#myrbkmkmenu");
 const MyRBkmkMenuStyle = document.querySelector("#myrbkmkmenu").style;
 ////const MyRBkmkMenuStyle = document.getElementById("myrbkmkmenu").style;
+const MyRShowBkmkMenu = document.querySelector("#myrshowbkmkmenu");
+const MyRShowBkmkMenuStyle = document.querySelector("#myrshowbkmkmenu").style;
+const MyRFldrMenu = document.querySelector("#myrfldrmenu");
+const MyRFldrMenuStyle = document.querySelector("#myrfldrmenu").style;
 const MyBBkmkMenu = document.querySelector("#mybbkmkmenu");
 const MyBBkmkMenuStyle = document.querySelector("#mybbkmkmenu").style;
 const MyBBkmkMenuPaste = document.querySelector("#mybbkmkmenupaste");
@@ -101,19 +105,26 @@ var resultsFragment; // Type is DocumentFragment
 var docFragment; // Type is DocumentFragment
 var resultsTable; // Assuming it is an HTMLTableElement
 var bookmarksTable; // Assuming it is an HTMLTableElement
+var advancedClick_option = false; // Boolean
+var openTree_option = false; // Boolean
 var asyncLoad_option = false; // Boolean
 var highest_open_level; // Indicator of what to hide / display when initially displaying the table
 var inputTimeout = null; // Timeout between keystrokes to trigger bookmarck search from inpu
 var resultHighlight = null; // Current highlight of a search result in source bookmarks = cell
 var myRBkmkMenu_open = false;
+var myRShowBkmkMenu_open = false;
+var myRFldrMenu_open = false;
 var myBBkmkMenu_open = false;
 var myBFldrMenu_open = false;
 var myBSepMenu_open = false;
 var myBProtMenu_open = false;
-var bkmkClipboard = undefined;
+var bkmkClipboard = undefined; // Contains the bookmark(s) being copied or cut
+var rowClipboard = undefined; // Remains undefined in case of copy, else contains the row(s)
+                              // being cut.
 
 var traceEnabled_option = false; // Boolean
 var countBookmarks = 0, countFolders = 0, countSeparators = 0;
+var startTime, endLoadTime, endDisplayTime, endSaveTime;
 
 
 /*
@@ -190,17 +201,11 @@ function appendResult (BTN) {
   cell.setAttribute("tabindex", "0");
 
   // Append proper contents to the cell:
-  // - a <div> of class "bkmkitem", with no margin-left, containing:
-  //   - a <div> of class "bkmkitem_f", or a <a> of class "bkmkitem_b",
-  //     for respectively folder or bookmark, containing:
-  //     - an <img> (class "favicon") and a <span> with text
-  //       (set class to "favtext" in javascript to get 3px margin-left, but not in HTML where
-  //        it's already done, don't know why).
-  var div1 = document.createElement("div"); // Assuming it is an HTMLDivElement
-  div1.classList.add("bkmkitem");
-  div1.draggable = false;
-  cell.appendChild(div1);
-
+  // - a <div> of class "bkmkitem_f", or a <a> of class "bkmkitem_b",
+  //   for respectively folder or bookmark, containing:
+  //   - an <img> (class "favicon") and a <span> with text
+  //     (set class to "favtext" in javascript to get 3px margin-left, but not in HTML where
+  //      it's already done, don't know why).
   if (BTN.type == "folder") {               // Folder
     // Mark that row as folder
     row.dataset.type = "folder";
@@ -209,7 +214,7 @@ function appendResult (BTN) {
     var div3 = document.createElement("div"); // Assuming it is an HTMLDivElement
     div3.classList.add("bkmkitem_f");
     div3.draggable = false;
-    div1.appendChild(div3);
+    cell.appendChild(div3);
 
     var img = document.createElement("img"); // Assuming it is an HTMLImageElement
     img.classList.add("favicon");
@@ -237,13 +242,17 @@ function appendResult (BTN) {
       anchor = document.createElement("div"); // Assuming it is an HTMLDivElement
     }
     else {
-      anchor = document.createElement("a"); // Assuming it is an HTMLAnchorElement
+      // We can attach an href attribute to <div> !!
+      // Much better as it avoids any special behavior of <a> on clicks and look/CSS ..
+      //anchor = document.createElement("a"); // Assuming it is an HTMLAnchorElement
+      anchor = document.createElement("div"); // Assuming it is an HTMLDivElement
       anchor.href = BTN.url;
     }
     anchor.classList.add("bkmkitem_b");
     anchor.title = BTN.title+"\n"+BTN.url;
     anchor.draggable = false;
-    div1.appendChild(anchor);
+    anchor.style.marginLeft = "16px";
+    cell.appendChild(anchor);
 
     var img = document.createElement("img"); // Assuming it is an HTMLImageElement
     img.classList.add("favicon");
@@ -336,9 +345,9 @@ function resetTreeVisiblity () {
   while (row != null) {
     // We are on an intended to be visible row,
     row.hidden = false;
-    // check if this is a folder and if meant to be open
+    // Check if this is a folder and if meant to be open
     if ((row.dataset.type == "folder") // This is a folder, check its intended state
-        && (row.firstElementChild.firstElementChild.firstElementChild.classList
+        && (row.firstElementChild.firstElementChild.classList
                .contains("twistieac"))
        ) {
       // It is closed, then all its children are hidden ..
@@ -419,16 +428,6 @@ function clearSearchTextHandler () {
 }
 
 /*
-Update content when a new tab becomes active.
-*/
-/* browser.tabs.onActivated.addListener(updateContent); */
-
-/*
-Update content when a new page is loaded into a tab.
-*/
-/* browser.tabs.onUpdated.addListener(updateContent); */
-
-/*
  * Insert a bookmark inside the sidebar table at given position (so just before
  * the row at that position).
  *
@@ -471,23 +470,16 @@ function insertBookmark (BTN, level, index = -1) {
   cell.draggable = false;
 
   // Append proper contents to the cell:
-  // - a <div> of class "bkmkitem", with a margin-left corresponding to the level, containing:
-  //   - if folder, a <div> of class "twistiena", "twistieac" or twistieao", depending
-  //     if there are no children, or if closed or open
-  //   - a <div> of class "bkmkitem_s" or "bkmkitem_f", or a <a> of class "bkmkitem_b",
-  //     for respectively separator, folder or bookmark, containing:
-  //     - if separator, a <div> of class "favseparator"
-  //     - if folder or bookmark, an <img> (class "favicon") and a <span> with text
-  //       (set class to "favtext" in javascript to get 3px margin-left, but not in HTML where
-  //        it's already done, don't know why).
-  var div1 = document.createElement("div"); // Assuming it is an HTMLDivElement
-  div1.classList.add("bkmkitem");
-  div1.draggable = false;
-  if (level > 0) {
-    div1.style.marginLeft = (LevelIncrementPx * level)+"px";
-  }
-  cell.appendChild(div1);
-
+  // - if folder, a <div> of class "twistiena", "twistieac" or twistieao", depending
+  //   if there are no children, if closed or open, with a margin-left corresponding
+  //   to the level
+  // - a <div> of class "bkmkitem_s" or "bkmkitem_f", or a <a> of class "bkmkitem_b",
+  //   for respectively separator, folder or bookmark, with a margin-left corresponding
+  //   to the level + 16 if not "bkmkitem_f", containing:
+  //   - if separator, a <div> of class "favseparator"
+  //   - if folder or bookmark, an <img> (class "favicon") and a <span> with text
+  //     (set class to "favtext" in javascript to get 3px margin-left, but not in HTML where
+  //      it's already done, don't know why).
   if (BTN.type == "folder") {               // Folder
     countFolders++;
     // Mark that row as folder
@@ -502,8 +494,8 @@ function insertBookmark (BTN, level, index = -1) {
       // Verify if we already know about it
       open = curFldrOpenList[BTN_id];
     }
-    if (open == undefined) {
-      open = curFldrOpenList[BTN_id] = true;
+    if (open == undefined) { // Folder closed by default when no info
+      open = curFldrOpenList[BTN_id] = false;
     }
     else   curFldrOpenList[BTN_id] = open;
 
@@ -517,13 +509,16 @@ function insertBookmark (BTN, level, index = -1) {
         div2.classList.add("twistiena");
     else   div2.classList.add(open ? "twistieao" : "twistieac");
     div2.draggable = false;
-    div1.appendChild(div2);
+    if (level > 0) {
+      div2.style.marginLeft = (LevelIncrementPx * level)+"px";
+    }
+    cell.appendChild(div2);
 
     var div3 = document.createElement("div"); // Assuming it is an HTMLDivElement
     div3.classList.add("bkmkitem_f");
     div3.title = BTN.title;
     div3.draggable = false;
-    div1.appendChild(div3);
+    cell.appendChild(div3);
 
     var img = document.createElement("img"); // Assuming it is an HTMLImageElement
     img.classList.add("favicon");
@@ -560,7 +555,10 @@ function insertBookmark (BTN, level, index = -1) {
     var div2 = document.createElement("div"); // Assuming it is an HTMLDivElement
     div2.classList.add("bkmkitem_s");
     div2.draggable = false;
-    div1.appendChild(div2);
+    if (level > 0) {
+      div2.style.marginLeft = (LevelIncrementPx * level + 16)+"px";
+    }
+    cell.appendChild(div2);
 
     var div3 = document.createElement("div"); // Assuming it is an HTMLDivElement
     div3.classList.add("favseparator");
@@ -580,14 +578,20 @@ function insertBookmark (BTN, level, index = -1) {
     // Create elements
     var isSpecial = BTN.url.startsWith("place:");
     var anchor;
-    anchor = document.createElement("a"); // Assuming it is an HTMLAnchorElement
+    // We can attach an href attribute to <div> !!
+    // Much better as it avoids any special behavior of <a> on clicks and look/CSS ..
+    //anchor = document.createElement("a"); // Assuming it is an HTMLAnchorElement
+    anchor = document.createElement("div"); // Assuming it is an HTMLDivElement
     if (!isSpecial) {
       anchor.href = BTN.url;
     }
     anchor.classList.add("bkmkitem_b");
     anchor.title = BTN.title+"\n"+BTN.url;
     anchor.draggable = false;
-    div1.appendChild(anchor);
+    if (level > 0) {
+      anchor.style.marginLeft = (LevelIncrementPx * level + 16)+"px";
+    }
+    cell.appendChild(anchor);
 
     var img = document.createElement("img"); // Assuming it is an HTMLImageElement
     img.classList.add("favicon");
@@ -626,7 +630,7 @@ function insertBookmark (BTN, level, index = -1) {
           }
           else {
             faviconWorker.postMessage(["icon:"+uglyHackTabFavIconUrl, BTN]);
-            trace("Retrieval demand 1 sent for icon:"+uglyHackTabFavIconUrl);
+//            trace("Retrieval demand 1 sent for icon:"+uglyHackTabFavIconUrl);
             uglyHackTabFavIconUrl = undefined; // One shot ..
           } 
         }
@@ -653,6 +657,7 @@ function insertBookmark (BTN, level, index = -1) {
  * 
  * Returns the (integer) real length of the folder
  */
+/*
 function realLength (folderBTN) {
   var length = 1; // At least the folder item
   for (let i of folderBTN.children) {
@@ -663,6 +668,7 @@ function realLength (folderBTN) {
   }
   return(length);
 }
+*/
 
 /*
  * Calculate the real offset from parent, including length of sub-folders between parent and node
@@ -672,6 +678,7 @@ function realLength (folderBTN) {
  * 
  * Returns the (integer) real offset from parent for relative position inside bookmarksTable.
  */
+/*
 function realOffset (parentBTN, internalPos) {
   var offset = 1;
   var children = parentBTN.children;
@@ -684,6 +691,7 @@ function realOffset (parentBTN, internalPos) {
   }
   return(offset);
 }
+*/
 
 /*
  * Insert one or more (if folder) bookmarks in table
@@ -714,7 +722,7 @@ function insertBkmks (BTN, parentRow, parentLevel = undefined, parentOpen = unde
 
     // Update parent twistiexx class if we insert under an empty folder
     // Note: this only happens when we don't know the parent ...
-    var twistie = parentRow.firstElementChild.firstElementChild.firstElementChild;
+    var twistie = parentRow.firstElementChild.firstElementChild;
     if (twistie.classList.contains("twistiena")) { // It was empty
       if (parentOpen) {
         twistie.classList.replace("twistiena", "twistieao");
@@ -730,11 +738,21 @@ function insertBkmks (BTN, parentRow, parentLevel = undefined, parentOpen = unde
     highest_open_level = 0; // Min possible, to make it simple ..
   }
   else { // Parent is visible, child visiblity depends on its open state ..
-         // Limitation: if the parent and its contents are visible because of
-         //       a search result click, but the parent is intended closed (.twistieac), then the
-         //       new bookmark will not be visible (it will in a next search or open though ..).
-    if (parentOpen)   highest_open_level = parentLevel + 1; // Will be set visible
-    else   highest_open_level = parentLevel; // Will be hidden
+    if (parentOpen)
+      highest_open_level = parentLevel + 1; // Will be visible
+    else { // Parent is closed, but lets verify if its contents is open because of a search ..
+    	   // If so, then the insert should be immediately visible.
+      var nextRow = parentRow.nextElementSibling;
+      if (nextRow != null) {
+    	var nextLevel = parseInt(nextRow.dataset.level, 10);
+    	if ((nextLevel == parentLevel+1) && !nextRow.hidden) {
+      	  highest_open_level = nextLevel; // Will be visible
+    	}
+    	else {
+    	  highest_open_level = parentLevel; // Will be hidden
+    	}
+      }
+    }
   }
 
   // Insert the new bookmark at its place (and retrieve its favicon .. etc ..)
@@ -890,7 +908,7 @@ function removeBkmks (rowIndex, cleanup) {
    		if (nextRow.dataset.type == "folder") {
           delete curFldrOpenList[BTN_id];
    		}
-   		else if (nextRow.firstElementChild.firstElementChild.firstElementChild.classList
+   		else if (nextRow.firstElementChild.firstElementChild.classList
                         .contains("bkmkitem_b")) { // Not a separator
    	      delete curBkmkUriList[BTN_id];
    		}
@@ -905,8 +923,8 @@ function removeBkmks (rowIndex, cleanup) {
   else {
     // Delete node and cleanup if needed
     if (cleanup) {
-      if (row.firstElementChild.firstElementChild.firstElementChild.classList
-               .contains("bkmkitem_b")) { // Not a separator
+      if (row.firstElementChild.firstElementChild.classList
+             .contains("bkmkitem_b")) { // Not a separator
         delete curBkmkUriList[BTN_id];
       }
       delete curRowIndexList[BTN_id];
@@ -914,7 +932,7 @@ function removeBkmks (rowIndex, cleanup) {
     bookmarksTable.deleteRow(rowIndex);
   }
 
-  // Update parent folder to twistiena class if it has no more chidren
+  // Update parent folder to twistiena class and closed if it has no more chidren
   // This is true if the previous row is a folder of level-1,
   // and if next row is null or is of level-1 or less
   if ((previousRow != null) // Being null should not occur, but just in case ...
@@ -922,9 +940,11 @@ function removeBkmks (rowIndex, cleanup) {
       && (parseInt(previousRow.dataset.level, 10) == level-1)
       && ((nextRow == null) || (parseInt(nextRow.dataset.level, 10) < level))
      ) {
-    var twistie = previousRow.firstElementChild.firstElementChild.firstElementChild;
+    var twistie = previousRow.firstElementChild.firstElementChild;
     if (twistie.classList.contains("twistieao")) { // It was open
       twistie.classList.replace("twistieao", "twistiena");
+      curFldrOpenList[previousRow.dataset.id] = false;
+      saveFldrOpen();
     }
     else {
       twistie.classList.replace("twistieac", "twistiena");
@@ -955,12 +975,11 @@ function bkmkRemovedHandler (id, removeInfo) {
   var row = removeBkmks(rowIndex, true);
 
   // Save new current info
-  var type = removeInfo.node.type;
-  if (type == "folder") {
-    saveBkmkUri(); // Presumably, some bookmark nodes were also removed ... so save it
-    saveFldrOpen();
-  }
-  else if (type == "bookmark")   saveBkmkUri(); // Only one bookmark affected
+  // A folder delete can presumably delete bookmarks, and a bookmark delete can
+  // also change the open state of its parent if it was the only children in there,
+  // so save all.
+  saveBkmkUri();
+  saveFldrOpen();
 
   // Update index of remaining rows after the deleted one(s) = -1 or more ..
   while (row != null) {
@@ -993,7 +1012,7 @@ function bkmkChangedHandler (id, changeInfo) {
 //      trace("Change event on: "+id+" title: <<"+changeInfo.title+">> url: <<"+changeInfo.url+">> isBookmark: "+isBookmark);
 
       // Update its contents
-      var item = row.firstElementChild.firstElementChild.firstElementChild;
+      var item = row.firstElementChild.firstElementChild;
       if (isBookmark) { // item is a .bkmkitem_b <a>
         // item.title mixes both, so is always updated
         var url = BTN.url;
@@ -1167,7 +1186,9 @@ function handleMoveRequest (id, moveInfo) {
         }
       }
 
-      // Current info didn't change, so no need to save anything ..
+      // State of parent folders may change, so save folder open state
+      saveFldrOpen();
+
       // Check if there is more in queue
       moveReqQueue.shift(); // Remove the element in queue we just processed (= first one)
       if (moveReqQueue.length > 0) { // Still work in queue, continue the cadence process
@@ -1242,12 +1263,37 @@ function handleResultClick (row) {
 
   // Make the source row of result visible if hidden
   var srcRow = bookmarksTable.rows[index];
-  if (srcRow.hidden) {
-    // Unhide up to first parent already visible
+  var srcHidden = srcRow.hidden;
+  if (srcHidden) {
+    // Unhide up to first ancestor already visible. Be careful to unhide only those
+	// items under same parent of higher level parents, but not intermediate items inside
+	// other folders on the path to the first open ancestor => strictly increasing level
+	// sequence.
+	var srcLevel = parseInt(srcRow.dataset.level, 10);
+	var level = srcLevel;
     var row;
+	var rowLevel;
+	var twistie;
+	var BTN_id;
     (row = srcRow).hidden = false;
     while ((row = row.previousElementSibling).hidden) {
-      row.hidden = false;
+      rowLevel = parseInt(row.dataset.level, 10);
+      if (rowLevel == level) {
+        row.hidden = false;
+      }
+      else if (rowLevel < level) {
+    	level = rowLevel;
+        row.hidden = false;
+        // That can only be a folder, but that doesn't hurt to check
+        if (openTree_option && (row.dataset.type == "folder")) { // Set it to open state
+          twistie = row.firstElementChild.firstElementChild;
+          if (twistie.classList.contains("twistieac")) { // Open twistie
+        	twistie.classList.replace("twistieac", "twistieao");
+        	BTN_id = row.dataset.id;
+        	curFldrOpenList[BTN_id] = true;
+          }
+        }
+      }
     }
 
     // Retrieve the level of that first already visible parent
@@ -1256,14 +1302,32 @@ function handleResultClick (row) {
     // so no test for that condition ..
     var last_open_level = parseInt(row.dataset.level, 10);
 
-    // And now, unhide down all hidden elements, until we find a level < last_open_level
-    // or reach end of table.
+    // Open it if openTree_option is active
+    if (openTree_option && (row.dataset.type == "folder")) { // Set it to open state
+      twistie = row.firstElementChild.firstElementChild;
+      if (twistie.classList.contains("twistieac")) { // Open twistie
+      	twistie.classList.replace("twistieac", "twistieao");
+      	BTN_id = row.dataset.id;
+      	curFldrOpenList[BTN_id] = true;
+      }
+    }
+    
+    // And now, unhide down all hidden elements after the shown item, until we find a
+    // level < last_open_level or we reach end of table. Do that only on elements which are
+    // at the same level than an ancestor we had to open => strictly increasing level sequence.
     row = srcRow;
+    level = srcLevel;
     while (((row = row.nextElementSibling) != null)
            && row.hidden
-           && (parseInt(row.dataset.level, 10) >= last_open_level)
+           && ((rowLevel = parseInt(row.dataset.level, 10)) >= last_open_level)
           ) {
-      row.hidden = false;
+      if (rowLevel == level) {
+        row.hidden = false;
+      }
+      else if (rowLevel < level) {
+      	level = rowLevel;
+        row.hidden = false;
+      }
     }
   }
 
@@ -1271,6 +1335,12 @@ function handleResultClick (row) {
   resultHighlight = srcRow.firstElementChild;
   resultHighlight.classList.replace("brow", Reshighlight);
   srcRow.scrollIntoView({behavior: "smooth"});
+
+  // If row was hidden and we have the openTree_option active, then we necessarily
+  // changed some folder state => save it.
+  if (openTree_option && srcHidden) {
+	saveFldrOpen();
+  }
 }
 
 /*
@@ -1280,7 +1350,7 @@ function handleResultClick (row) {
  */
 function handleFolderClick (twistie) {
   // Retrieve bookmark information in the row (BTN.id and level)
-  var row = twistie.parentElement.parentElement.parentElement;
+  var row = twistie.parentElement.parentElement;
   var BTN_id = row.dataset.id;
   var level = parseInt(row.dataset.level, 10);
 //  trace("Row: "+row+" level: "+level);
@@ -1313,7 +1383,7 @@ function handleFolderClick (twistie) {
 //      trace("Row: "+row+" cur_level: "+cur_level+" prev_level: "+prev_level);
       if (cur_level > prev_level) { // We just crossed a folder in previous row ..
         // Check if it was open or not
-        twistie = prev_row.firstElementChild.firstElementChild.firstElementChild;
+        twistie = prev_row.firstElementChild.firstElementChild;
         open = twistie.classList.contains("twistieao");
 //        trace("Row: "+row+" cur_level: "+cur_level+" prev_level: "+prev_level+" twistie: "+twistie.classList+" open:"+open);
 
@@ -1339,36 +1409,53 @@ function handleFolderClick (twistie) {
  */
 function resultsMouseHandler (e) {
   var target = e.target; // Type depends ..
-//  trace("Result click event: "+e.type+" target: "+target+" class: "+target.classList);
-  if ((target.className != undefined)
-	  && (target.className.length > 0)) {
+  var className = target.className;
+//  trace("Result click event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" target: "+target+" class: "+className);
+  if ((className != undefined)
+	  && (className.length > 0)) {
 //  if (resultsTable.rows.length > 0) {
 
-    // The click target is one of .brow cell, .bkmkitem div,
-    // .bkmkitem_x div or anchor, .favicon or .favttext
+    // The click target is one of .brow cell,
+    // .bkmkitem_x div or anchor, .favicon img or .favttext span
     // Handle click, and go to the parent row
-    var className = target.className;
-    if (className.startsWith("fav")) {
-	  target = target.parentElement;
-	  className = target.className;
+    if (className.startsWith("fav")) { // <div>, <img> or <span> -> got to .bkmkitem_x
+    	                               // when advanced or Shift key, else go to .brow
+      if (advancedClick_option || e.shiftKey) {
+	    target = target.parentElement;
+      }
+      else {
+  	    target = target.parentElement.parentElement;
+      }
     }
-    if (className == "bkmkitem_b") { // An HTMLAnchorElement
+    else if (className.startsWith("bkmkitem_")) { // If Shift key or advanced, open in current tab
+    	                                          // else just show -> go to .brow
+      if (!advancedClick_option && !e.shiftKey) {
+    	target = target.parentElement;
+      }
+    }
+    else if (e.shiftKey) { //  Presumably .brow, if Shift key, open in current tab if bookmark
+      if (target.parentElement.dataset.type == "bookmark") {
+    	target = target.firstElementChild;
+      }
+    }
+    className = target.className;
+
+    if (className == "bkmkitem_b") { // An HTMLDivElement
 	  e.preventDefault(); // We do not want the left click to open in a new tab ..
-	                    // but in the active tab
+	                      // but in the active tab
 	  var href = target.href;
-	  if (href != undefined) {
+	  if ((href != undefined) && (href.length > 0)) {
 	    browser.tabs.update({url: href});
 	  }
-
-      target = target.parentElement.parentElement.parentElement;
-    }
-    else if (className == "bkmkitem_f") {
-	  target = target.parentElement.parentElement.parentElement;
-	}
-    else if (target.classList.contains("bkmkitem")) {
+	  // Now go to row
       target = target.parentElement.parentElement;
     }
+    else if (className == "bkmkitem_f") {
+  	  // Go to row
+	  target = target.parentElement.parentElement;
+	}
     else { // Presumably the .brow cell
+  	  // Go to row
       target = target.parentElement;
     }
 
@@ -1384,23 +1471,37 @@ function resultsMouseHandler (e) {
  */
 function bkmkMouseHandler (e) {
   var target = e.target; // Type depends ..
-//  trace("Bookmark click event: "+e.type+" target: "+target+" class: "+target.classList);
+  var className = target.className;
+//  trace("Bookmark click event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" target: "+target+" class: "+className);
 
-  // The click target is one of .brow cell, .bkmkitem div, .twistiexx img (if folder),
+  // The click target is one of .brow cell, .twistiexx img (if folder),
   // .bkmkitem_x div or anchor, .favseparator div, .favicon or .favttext
   // Act only if the user clicked on .twistieax img, .bkmkitem_x, .favicon or .favtext
-  // If favicon or favtext, get parent instead and handle click
+  // If favicon or favtext, get parent instead to handle click
   var twistie;
-  var className = target.className;
   if (className.startsWith("fav")) {
 	target = target.parentElement;
 	className = target.className;
+  }
+  else if (e.shiftKey) { // If Shift is pressed, open in current tab wherever we click
+    if (className.includes("brow")) {
+	  if (target.parentElement.dataset.type == "bookmark") {
+		target = target.firstElementChild;
+		className = target.className;
+	  }
+	}
   }
   if (className == "bkmkitem_b") { // An HTMLAnchorElement
     e.preventDefault(); // We do not want the left click to open in a new tab ..
                         // but in the active tab
     var href = target.href;
-    if (href != undefined) {
+	if (((href != undefined) && ((href.length > 0))
+		|| traceEnabled_option)) { // Special trick .. if traces are
+		                           // enabled, authorize this .. with href == "", it will
+                                   // load the add-on itself in the window !
+                                   // Very useful to use the inpector on it,
+                                   // as we cannot have le inspector inside the sidebar ..
+      if(href == undefined)   href="";
       browser.tabs.update({url: href});
     }
   }
@@ -1412,6 +1513,101 @@ function bkmkMouseHandler (e) {
   // If active twistie (folder with children), also go for folder action
   else if (className.startsWith("twistiea")) { // "twistieao" or "twistieac"
     handleFolderClick(target);
+  }
+}
+
+/*
+ * Receive event from aux clicks on results table
+ *
+ * e is of type MouseEvent (click)
+ */
+function resultsAuxHandler (e) {
+  var target = e.target; // Type depends ..
+  var className = target.className;
+//  trace("Result aux event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" phase: "+e.eventPhase+" target: "+target+" class: "+className);
+  // Be careful, button 2 (contextmenu) also ends up here :-(
+  if ((e.button == 1)
+	  && (className != undefined)
+	  && (className.length > 0)) {
+    // The click target is one of .brow cell,
+    // .bkmkitem_x div or anchor, .favicon img or .favttext span
+    // Handle click, and go to the parent row
+    if (className.startsWith("fav")) { // <div>, <img> or <span>
+      target = target.parentElement;
+      className = target.className;
+    }
+    else if (className.includes("brow")) {
+  	  if (target.parentElement.dataset.type == "bookmark") {
+    	target = target.firstElementChild;
+    	className = target.className;
+      }
+    }
+    if (className == "bkmkitem_b") { // An HTMLAnchorElement
+	  e.preventDefault(); // We prevent default behavior and handle ourselves ..
+	  var href = target.href;
+	  if ((href != undefined) && (href.length > 0)) {
+		// Get current active tab as opener id to come back to it when closing the new tab
+	    browser.tabs.query({windowId: myWindowId, active: true})
+	    .then (
+	      function (a_tabs) {
+		    browser.tabs.create({url: href, openerTabId: a_tabs[0].id});
+		  }
+	    );
+	  }
+
+      target = target.parentElement.parentElement;
+    }
+    else if (className == "bkmkitem_f") {
+	  target = target.parentElement.parentElement;
+	}
+    else { // Presumably the .brow cell
+      target = target.parentElement;
+    }
+
+    // Make the source object visible .. and scroll to it
+    handleResultClick(target);
+  }
+}
+
+/*
+ * Receive event from aux clicks on bookmarks table
+ *
+ * e is of type MouseEvent (click)
+ */
+function bkmkAuxHandler (e) {
+  var target = e.target; // Type depends ..
+  var className = target.className;
+//  trace("Bookmark aux event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" phase: "+e.eventPhase+" target: "+target+" class: "+className);
+
+  // Be careful, button 2 (contextmenu) also ends up here :-(
+  if (e.button == 1) {
+    // The click target is one of .brow cell, .twistiexx img (if folder),
+    // .bkmkitem_x div or anchor, .favseparator div, .favicon or .favttext
+    // Act only if the user clicked on .twistieax img, .bkmkitem_x, .favicon or .favtext
+    // If favicon or favtext, get parent instead to handle click
+    if (className.startsWith("fav")) {
+	  target = target.parentElement;
+	  className = target.className;
+    }
+    else if (className.includes("brow")) {
+	  if (target.parentElement.dataset.type == "bookmark") {
+	    target = target.firstElementChild;
+	    className = target.className;
+	  }
+    }
+    if (className == "bkmkitem_b") { // An HTMLAnchorElement
+      e.preventDefault(); // We prevent default behavior and handle ourselves ..
+      var href = target.href;
+	  if ((href != undefined) && (href.length > 0)) {
+	    // Get current active tab as opener id to come back to it when closing the new tab
+	    browser.tabs.query({windowId: myWindowId, active: true})
+	    .then (
+	      function (a_tabs) {
+		    browser.tabs.create({url: href, openerTabId: a_tabs[0].id});
+		  }
+	    );
+	  }
+    }
   }
 }
 
@@ -1453,6 +1649,16 @@ function clearMenu () {
     myRBkmkMenu_open = false;
   }
 
+  if (myRShowBkmkMenu_open) {
+	MyRShowBkmkMenuStyle.visibility = "hidden";
+	myRShowBkmkMenu_open = false;
+  }
+
+  if (myRFldrMenu_open) {
+    MyRFldrMenuStyle.visibility = "hidden";
+    myRFldrMenu_open = false;
+  }
+
   if (myBBkmkMenu_open) {
     MyBBkmkMenuStyle.visibility = "hidden";
     myBBkmkMenu_open = false;
@@ -1486,22 +1692,22 @@ function resultsContextHandler (e) {
   // If there is a previous menu, clear it
   clearMenu();
 
+  var isShowMenu = !advancedClick_option; // If not advanced, always "Show bookmark" by default
   if ((target.className != undefined)
 	  && (target.className.length > 0)) {
     // Go up to the row level, and store the rowIndex and type in the menu as data- attribute
     var className = target.className;
     var row;
     if(className.includes("fav")) {
-	  row = target.parentElement.parentElement.parentElement.parentElement;
-    }
-    else if (className.startsWith("bkmkitem_") || className.startsWith("twistie")) {
 	  row = target.parentElement.parentElement.parentElement;
     }
-    else if (className == "bkmkitem") {
+    else if (className.startsWith("bkmkitem_")) {
 	  row = target.parentElement.parentElement;
     }
     else { // .brow
 	  row = target.parentElement;
+	  if (advancedClick_option)
+	  isShowMenu = true;
     }
 
     // Determine proper menu from type, signal it is open,
@@ -1509,13 +1715,28 @@ function resultsContextHandler (e) {
     var type = row.dataset.type;
 //    trace("Row: "+row+" rowIndex: "+row.rowIndex+" type: "+type);
     if (type == "bookmark") {
-      myRBkmkMenu_open = true;
-      MyRBkmkMenu.dataset.index = row.rowIndex;
+      var menu;
+      if (isShowMenu) {
+        myRShowBkmkMenu_open = true;
+        MyRShowBkmkMenu.dataset.index = row.rowIndex;
+        menu = MyRShowBkmkMenu;
+      }
+      else {
+        myRBkmkMenu_open = true;
+        MyRBkmkMenu.dataset.index = row.rowIndex;
+        menu = MyRBkmkMenu;
+      }
 
       // Display the context menu function of click position
-      drawMenu(MyRBkmkMenu, e.clientY, e.clientX);
+      drawMenu(menu, e.clientY, e.clientX);
     }
-    // No menu for "folder"
+    else { // Menu for "folder"
+      myRFldrMenu_open = true;
+      MyRFldrMenu.dataset.index = row.rowIndex;
+
+      // Display the context menu function of click position
+      drawMenu(MyRFldrMenu, e.clientY, e.clientX);
+    }
   }
 }
 
@@ -1532,12 +1753,9 @@ function bkmkContextHandler (e) {
   var className = target.className;
   var row;
   if(className.startsWith("fav")) {
-	row = target.parentElement.parentElement.parentElement.parentElement;
-  }
-  else if (className.startsWith("bkmkitem_") || className.startsWith("twistie")) {
 	row = target.parentElement.parentElement.parentElement;
   }
-  else if (className == "bkmkitem") {
+  else if (className.startsWith("bkmkitem_") || className.startsWith("twistie")) {
 	row = target.parentElement.parentElement;
   }
   else { // .brow
@@ -1651,7 +1869,7 @@ function bkmkDragStartHandler (e) {
       text = type;
     }
     else { // Bookmark
-      var anchor = rowDragged.firstElementChild.firstElementChild.firstElementChild; // This is an HTMLAnchorElement
+      var anchor = rowDragged.firstElementChild.firstElementChild; // This is an HTMLAnchorElement
       isBookmark = true;
       text = anchor.href;
     }
@@ -1709,6 +1927,8 @@ function checkDragType (dt) {
   //   dt.types        : application/x-bookmark,[text/uri-list,]text/plain
   // When it is a tab, it will be
   //   dt.types        : text/x-moz-text-internal
+  // When it is the (i) in the location bar
+  //   dt.types        : text/x-moz-url,text/uri-list,text/plain,text/html
   // When it is a link in the HTML page:
   //   dt.types        : text/x-moz-url,text/x-moz-url-data,text/x-moz-url-desc,text/uri-list,text/_moz_htmlcontext,text/_moz_htmlinfo,text/html,text/plain
   // When it ia a selected text in HTML page:
@@ -1741,7 +1961,7 @@ function getDragToRow (target) {
   var row;
 
   if (classList == undefined) { // Apparently drag enter events can be on the text inside Span..
-	row = (bkmkitem_x = target.parentElement.parentElement).parentElement.parentElement.parentElement;
+	row = (bkmkitem_x = target.parentElement.parentElement).parentElement.parentElement;
 	if (isBkmkitem_f = (row.dataset.type == "folder")) {
       if (bkmkitem_x.previousElementSibling.classList.contains("twistieac"))
 		isFolderClosed = true;
@@ -1749,7 +1969,7 @@ function getDragToRow (target) {
 	}
   }
   else if (className.startsWith("fav")) {
-	row = (bkmkitem_x = target.parentElement).parentElement.parentElement.parentElement;
+	row = (bkmkitem_x = target.parentElement).parentElement.parentElement;
 	if (isBkmkitem_f = (row.dataset.type == "folder")) {
 	  if (bkmkitem_x.previousElementSibling.classList.contains("twistieac"))
 		isFolderClosed = true;
@@ -1757,39 +1977,27 @@ function getDragToRow (target) {
 	}
   }
   else if (classList.contains("bkmkitem_f")) {
-	row = (bkmkitem_x = target).parentElement.parentElement.parentElement;
+	row = (bkmkitem_x = target).parentElement.parentElement;
 	isBkmkitem_f = true;
     if (bkmkitem_x.previousElementSibling.classList.contains("twistieac"))
 	  isFolderClosed = true;
 	else   isFolderClosed = false;
   }
   else if (className.startsWith("bkmkitem_")) {
-	row = (bkmkitem_x = target).parentElement.parentElement.parentElement;
+	row = (bkmkitem_x = target).parentElement.parentElement;
 	isBkmkitem_f = false;
   }
   else if (className.startsWith("twistie")) {
-	row = target.parentElement.parentElement.parentElement;
+	row = target.parentElement.parentElement;
 	bkmkitem_x = target.nextElementSibling;
 	isBkmkitem_f = true;
     if (classList.contains("twistieac"))
 	  isFolderClosed = true;
 	else   isFolderClosed = false;
   }
-  else if (classList.contains("bkmkitem")) {
-	row = target.parentElement.parentElement;
-	bkmkitem_x = target.firstElementChild;
-	if (bkmkitem_x.className.startsWith("twistie")) {
-      if (bkmkitem_x.classList.contains("twistieac"))
-	    isFolderClosed = true;
-	  else   isFolderClosed = false;
-      bkmkitem_x = bkmkitem_x.nextElementSibling;
-      isBkmkitem_f = true;
-	}
-	else   isBkmkitem_f = false;
-  }
-  else if (classList.contains("brow")) {
+  else if (className.includes("brow")) {
 	row = target.parentElement;
-	bkmkitem_x = target.firstElementChild.firstElementChild;
+	bkmkitem_x = target.firstElementChild;
 	if (bkmkitem_x.className.startsWith("twistie")) {
       if (bkmkitem_x.classList.contains("twistieac"))
   	    isFolderClosed = true;
@@ -2154,6 +2362,7 @@ function bkmkDropHandler (e) {
 		    trace("... data["+type+"] = <<"+data+">>");
 	      }
 */
+
 	      if (dt.types.includes("application/x-bookmark")) { // Move the dragged bookmark
 	    	if (insertPos == 0) { // Drop to a folder, add at end
 	          browser.bookmarks.move(rowDragged.dataset.id,
@@ -2252,7 +2461,16 @@ function bkmkDropHandler (e) {
 		  else if (dt.types.includes("text/uri-list")) { // Dragging a page link to us
 		    var url = dt.getData("text/uri-list");
 		    var title = dt.getData("text/x-moz-url-desc");
-		    if (title.length == 0)   title = url;
+		    if (title.length == 0) {
+		      title = dt.getData("text/x-moz-url");
+		      if (title.length == 0) {
+		    	title = url;
+		      }
+		      else {
+		    	var splitIndex = title.indexOf("\n");
+		    	title = title.slice(splitIndex+1);
+		      }
+		    }
 
 		    // Create new bookmark at insertion point
 	    	if (insertPos == 0) { // Drop to a folder, add at end
@@ -2288,7 +2506,8 @@ function bkmkDropHandler (e) {
 }
 
 /*
- * Paste bookmark contents (recursively) at the designated place
+ * Paste bookmark contents (recursively because can only create one by one) at the
+ * designated place.
  * 
  * BTN = BookmarkTreeNode to paste - If it is undefined, it signals last sibling reached at
  *       current recursion level.
@@ -2303,7 +2522,7 @@ function bkmkDropHandler (e) {
 var stackBTN;
 var stackNewBTN;
 var stackIndex
-function pasteBkmk (BTN, newParentBTN, index, recurLevel = 0) {
+function pasteBkmk (BTN, newParentBTN, index = undefined, recurLevel = 0) {
 //  var t1 = new Date();
 //  trace(t1.getTime()+" Paste BTN: "+BTN+" Parent: "+newParentBTN+" index: "+index+" recur: "+recurLevel);
   if (BTN != undefined) { // Initial call or recursive call
@@ -2312,16 +2531,30 @@ function pasteBkmk (BTN, newParentBTN, index, recurLevel = 0) {
 	  stackNewBTN = [];
 	  stackIndex = [];
     }
-    // Create BTN at designated place
-    browser.bookmarks.create(
-	  {index: index,
-       parentId: newParentBTN.id,
-	   title: BTN.title,
-	   type: BTN.type,
-	   url: BTN.url
-	  }
-    )
-    .then(
+    // If index is undefined, wwe are pasting into a folder => at end
+    var creating;
+    if (index == undefined) {
+      // Create BTN at end of parent folder
+      creating = browser.bookmarks.create(
+  	    {parentId: newParentBTN.id,
+  	     title: BTN.title,
+  	     type: BTN.type,
+  	     url: BTN.url
+  	    }
+      );
+    }
+    else {
+      // Create BTN at designated place
+      creating = browser.bookmarks.create(
+	    {index: index,
+         parentId: newParentBTN.id,
+	     title: BTN.title,
+	     type: BTN.type,
+	     url: BTN.url
+	    }
+      );
+    }
+    creating.then(
       function (newBTN) { // Created BookmarkTreeNode
 //        var t2 = new Date();
 //        trace(t2.getTime()+" Paste node creation delay: "+(t2.getTime() - t1.getTime()));
@@ -2368,13 +2601,83 @@ function pasteBkmk (BTN, newParentBTN, index, recurLevel = 0) {
 }
 
 /*
- * Retrieve row on which a context menu was open
+ * Move bookmark at the designated place.
  * 
- * menu is an HTMLDivElement
+ * BTN = BookmarkTreeNode to move
+ * newParentBTN = BookmarkTreeNode of new parent to paste into
+ * newIndex = integer position in parent
+ * 
+ * Return true if moved, else false. 
+ */
+function moveBkmk (BTN, newParentBTN, newIndex = undefined) {
+//  trace("Move BTN: "+BTN.id+" Parent: "+newParentBTN.id+" index: "+newIndex);
+  if (newIndex == undefined) { // Cut and pasting into a folder, at end
+	// Move BTN at end of folder
+	browser.bookmarks.move(
+	  BTN.id,
+	  {parentId: newParentBTN.id
+	  }
+	);
+  }
+  else {
+    // If designated place is under same parent and after, some special handling ..
+    if (BTN.parentId == newParentBTN.id) {
+	  // If moved after, need to decrease index by 1 to represent position without moved item ..
+	  // This is not documented properly on https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/bookmarks/move
+	  if (newIndex > BTN.index)   newIndex--;
+	  if (newIndex == BTN.index) { // No move
+	    return;
+	  }
+    }
+	// Move BTN at designated place
+	browser.bookmarks.move(
+	  BTN.id,
+	  {parentId: newParentBTN.id,
+	   index: newIndex
+	  }
+	);
+  }
+}
+
+/*
+ * Retrieve rowIndex for an action in a context menu
+ * 
+ * item is an HTMLDivElement or and HTMLElement (<b>) in a menu
+ * 
+ * Returns the rowIndex
+ */
+function getRowIndex (item) {
+  var menu;
+/*  var targetObjectType = Object.prototype.toString.call(item).slice(8, -1);
+  if (targetObjectType == "HTMLElement") { // this is a <b>
+	menu = item.parentElement.parentElement;
+  }
+  else { // This is a <div>
+*/
+	menu = item.parentElement;
+/*  }
+ */
+  return(parseInt(menu.dataset.index, 10));
+}
+
+/*
+ * Retrieve row for an action in a context menu
+ * 
+ * item is an HTMLDivElement or and HTMLElement (<b>) in a menu
  * 
  * Returns the row in context
  */
-function getRow (menu) {
+function getRow (item) {
+  var menu;
+/*  var targetObjectType = Object.prototype.toString.call(item).slice(8, -1);
+  if (targetObjectType == "HTMLElement") { // this is a <b>
+	menu = item.parentElement.parentElement;
+  }
+  else { // This is a <div>
+*/
+	menu = item.parentElement;
+/*  }
+*/
   var rowIndex = parseInt(menu.dataset.index, 10);
   var row;
   if (menu.id.startsWith("myr")) { // A results table menu
@@ -2409,6 +2712,8 @@ function createBookmark (BTN) {
   if (paramPos != -1) {
 	title = title.slice(0, paramPos);
   }
+  var url = PopupURL+"?type=newbkmk&id="+BTN.id+"&title="+title+"&url="+BTN.url;
+  url = encodeURI(url);
   browser.windows.create(
     {titlePreface: "New bookmark",
 	 type: "popup",
@@ -2416,7 +2721,7 @@ function createBookmark (BTN) {
 	 // Using a trick with URL parameters to tell the window which type
      // it is, which bookmark id, .. etc .. since titlePreface doesn't appear to work
 	 // and there appears to be no way to pass parameters to the popup by the call. 
-	 url: PopupURL+"?type=newbkmk&id="+BTN.id+"&title="+title+"&url="+BTN.url,
+	 url: url,
 	 height: 150,
 	 width: 375,
 	 left: 300,
@@ -2459,25 +2764,55 @@ function createFolder (BTN) {
  * Receive event from clicks anywhere in the sidebar panel, and also handle
  * menu actions
  * 
- * e is of type MouseEvent (click, but apparently works also with right clicks .. 
- *   still saying "click" .. wonder why)
+ * e is of type MouseEvent (click, but apparently works also with right and aux clicks .. 
+ *   still saying "click" .. wonder why .. => filtering this out)
+ */
+function keyHandler (e) {
+  var target = e.target; // Type depends ..
+//  trace("Key event: "+e.type+" key: "+e.key+" char: "+e.char+" target: "+target);
+
+  if (e.key == "Escape") {
+	// Clear any menu when Esc is pressed
+	clearMenu();
+
+	// Clear searchbox input and any search result when Esc is pressed within it
+	if ((target.id == "searchtext") && (SearchTextInput.value.length > 0)) {
+	  clearSearchTextHandler();
+	}
+  }
+}
+
+/*
+ * Receive event from clicks anywhere in the sidebar panel, and also handle
+ * menu actions
+ * 
+ * e is of type MouseEvent (click, but apparently works also with right and aux clicks .. 
+ *   still saying "click" .. wonder why .. => filtering this out)
  */
 function clickHandler (e) {
   var target = e.target; // Type depends ..
   var classList = target.classList;
-//  trace("General click event: "+e.type+" target: "+target+" class: "+target.classList);
+//  trace("General click event: "+e.type+" button: "+e.button+" target: "+target+" class: "+target.classList);
 
   if (!classList.contains("menupasted")) { // Click on a disabled menu paste element
 	                                       // won't have any action
 	                                       // and won't make the menu disappear
 	var menuAction = false;  
     // If a menu action is clicked, handle it
-	if (classList.contains("menuopen")) { // Open bookmark in active tab
+	if (classList.contains("menushow")) { // Show source item in bookmarks table
+		                                  // This can only happen in the results table
 	  // Retrieve parent context menu, and the rowIndex on which it is
 	  menuAction = true;
-	  var row = getRow(target.parentElement);
+	  var row = getRow(target);
+      // Make the source object visible .. and scroll to it
+	  handleResultClick(row);
+	}
+	else if (classList.contains("menuopen")) { // Open bookmark in active tab
+	  // Retrieve parent context menu, and the rowIndex on which it is
+	  menuAction = true;
+	  var row = getRow(target);
 	  // Get anchor href
-      var href = row.firstElementChild.firstElementChild.firstElementChild.href;
+      var href = row.firstElementChild.firstElementChild.href;
 	  if ((href != undefined) && (href.length > 0)) {
 	    browser.tabs.update({url: href});
 	  }
@@ -2485,9 +2820,9 @@ function clickHandler (e) {
 	else if (classList.contains("menuopentab")) { // Open bookmark in a new tab
 	  // Retrieve parent context menu, and the rowIndex on which it is
 	  menuAction = true;
-	  var row = getRow(target.parentElement);
+	  var row = getRow(target);
 	  // Get anchor href
-	  var href = row.firstElementChild.firstElementChild.firstElementChild.href;
+	  var href = row.firstElementChild.firstElementChild.href;
 	  if ((href != undefined) && (href.length > 0)) {
 		// Get current active tab as opener id to come back to it when closing the new tab
         browser.tabs.query({windowId: myWindowId, active: true})
@@ -2501,9 +2836,9 @@ function clickHandler (e) {
 	else if (classList.contains("menuopenwin")) { // Open bookmark in a new Window
 	  // Retrieve parent context menu, and the rowIndex on which it is
 	  menuAction = true;
-	  var row = getRow(target.parentElement);
+	  var row = getRow(target);
 	  // Get anchor href
-	  var href = row.firstElementChild.firstElementChild.firstElementChild.href;
+	  var href = row.firstElementChild.firstElementChild.href;
 	  if ((href != undefined) && (href.length > 0)) {
 		// The second method disables any sidebar as it seems ... so can't use it
 	    browser.windows.create({url: href});
@@ -2513,9 +2848,9 @@ function clickHandler (e) {
 	else if (classList.contains("menuopenpriv")) { // Open bookmark in a new private Window
 	  // Retrieve parent context menu, and the rowIndex on which it is
 	  menuAction = true;
-	  var row = getRow(target.parentElement);
+	  var row = getRow(target);
 	  // Get anchor href
-	  var href = row.firstElementChild.firstElementChild.firstElementChild.href;
+	  var href = row.firstElementChild.firstElementChild.href;
 	  if ((href != undefined) && (href.length > 0)) {
 	    browser.windows.create({url: href, incognito: true});
 	  }
@@ -2523,7 +2858,7 @@ function clickHandler (e) {
 	else if (classList.contains("menunewb")) { // Create a new bookmark
 	  // Can only be on bookmarks table row
 	  menuAction = true;
-	  var rowIndex = parseInt(target.parentElement.dataset.index, 10);
+	  var rowIndex = getRowIndex(target);
 	  var row = bookmarksTable.rows[rowIndex];
 	  // Retrieve bookmark item in that row
 	  var BTN_id = row.dataset.id;
@@ -2532,23 +2867,36 @@ function clickHandler (e) {
 		function (a_BTN) { // Array of BookmarkTreeNode
 		  var BTN = a_BTN[0]; // Assume we have only one element since we gave only one id
 
-		  // Create new bookmark just before
-		  browser.bookmarks.create(
-			{index: BTN.index,
-			 parentId: BTN.parentId,
-			 title: "New bookmark",
-			 type: "bookmark",
-			 url: "about:blank"
-			}
-		  )
-		  .then(createBookmark);
+		  // Create new bookmark just before if this is a separator or a bookmark,
+		  // or append inside if this is a folder.
+		  if (BTN.type == "folder") {
+		    browser.bookmarks.create(
+			  {parentId: BTN.id,
+			   title: "New bookmark",
+			   type: "bookmark",
+			   url: "about:blank"
+			  }
+		    )
+		    .then(createBookmark);
+		  }
+		  else {
+		    browser.bookmarks.create(
+			  {index: BTN.index,
+			   parentId: BTN.parentId,
+			   title: "New bookmark",
+			   type: "bookmark",
+			   url: "about:blank"
+			  }
+		    )
+		    .then(createBookmark);
+		  }
 		}
 	  );
 	}
 	else if (classList.contains("menunewf")) { // Create a new folder
 	  // Can only be on bookmarks table row
 	  menuAction = true;
-	  var rowIndex = parseInt(target.parentElement.dataset.index, 10);
+	  var rowIndex = getRowIndex(target);
 	  var row = bookmarksTable.rows[rowIndex];
 	  // Retrieve bookmark item in that row
 	  var BTN_id = row.dataset.id;
@@ -2557,22 +2905,34 @@ function clickHandler (e) {
 		function (a_BTN) { // Array of BookmarkTreeNode
 		  var BTN = a_BTN[0]; // Assume we have only one element since we gave only one id
 
-		  // Create new bookmark just before
-		  browser.bookmarks.create(
-			{index: BTN.index,
-			 parentId: BTN.parentId,
-			 title: "New folder",
-			 type: "folder"
-			}
-		  )
-		  .then(createFolder);
+		  // Create new folder just before if this is a separator or a bookmark,
+		  // or append inside if this is a folder.
+		  if (BTN.type == "folder") {
+		    browser.bookmarks.create(
+			  {parentId: BTN.id,
+			   title: "New folder",
+			   type: "folder"
+			  }
+		    )
+		    .then(createFolder);
+		  }
+		  else {
+		    browser.bookmarks.create(
+			  {index: BTN.index,
+			   parentId: BTN.parentId,
+			   title: "New folder",
+			   type: "folder"
+			  }
+		    )
+		    .then(createFolder);
+		  }
 		}
 	  );
 	}
 	else if (classList.contains("menunews")) { // Create a new separator
 	  // Can only be on bookmarks table row
 	  menuAction = true;
-	  var rowIndex = parseInt(target.parentElement.dataset.index, 10);
+	  var rowIndex = getRowIndex(target);
 	  var row = bookmarksTable.rows[rowIndex];
 	  // Retrieve bookmark item in that row
 	  var BTN_id = row.dataset.id;
@@ -2580,19 +2940,31 @@ function clickHandler (e) {
 	  .then(
 		function (a_BTN) { // Array of BookmarkTreeNode
 		  var BTN = a_BTN[0]; // Assume we have only one element since we gave only one id
-		  browser.bookmarks.create(
-		    {index: BTN.index,
-		     parentId: BTN.parentId,
-		     type: "separator"
-		    }
-		  );
+
+		  // Create new separator just before if this is a separator or a bookmark,
+		  // or append inside if this is a folder.
+		  if (BTN.type == "folder") {
+		    browser.bookmarks.create(
+			  {parentId: BTN.id,
+			   type: "separator"
+			  }
+		    );
+		  }
+		  else {
+		    browser.bookmarks.create(
+			  {index: BTN.index,
+			   parentId: BTN.parentId,
+			   type: "separator"
+			  }
+		    );
+		  }
 		}
 	  );
 	}
 	else if (classList.contains("menucut")) { // Cut a bookmark item into bkmkClipboard
 	  // Can only happen on bookmarks table row, retrieve the rowIndex from the menu
 	  menuAction = true;
-	  var rowIndex = parseInt(target.parentElement.dataset.index, 10);
+	  var rowIndex = getRowIndex(target);
 	  var row = bookmarksTable.rows[rowIndex];
 	  // Retrieve bookmark item in that row and its contents
 	  var BTN_id = row.dataset.id;
@@ -2600,7 +2972,13 @@ function clickHandler (e) {
 	  .then(
 		function (a_BTN) { // Array of BookmarkTreeNode
 		  bkmkClipboard = a_BTN[0]; // Assume we have only one element since we gave only one id
-		  browser.bookmarks.removeTree(BTN_id);
+		  if (rowClipboard != undefined) {
+			rowClipboard.classList.remove("cut");
+		  }
+		  rowClipboard = row;
+		  // Just dim the row being cut, do not remove it now
+		  // browser.bookmarks.removeTree(BTN_id);
+		  rowClipboard.classList.add("cut");
 /*		  trace("clipboard: "+bkmkClipboard.id+" "+bkmkClipboard.title+" "+bkmkClipboard.type+" "+bkmkClipboard.index+" "+bkmkClipboard.children+" "+bkmkClipboard.url);
 		  if (bkmkClipboard.children != undefined)
 			for (let i of bkmkClipboard.children) {
@@ -2613,7 +2991,7 @@ function clickHandler (e) {
 	else if (classList.contains("menucopy")) { // Copy a bookmark item into bkmkClipboard
 	  // Can only happen on bookmarks table row, retrieve the rowIndex from the menu
 	  menuAction = true;
-	  var rowIndex = parseInt(target.parentElement.dataset.index, 10);
+	  var rowIndex = getRowIndex(target);
 	  var row = bookmarksTable.rows[rowIndex];
 	  // Retrieve bookmark item in that row and its contents
 	  var BTN_id = row.dataset.id;
@@ -2621,6 +2999,10 @@ function clickHandler (e) {
 	  .then(
 		function (a_BTN) { // Array of BookmarkTreeNode
 		  bkmkClipboard = a_BTN[0]; // Assume we have only one element since we gave only one id
+		  if (rowClipboard != undefined) {
+			rowClipboard.classList.remove("cut");
+		  }
+		  rowClipboard = undefined; // Not a cut
 		}
 	  );
 	}
@@ -2629,7 +3011,7 @@ function clickHandler (e) {
 		                                        // to paste only once.
 	  // Can only happen on bookmarks table row, retrieve the rowIndex from the menu
 	  menuAction = true;
-	  var rowIndex = parseInt(target.parentElement.dataset.index, 10);
+	  var rowIndex = getRowIndex(target);
 	  var row = bookmarksTable.rows[rowIndex];
 	  // Retrieve bookmark item in that row
 	  var BTN_id = row.dataset.id;
@@ -2644,9 +3026,18 @@ function clickHandler (e) {
 			function (a_BTN2) { // Array of BookmarkTreeNode
 			  var parentBTN = a_BTN2[0]; // Assume we have only one element since we gave only one id
 
-			  // Paste clipboard contents at BTN.index (then just before BTN) under that parent
-			  pasteBkmk(bkmkClipboard, parentBTN, BTN.index);
-			  bkmkClipboard = undefined; // Empty bkmkClipboard
+			  if (rowClipboard == undefined) {
+			    // Paste clipboard contents at BTN.index (then just before BTN) under that parent
+			    pasteBkmk(bkmkClipboard, parentBTN, BTN.index);
+			    bkmkClipboard = undefined; // Empty bkmkClipboard
+			  }
+			  else {
+			    // Move clipboard contents at BTN.index (then just before BTN) under that parent
+				rowClipboard.classList.remove("cut"); // In case it stays at the same place = no move
+			    moveBkmk(bkmkClipboard, parentBTN, BTN.index);
+			    bkmkClipboard = undefined; // Empty bkmkClipboard
+			    rowClipboard = undefined;
+			  }
 			}
 		  );
 		}
@@ -2657,7 +3048,7 @@ function clickHandler (e) {
                                                     // to paste only once.
       // Can only happen on bookmarks table folder rows, retrieve the rowIndex from the menu
 	  menuAction = true;
-      var rowIndex = parseInt(target.parentElement.dataset.index, 10);
+	  var rowIndex = getRowIndex(target);
       var row = bookmarksTable.rows[rowIndex];
       // Retrieve bookmark item in that row
       var BTN_id = row.dataset.id;
@@ -2666,16 +3057,25 @@ function clickHandler (e) {
         function (a_BTN) { // Array of BookmarkTreeNode
           var folderBTN = a_BTN[0]; // Assume we have only one element since we gave only one id
 
-          // Paste clipboard contents at end of folder
-          pasteBkmk(bkmkClipboard, folderBTN, folderBTN.length);
-          bkmkClipboard = undefined; // Empty bkmkClipboard
+		  if (rowClipboard == undefined) {
+            // Paste clipboard contents at end of folder
+            pasteBkmk(bkmkClipboard, folderBTN);
+            bkmkClipboard = undefined; // Empty bkmkClipboard
+		  }
+		  else {
+	        // Move clipboard contents at end of folder
+			rowClipboard.classList.remove("cut"); // In case it stays at the same place = no move
+			moveBkmk(bkmkClipboard, folderBTN);
+			bkmkClipboard = undefined; // Empty bkmkClipboard
+			rowClipboard = undefined;
+		  }
         }
       );
     }
 	else if (classList.contains("menudel")) { // Delete a bookmark item
 	  // Can only happen on bookmarks table row, retrieve the rowIndex from the menu
 	  menuAction = true;
-	  var rowIndex = parseInt(target.parentElement.dataset.index, 10);
+	  var rowIndex = getRowIndex(target);
 	  var row = bookmarksTable.rows[rowIndex];
 	  // Delete bookmark item in that row
 	  var BTN_id = row.dataset.id;
@@ -2684,7 +3084,7 @@ function clickHandler (e) {
 	else if (classList.contains("menurefreshfav")) { // Refresh favicon
       // Can only happen on bookmarks table bookmark row, retrieve the rowIndex from the menu
 	  menuAction = true;
-	  var rowIndex = parseInt(target.parentElement.dataset.index, 10);
+	  var rowIndex = getRowIndex(target);
 	  var row = bookmarksTable.rows[rowIndex];
 	  // Refresh favicon of that bookmark item
 	  var BTN_id = row.dataset.id;
@@ -2703,7 +3103,7 @@ function clickHandler (e) {
 	else if (classList.contains("menuprop")) { // Edit properties of an existing bookmark
 	  // Can only be on bookmarks table row
 	  menuAction = true;
-	  var rowIndex = parseInt(target.parentElement.dataset.index, 10);
+	  var rowIndex = getRowIndex(target);
 	  var row = bookmarksTable.rows[rowIndex];
 	  // Retrieve bookmark item in that row
 	  var BTN_id = row.dataset.id;
@@ -2747,10 +3147,10 @@ function clickHandler (e) {
 	}
 
     if ((e.button != 2) || menuAction || (classList == undefined) || (classList.length == 0)) {
-      // Clear open menus on left click, or on right click on (a menu action or oustide
+      // Clear open menus on left or middle click, or on right click on (a menu action or outside
       // bookmarks or results).
-      // Indeed, sometimes, the "click" Handler is called after the "context" Handler :-(
-      // (in Linux at least)
+      // Indeed, sometimes, the "click" Handler is called after the "context" Handler
+      // instead of before :-( (in Linux at least)
       clearMenu();
     }
   }
@@ -2759,9 +3159,9 @@ function clickHandler (e) {
 /*
  * Prevent default context menus except in a few places
  */
-function noDefaultContextMenu (e) {
+function noDefaultAction (e) {
   var target = e.target; // Type depends ..
-//  trace("General context right click event: "+e.type+" target: "+target+" class: "+target.classList);
+//  trace("noDefaultAction event: "+e.type+" button: "+e.button+" phase: "+e.eventPhase+" target: "+target+" class: "+target.classList);
 
   // Prevent default context menu except in the search box and in the trace box
   var targetObjectType = Object.prototype.toString.call(target).slice(8, -1);
@@ -2769,6 +3169,8 @@ function noDefaultContextMenu (e) {
       && (targetObjectType != "HTMLTextAreaElement")
      ) {
     e.preventDefault();
+//    e.stopPropagation();
+//    e.stopImmediatePropagation();
   }
 }
 
@@ -2778,10 +3180,14 @@ function noDefaultContextMenu (e) {
 function completeBookmarks () {
   WaitingImg.hidden = true; // Stop displaying the waiting glass
   Bookmarks.appendChild(docFragment); // Display the table of bookmarks + reflow
+  endDisplayTime = new Date();
+  trace("Display duration: "+(endDisplayTime.getTime() - endLoadTime.getTime())+" ms");
 
   // Save current info
   saveBkmkUri();
   saveFldrOpen();
+  endSaveTime = new Date();
+  trace("Save duration: "+(endSaveTime.getTime() - endDisplayTime.getTime())+" ms");
 
   // Cleanup saved info and release memory, all is now maintained in cur... lists
   savedBkmkUriList = undefined;
@@ -2791,18 +3197,21 @@ function completeBookmarks () {
   // Setup mouse handlers for bookmarks and results
   SearchResult.addEventListener("click", resultsMouseHandler);
   Bookmarks.addEventListener("click", bkmkMouseHandler);
+  SearchResult.addEventListener("auxclick", resultsAuxHandler);
+  Bookmarks.addEventListener("auxclick", bkmkAuxHandler);
   SearchResult.addEventListener("contextmenu", resultsContextHandler);
   Bookmarks.addEventListener("contextmenu", bkmkContextHandler);
 
   // General event handlers for a click anywhere in the document .. used to clear menus
   // and prevent default menus
+  addEventListener("keyup", keyHandler);
   addEventListener("click", clickHandler);
-  addEventListener("contextmenu", noDefaultContextMenu);
+  addEventListener("contextmenu", noDefaultAction);
+  addEventListener("auxclick", noDefaultAction);
 
   // Event handlers for drag & drop
   Bookmarks.addEventListener("dragstart", bkmkDragStartHandler);
   Bookmarks.addEventListener("dragend", bkmkDragEndHandler);
-//  row.ondragenter = bkmkDragEnterHandler;
   Bookmarks.addEventListener("dragenter", bkmkDragEnterHandler);
   Bookmarks.addEventListener("dragover", bkmkDragOverHandler);
   Bookmarks.addEventListener("dragleave", bkmkDragLeaveHandler);
@@ -2820,6 +3229,12 @@ function completeBookmarks () {
   if (browser.bookmarks.onChildrenReordered != undefined) {
     browser.bookmarks.onChildrenReordered.addListener(bkmkReorderedHandler);
   }
+  var computedStyle = window.getComputedStyle(MyBProtMenu, null);
+  trace("fontFamily = '"+computedStyle["fontFamily"]+"'");
+  trace("fontSize   = '"+computedStyle["fontSize"]+"'");
+//  for (let prop in computedStyle) {
+//    trace(prop+" = '"+computedStyle[prop]+"'");
+//  }
 
   // Trace stats
   trace("Stats:\r\n------");
@@ -2827,10 +3242,6 @@ function completeBookmarks () {
   trace("Folders:    "+countFolders);
   trace("Separators: "+countSeparators);
   trace("--------------------");
-//  var computedStyle = window.getComputedStyle(MyBProtMenu, null);
-//  for (let prop in computedStyle) {
-//    trace(prop+" = '"+computedStyle[prop]+"'");
-//  }
 }
 
  /*
@@ -2928,6 +3339,8 @@ function displayBookmarksTable () {
 function storeAndDisplayTree (a_BTN) {
 //  trace("storeAndDisplayTree");
   bookmarksTree = a_BTN;
+  endLoadTime = new Date();
+  trace("Load duration: "+(endLoadTime.getTime() - startTime.getTime())+" ms");
   displayBookmarksTable();
 }
 
@@ -2951,7 +3364,7 @@ function setFavicon (BTN, uri) {
   var index = curRowIndexList[BTN.id]; // Rerieve index of row holding the icon
   var row = bookmarksTable.rows[index];
 //  trace("BTN.id: "+BTN.id+" index: "+index+" Row id: "+row.dataset.id);
-  var img = row.firstElementChild.firstElementChild.firstElementChild.firstElementChild;
+  var img = row.firstElementChild.firstElementChild.firstElementChild;
   img.src = uri;
 
   // Save new icon
@@ -2968,7 +3381,7 @@ function setWaitingFavicon (BTN) {
   var index = curRowIndexList[BTN.id]; // Rerieve index of row holding the icon
   var row = bookmarksTable.rows[index];
 //  trace("BTN.id: "+BTN.id+" index: "+index+" Row id: "+row.dataset.id+" set to waiting");
-  var img = row.firstElementChild.firstElementChild.firstElementChild.firstElementChild;
+  var img = row.firstElementChild.firstElementChild.firstElementChild;
   img.src = "/icons/waiting.gif";
 }
 
@@ -2982,7 +3395,7 @@ function setNoFavicon (BTN) {
   var row = bookmarksTable.rows[index];
   var uri = curBkmkUriList[BTN.id] = "/icons/nofavicon.png";
 //  trace("BTN.id: "+BTN.id+" index: "+index+" Row id: "+row.dataset.id+" uri: "+uri);
-  var img = row.firstElementChild.firstElementChild.firstElementChild.firstElementChild;
+  var img = row.firstElementChild.firstElementChild.firstElementChild;
   img.src = uri;
 
   // Save new icon
@@ -2998,7 +3411,7 @@ function setNoFavicon (BTN) {
 function asyncFavicon (e) {
   var BTN = e.data[0]; // BookmarkTreeNode
   var uri = e.data[1]; // String
-  trace("Async uri received for BTN.id: "+BTN.id+" url: "+BTN.url+" uri: <<"+uri.substr(0,50)+">>");
+//  trace("Async uri received for BTN.id: "+BTN.id+" url: "+BTN.url+" uri: <<"+uri.substr(0,50)+">>");
 
   // Refresh display of the icon, and save it
   if (uri.startsWith("error:")) { // Got an error ... trace it
@@ -3090,9 +3503,8 @@ function tabModified (tabId, changeInfo, tabInfo) {
  * Let's delete it.
  */
 function onVisited(historyItem) {
-trace("onVisited event: "+historyItem.url);
+//trace("onVisited event: "+historyItem.url);
   if (historyItem.url.startsWith(PopupURL)) {
-trace("here");
     browser.history.deleteUrl({url: historyItem.url});
   }
 }
@@ -3105,12 +3517,24 @@ trace("here");
 // Retrieve Platform, and config options
 browser.runtime.getPlatformInfo().then(function(info){
   platformOs = info.os;
-  var gettingItem = browser.storage.local.get(["asyncLoad_option"
+  var gettingItem = browser.storage.local.get(["advanced_option"
+                                               ,"opentree_option"
+	                                           ,"asyncLoad_option"
                                                ,"traceEnabled_option"
                                                ,"savedBkmkUriList"
                                                ,"savedFldrOpenList"
                                               ]);
   gettingItem.then((res) => {
+    if (res.advanced_option != undefined) {
+      if (res.advanced_option == "true") {
+        advancedClick_option = true;
+      }
+    }
+    if (res.opentree_option != undefined) {
+        if (res.opentree_option == "true") {
+          openTree_option = true;
+        }
+      }
     if (res.asyncLoad_option != undefined) {
       if (res.asyncLoad_option == "true") {
         asyncLoad_option = true;
@@ -3127,6 +3551,9 @@ browser.runtime.getPlatformInfo().then(function(info){
     trace("PlatformOs: "+platformOs);
     if (platformOs == "linux") {
 	  trace("Setting Linux variations");
+	  // Windows 10 -> font: caption;   which is in fact font: 12px "Segoe UI";
+	  // Windows 7  -> font: 12px serif; ?? 12px "Segoe UI" seems to work also
+	  // Linux      -> font: 12px "Sans";
 	  Body.style.fontSize = "12px";
 	  SearchTextInput.style.fontSize = "12px";
 	  MyRBkmkMenuStyle.width = "170px";
@@ -3168,6 +3595,7 @@ browser.runtime.getPlatformInfo().then(function(info){
     faviconWorker.onmessage = asyncFavicon;
 
     // Get the boorkmarks tree and display it
+    startTime = new Date();
     var getTree = browser.bookmarks.getTree();
     getTree.then(storeAndDisplayTree, onRejected);
 

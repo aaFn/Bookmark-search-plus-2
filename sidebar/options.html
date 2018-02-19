@@ -3,17 +3,31 @@
 <html>
   <head>
     <meta charset="utf-8">
+    <link rel="stylesheet" href="options.css"/>
   </head>
 
 <body>
-  <div>
+  <p> Changing an option will be effective at next restart / plugin refresh / sidebar switch</p>
+  <p>
+    <b>Search results bookmark behaviour:</b><br>
+    <input type="checkbox" id="advanced"> <!--  Unchecked by default -->
+    <label for="advanced">Advanced = use classic "Sidebar Bookmark Search Plus" click behaviour<br>
+      "Show bookmark" in tree <img src="/icons/clickshow.png"> and "Open" result in active tab <img src="/icons/clickopen.png">
+    </label>
+    <br><br>
+    <input type="checkbox" id="opentree"> <!--  Unchecked by default -->
+    <label for="opentree">On "Show bookmark", force state to open for all ancestor folders of shown bookmark</label>
+  </p>
+  <p>
+    <b>Performances (not yet effective):</b><br>
     <input type="checkbox" id="asyncLoad"> <!--  Unchecked by default -->
-    <label for="asyncLoad">Non blocking bookmarks load at start - for large volumes (next restart / plugin refresh / sidebar switch)</label>
-  </div>
-  <div>
+    <label for="asyncLoad">Load bookmarks only when required to show or open them, instead of all at start - for large volumes</label>
+  </p>
+  <p>
+    <b>Traces:</b><br>
     <input type="checkbox" id="traceEnabled"> <!--  Unchecked by default -->
-    <label for="traceEnabled">Activate traces (next restart / plugin refresh / sidebar switch)</label>
-  </div>
+    <label for="traceEnabled">Activate</label>
+  </p>
   <script src="options.js"></script>
 </body>
 
