@@ -6,23 +6,23 @@
     <link rel="stylesheet" href="panel.css"/>
   </head>
 
-<body id="body">
+<body id="body" class="fontdflt">
   <div id="searchbox">
-    <img src="/icons/search.png">
-    <input id="searchtext" type="text" placeholder="Search bookmarks.." size=1>
+    <img src="/icons/search.png" id="mglass"/>
+    <input id="searchtext" type="text" placeholder="Search bookmarks.." class="fontdflt" size=1 autofocus>
     <input id="cancelsearch" type="image" src="/icons/empty.png" disabled>
   </div>
   <div id = "searchresult" hidden=true>
     <img src="/icons/waiting.gif" height="20px" id="waitingsearch">
 <!--
     <table><tbody>
-      <tr><td class="brow" tabindex="0" draggable="false">
+      <tr data-id=".."><td class="brow" tabindex="0" draggable="false">
         <div class="bkmkitem_b" href=".." draggable="false">
           <img src="/icons/nofavicon.png" class="favicon" draggable="false">
           <span class="favtext" draggable="false">aa</span>
         </div>
       </td></tr>
-      <tr><td class="brow" tabindex="0" draggable="false">
+      <tr data-id=".."><td class="brow" tabindex="0" draggable="false">
         <div class="bkmkitem_f" draggable="false">
           <img src="/icons/folder.png" class="favicon" draggable="false">
           <span class="favtext" draggable="false">aaaaaa</span>
@@ -34,8 +34,8 @@
   <textarea readonly id="trace" hidden=true></textarea>
   <div id = "bookmarks">
     <div id="waiting">
-      <img src="/icons/waiting.gif" height="20px">
-      <span>Loading bookmarks..</span>
+      <img src="/icons/waiting.gif" height="20px"/>
+      <span id="waitmsg">Load saved state..</span>
     </div>
 <!--
     <table><tbody>
@@ -95,26 +95,63 @@
     <hr>
     <div class="menunewb">New bookmark..</div>
     <div class="menunewf">New folder..</div>
-    <div class="menunews">New Separator</div>
+    <div class="menunews">New separator</div>
     <hr>
     <div class="menucut">Cut</div>
     <div class="menucopy">Copy</div>
-    <div class="menupasted" id="mybbkmkmenupaste">Paste before</div>
+    <div class="menudisabled" id="mybbkmkmenupaste">Paste before</div>
     <hr>
     <div class="menudel">Delete</div>
     <hr>
-    <div class="menurefreshfav">Refresh favicon</div>
+    <div class="menurefreshfav" id="mybbkmkmenufavicon">Refresh favicon</div>
+    <div class="menuprop">Properties..</div>
+  </div>
+  <div id="mybresbkmkmenu" class="mymenu" data-type="bookmark">
+    <div class="menuopen menudefault">Open</div>
+    <div class="menuopentab">Open in new tab</div>
+    <div class="menuopenwin">Open in new window</div>
+    <div class="menuopenpriv">Open in private window</div>
+    <hr>
+    <div class="menuopentree">Open parent folder(s)</div>
+    <hr>
+    <div class="menunewb">New bookmark..</div>
+    <div class="menunewf">New folder..</div>
+    <div class="menunews">New separator</div>
+    <hr>
+    <div class="menucut">Cut</div>
+    <div class="menucopy">Copy</div>
+    <div class="menudisabled" id="mybresbkmkmenupaste">Paste before</div>
+    <hr>
+    <div class="menudel">Delete</div>
+    <hr>
+    <div class="menurefreshfav" id="mybresbkmkmenufavicon">Refresh favicon</div>
     <div class="menuprop">Properties..</div>
   </div>
   <div id="mybfldrmenu" class="mymenu" data-type="folder">
     <div class="menunewb">New bookmark..</div>
     <div class="menunewf">New folder..</div>
-    <div class="menunews">New Separator</div>
+    <div class="menunews">New separator</div>
     <hr>
     <div class="menucut">Cut</div>
     <div class="menucopy">Copy</div>
-    <div class="menupasted" id="mybfldrmenupaste">Paste before</div>
-    <div class="menupastedinto" id="mybfldrmenupasteinto">Paste into</div>
+    <div class="menudisabled" id="mybfldrmenupaste">Paste before</div>
+    <div class="menudisabled" id="mybfldrmenupasteinto">Paste into</div>
+    <hr>
+    <div class="menudel">Delete</div>
+    <hr>
+    <div class="menuprop">Properties..</div>
+  </div>
+  <div id="mybresfldrmenu" class="mymenu" data-type="folder">
+    <div class="menunewb">New bookmark..</div>
+    <div class="menunewf">New folder..</div>
+    <div class="menunews">New separator</div>
+    <hr>
+    <div class="menuopentree">Open parent folder(s)</div>
+    <hr>
+    <div class="menucut">Cut</div>
+    <div class="menucopy">Copy</div>
+    <div class="menudisabled" id="mybresfldrmenupaste">Paste before</div>
+    <div class="menudisabled" id="mybresfldrmenupasteinto">Paste into</div>
     <hr>
     <div class="menudel">Delete</div>
     <hr>
@@ -123,11 +160,11 @@
   <div id="mybsepmenu" class="mymenu" data-type="separator">
     <div class="menunewb">New bookmark..</div>
     <div class="menunewf">New folder..</div>
-    <div class="menunews">New Separator</div>
+    <div class="menunews">New separator</div>
     <hr>
     <div class="menucut">Cut</div>
     <div class="menucopy">Copy</div>
-    <div class="menupasted" id="mybsepmenupaste">Paste before</div>
+    <div class="menudisabled" id="mybsepmenupaste">Paste before</div>
     <hr>
     <div class="menudel">Delete</div>
   </div>
@@ -136,6 +173,13 @@
     <div class="menuopentab">Open in new tab</div>
     <div class="menuopenwin">Open in new window</div>
     <div class="menuopenpriv">Open in private window</div>
+  </div>
+  <div id="mybprotfmenu" class="mymenu" data-type="fprotected">
+    <div class="menunewb">New bookmark..</div>
+    <div class="menunewf">New folder..</div>
+    <div class="menunews">New separator</div>
+    <hr>
+    <div class="menudisabled" id="mybprotfmenupasteinto">Paste into</div>
   </div>
   <div id="myrbkmkmenu" class="mymenu" data-type="bookmark">
     <div class="menuopen menudefault">Open</div>

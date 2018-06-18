@@ -8,10 +8,17 @@ html, body {
 }
 
 body {
-  font: caption;
   background-color: white;
   display: flex;
   flex-direction: column;
+}
+
+.fontdflt {
+  font: caption;
+}
+
+.fontwin {
+  font: 12px "Segoe UI";
 }
 
 p {
@@ -35,9 +42,6 @@ p {
 }
 
 #searchtext {
-  font: caption;
-/*  font: 12px "Segoe UI"; */
-/*  font: 12px "Sans"; */
   flex: 1;
   background-color: white;
   border: 0;
@@ -89,10 +93,6 @@ tbody {
   min-width: 100%;
 }
 
-row {
-  min-width: 100%;
-}
-
 .cut {
   opacity: 0.5;
 }
@@ -108,7 +108,7 @@ row {
   align-items: center;
 }
 
-.resbrow {
+.selbrow {
   min-width: 100%;
   background-color: #D9D9D9;
   border-color: #D9D9D9 #D9D9D9 #CCCCCC;
@@ -121,17 +121,12 @@ row {
   align-items: center;
 }
 
-.brow:hover, .resbrow:hover {
+.brow:hover, .selbrow:hover {
   background-color: #E5F3FF;
   border-color: #E5F3FF;
 }
 
-.brow:focus, .resbrow:focus {
-  background-color: #D9D9D9;
-  border-color: #D9D9D9 #D9D9D9 #CCCCCC;
-}
-
-.brow:focus:hover, .resbrow:focus:hover {
+.brow:focus, .selbrow:focus {
   background-color: #CDE8FF;
   border-color: #7BC3FF;
 }
@@ -150,7 +145,7 @@ row {
   background-image: url("/icons/twistieac.png");
 }
 
-.brow:hover .twistieac {
+.brow:hover .twistieac, .selbrow:hover .twistieac {
   background-image: url("/icons/twistieacf.png");
 }
 
@@ -161,7 +156,7 @@ row {
   background-image: url("/icons/twistieao.png");
 }
 
-.brow:hover .twistieao {
+.brow:hover .twistieao, .selbrow:hover .twistieao {
   background-image: url("/icons/twistieaof.png");
 }
 
@@ -193,7 +188,24 @@ row {
   height: 17px;
 }
 
+.ffavicon {
+  display: inline-block;
+  height: 16px;
+  width: 16px;
+  vertical-align: text-bottom;
+  background-image: url("/icons/folder.png");
+}
+
+.nofavicon {
+  display: inline-block;
+  height: 16px;
+  width: 16px;
+  vertical-align: text-bottom;
+  background-image: url("/icons/nofavicon.png");
+}
+
 .favicon {
+  display: inline-block;
   height: 16px;
   width: 16px;
   vertical-align: text-bottom;
@@ -201,7 +213,6 @@ row {
 
 .favtext {
   margin-left: 3px;
-  flex: none;
 }
 
 .mymenu {
@@ -220,7 +231,7 @@ row {
 .mymenu div {
   display: block;
   padding: 3px 3px 2px 20px;
-  width: 150px;
+  min-width: 150px;
   position: relative;
 }
 
@@ -234,13 +245,11 @@ row {
   margin: 2px 3px 2px 20px;
 }
 
-.menupasted,
-.menupastedinto {
+.menudisabled {
   color: #6D6D6D;
 }
 
-.menupasted:hover,
-.menupastedinto:hover {
+.menudisabled:hover {
   background: #E5E5E5;
 }
 

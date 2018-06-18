@@ -8,9 +8,16 @@ html, body {
 }
 
 body {
-  font: caption;
   background-color: #F0F0F0;
   padding: 8px 12px 8px 12px;
+}
+
+.fontdflt {
+  font: caption;
+}
+
+.fontwin {
+  font: 12px "Segoe UI";
 }
 
 .fields {
@@ -47,7 +54,6 @@ label {
   flex-direction: column;
   justify-content: center;
   margin-left: 10px;
-  font: caption;
 }
 
 p {

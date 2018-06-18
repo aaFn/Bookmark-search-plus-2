@@ -6,27 +6,56 @@
     <link rel="stylesheet" href="options.css"/>
   </head>
 
-<body>
+<body id="body" class="fontdflt">
   <p> Changing an option will be effective at next restart / plugin refresh / sidebar switch</p>
   <p>
-    <b>Search results bookmark behaviour:</b><br>
-    <input type="checkbox" id="advanced"> <!--  Unchecked by default -->
-    <label for="advanced">Advanced = use classic "Sidebar Bookmark Search Plus" click behaviour<br>
-      "Show bookmark" in tree <img src="/icons/clickshow.png"> and "Open" result in active tab <img src="/icons/clickopen.png">
-    </label>
-    <br><br>
-    <input type="checkbox" id="opentree"> <!--  Unchecked by default -->
-    <label for="opentree">On "Show bookmark", force state to open for all ancestor folders of shown bookmark</label>
+    <b>Favicon fetching (retrieved only once and then cached):</b><br>
+    <input type="checkbox" id="disablefavicons">
+    <label for="disablefavicons">Disable favicon fetching</label>
+    <br>
+    <input type="checkbox" id="enablecookies">
+    <label for="enablecookies">Include cookies to increase background favicon retrieval success rate. <i>Drawback: prompts for user/pwd on some URLs</i></label>
+    <br>
+    <input type="checkbox" id="enableflipflop">
+    <label for="enableflipflop">Dual save to protect from local store corruption (activate only when you experience favicons loss when stopping/restarting BSP2 or Firefox)</label>
   </p>
   <p>
-    <b>Performances (not yet effective):</b><br>
-    <input type="checkbox" id="asyncLoad"> <!--  Unchecked by default -->
-    <label for="asyncLoad">Load bookmarks only when required to show or open them, instead of all at start - for large volumes</label>
+    <b>Search results bookmark behaviour:</b>
+  </p>
+    <div id="group">
+      <input type="radio" name="clickoption" id="simple" checked>
+      <label for="simple">Simple click = always "Show bookmark"</label>
+      <br>
+      <input type="radio" name="clickoption" id="advanced">
+      <label for="advanced">Advanced click = <img src="/icons/clickshow.png"> "Show bookmark", or <img src="/icons/clickopen.png"> "Show bookmark" and "Open" bookmark in active tab</label>
+    </div>
+  <p>
+    <input type="checkbox" id="opentree">
+    <label for="opentree">After "Show Bookmark", leave bookmark tree open by default when closing search pane</label>
+    <br>
+    <input type="checkbox" id="closesearch">
+    <label for="closesearch">After "Show bookmark", close search pane (implies leave tree open)</label>
   </p>
   <p>
-    <b>Traces:</b><br>
-    <input type="checkbox" id="traceEnabled"> <!--  Unchecked by default -->
-    <label for="traceEnabled">Activate</label>
+    <b>Performances:</b><br>
+    <input type="checkbox" id="immediatefavdisplay">
+    <label for="immediatefavdisplay">Revert to old behavior of immediate favicon display (slows down bookmark tree availability)</label>
+    <br>
+    <input type="checkbox" id="delayLoad" disabled>
+    <label for="delayLoad"> (not yet effective) Load bookmarks only when required to (show result or open folder), do not load all at start - for large volumes</label>
+  </p>
+  <p>
+    <b>User Interface:</b><br>
+    <input type="checkbox" id="remembersizes">
+    <label for="remembersizes">Remember size of resizeable objects - search pane, edit bookmark property, ..</label>
+    <button type="button" id="resetsizes" disabled>Reset defaults</button>
+  </p>
+  <p>
+    <b>Traces / debug:</b><br>
+    <input type="checkbox" id="traceEnabled">
+    <label for="traceEnabled">Activate traces</label>
+    <br>
+    <button type="button" id="resetmigr16x16" disabled>Re-trigger 16x16 favicon migration</button>
   </p>
   <script src="options.js"></script>
 </body>

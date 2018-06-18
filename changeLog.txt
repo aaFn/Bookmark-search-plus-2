@@ -1,5 +1,298 @@
 Release notes:
 --------------
+- 2.0.26 Improvements
+    - Accelerated display phase by a factor between 2 and 4 depending on cases, by using cloneNode()
+      techniques, background images for folders and for disabled favicon mode, and most of all by
+      deferring favicon display (which is the longest piece) out of the main cycles, in background
+      after the main display is done. Total time is roughly the same than before or a little inferior,
+      however the bookmark tree pane is available much before.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/5
+    - Added an option to revert to old favicon display behavior during main display phase, and to
+      not defer them, in case the new behavior would create problems for some users. It is not
+      disabling the usage of cloneNode() though, which is supposed to always have a gain.
+- 2.0.25 Improvements
+    - Support working with the websites.resistFingerprinting setting as manipulated in the
+      Privacy Settings add-on, which alter the Navigator.buildID returned value.
+        https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/privacy/websites
+- 2.0.24 Improvements
+    - Reproduced  the native bookmarks behavior on Shift and Ctrl Keys:
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/44
+    - And therefore, changed Shift to Alt to force opening the clicked bookmark in non-advanced
+      mode:
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/3
+- 2.0.23 Bug
+    - Removed the annoying "force trace" textarea left by error from a temporary version made for
+      investigating issue https://github.com/aaFn/Bookmark-search-plus-2/issues/40.
+      - See https://github.com/aaFn/Bookmark-search-plus-2/issues/42
+      - Sorry for the inconvenience.
+- 2.0.22 Bugs & improvements
+    - Corrected a bug when the add-on was stopped while the favicon of a bookmark was being
+      fetched, where the favicon was not reset to be fetched when restarting.
+    - Introduced a priority process for manual "Refresh favicon" and for existing modified
+      bookmark favicon retrieval, over initial favicon massive load on install of BSP2
+      = insert at head of queue, for imediate responsiveness to user action (instead of waiting
+      the end of the massive load, which might be interrupted by an FF stop, and so the manual
+      refresh request would be lost).
+    - Significantly reduced amount of local storage and duration of load and save of bookmark
+      tree by tuning the objects to save and by pre-jsonifying those objects instead of relying
+      entirely on the FF API.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/40
+    - Reduced further the memory saw phenomenon at initial massive favicon fetching which is
+      happening when calling the FF API local storage set() function, by dynamically spacing them
+      function of frequency of modifications to the tree, and by reducing the size of what to save. 
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/40
+    - Added error handling on storage saves to detect a few errors which can come back from
+      the FF API implying corruption of the saves .. However not all is coming back from the FF API,
+      so this cannot catch all the cases, far from it .. :-(
+    - Introduced a resiliency option of dual save slots (flip-flop) for people having trouble with
+      local storage getting corrupted when FF is low on memory or getting out of memory.
+      If the option is activated, each save to local store will take the other slot than previous
+      save, preserving a fallback in case the last save was corrupted.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/40
+    - Some cleanup on options format in local storage.
+- 2.0.21 Improvements
+    - Added intermediate messages on the status when initially loading the sidebar, to better
+      visually track each step. And if one is blocking load, identify which one it is. 
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/40
+- 2.0.20 Bugs & improvements
+    - Accelerated setting zones of no-drop or no-paste when dragging or cutting a folder
+      with many bookmarks inside.
+    - Also show bookmark in the bookmark pane when right clicking on a result in the search pane.
+      (any click on a result row in the search pane should show the source bookmark)
+    - Corrected a regression where dragging a link from a web page to the bookmarks tree pane
+      was not creating a new bookmark. Introduced in 2.0.18.
+    - Tried to decrease somewhat further amplitude of the memory "saw phenomenon" when saving
+      favicons while fetching or converting them massively, by spacing further two continuous
+      saves to local store (hysteris increased from 3s to 5s), to leave more time to the Garbage
+      Collector to act.
+      Also introduced a delay of 60s between tree build at load time and first favicon being
+      retrieved in background, to give time to things to stabilize after display, and to users
+      to Disable favicon fetching in the options panel and recycle the add-on for it to take
+      effect, in case the memory saw phenomenon due to favicon fetching is really annoying
+      and creating problems.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/40
+- 2.0.19 Bugs & improvements
+    - Corrected an internal error happening during some drag operations. Apparently without
+      consequence, but cleaner without.
+        See https://github.com/aaFn/Bookmark-search-plus-2/issues/35
+    - Corrected a regression where "Open parent folder(s)" menu item was not showing anymore
+    - Accelerated execution of "Open parent folder(s)" when there are big numbers of bookmarks
+      between row and its ancestors.
+    - Corrected a bug where showing a second result under the same parent than previous shown
+      result was losing the information of its visibility or not, since showing previous result
+      already unhid everything above it.
+    - Corrected a blocking bug introduced in 2.0.18 with new internal acceleration tree structure,
+      of failure at start when a bookmark was created while the add-on was not active.
+      Emergency fix ..
+- 2.0.18 Bugs & improvements
+    - Corrected a bug when moving a folder holding separators in FF 56, where separators were not
+      shown again.
+    - Corrected a bug when creating or inserting a bookmark in FF 56 as last child of its parent
+      after separator(s) (going undetected until a non separator is created after them, because of
+      FF 56 limitations), where this/those separator(s) was(were) not shown.
+    - A little more internal traces to understand better impact of local store load / save durations.
+    - Accelerated operations like copy, cut, move (drag & drop) and create new bookmark when there
+      are lots of bookmarks, by building an internal tree representation of the bookmark nodes
+      rather than relying solely on a flat adjacency list plus the displayed bookmark table rows
+      with levels.
+      This also prepares for next acceleration phase, for quick switch on and off of the sidebar,
+      in a further release.
+    - Corrected a bug where context menus where going too much on left (or on top) when the sidebar
+      width (or height) was insufficient for the context menu width (or height).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/38
+    - Improved context menus width behavior to adapt when user is setting the minimum character size
+      in FF Options to a value higher than default menu fonts.
+      They are now expanding to the right to avoid cutting menu items.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/38
+    - Added detection of when we lose keyboard focus to close context menus if they are open.
+      This makes context menus more friendly now.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/38
+    - Added a toolbar button for switching on and off the sidebar.
+      For now, the switch on is still a little long when there are lots of bookmarks (10000 or more).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/18
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/36
+    - Update search result to show the "waiting favicon refresh" when we refresh a favicon, if
+      there is a search result open.
+- 2.0.17 Bugs
+    - Added support for Mobile bookmarks when not empty (no way to know that Mobile bookmarks / sync
+      is activated or not).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/33
+    - Added a better status of migration to 16x16 favicons, some more robustness to it, and
+      a way to retrigger it in case it is believed it didn't complete properly.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/35
+- 2.0.16 Improvements
+    - Decreased memory usage on massive favicon loads by spacing the saves to local storage.
+      Apparently, browser.storage.local.set() is leaving significant chunks of memory to garbage
+      collect, and having saves too close to each other (initially at each new favicon load)
+      is not sparing enough time for the GC to officiate properly.
+    - Improved display performances by around 200% through converting favicons to 16x16 when
+      fetching them, and storing them in that format for later load and display.
+      This avoids that conversion occurs each time the add-on is loaded, when displaying the
+      favicons. This is so yielding a decrease of load/waiting duration by about 50% on my
+      machine with around 1900 bookmarks and as many favicons.
+      This is also using much less local storage + decreasing by 2 the duration to save favicons.
+      No visual impact to favicons, thanks to rewriting on my own some of the Canvas 2d context
+      drawImage() algorithms, which are a little poor :-(
+      A migration task has been added to trigger only once, 1 minute after add-on loading,
+      and until all stored valid favicons are converted, so that this improvement applies also to
+      existing favicons.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/2
+- 2.0.15 Bugs and improvements
+    - Fix menu sizes not being consistent on Linux variation.
+    - Added an option to disable favison retrieval, as some users really do not use favicons.
+      Note that this allows to trigger massive refresh of all favicons, apart from the initial
+      load at install of the add-on, by setting the option, reloading the add-on, then removing
+      the option, and reloading again the add-on.
+      So removing the corresponding TODO, since this is done through this sequence.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/30
+    - Added option to remember size of resizeable objects = search pane, and bookmark properties
+      popup.
+      Along with a "Reset to defaults" button to come back to defaults if needed.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/26
+- 2.0.14 Bugs
+    - Corrected regression on drop into folder brought by 2.0.13.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/27
+    - Scroll to center for "Show bookmark" is only supported with FF > 58.0, so only
+      apply that improvement for versions >= 58.0, and revert to old behavior in older
+      version.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/25
+- 2.0.13 Bugs and improvements
+    - Fix folder twistie color change when hovering the mouse on a selected folder row
+      (it was not highlighting).
+    - Added context menu on top (system) folders to allow creating bookmarks, folders and
+      separators inside them. Also allowed paste into them, and drag and drop into them,
+      like native sidebar.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/27
+    - Modified scrolling behavior on "Show bookmark" for a search result, to now show the
+      bookmark at center of bookmark pane, so as to make previous context visible (previous
+      siblings, parents if no too far ..).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/25
+- 2.0.12 Bugs and improvements
+    - Small adjustment to highlight colors to make things more consistent between search pane
+      and bookmark pane.
+    - Made the insertion line a little more color intense when dragging bookmarks for better
+      visiblity.
+    - Firmed up support for FF56. However, there are limitations: separators are not well
+      supported by the WebExtension API until FF57, so I have to make them non movable and
+      non deleteable. Also there is no way to create a separator in the API, so that
+      operation is not supported.
+      And there are cases where we can't know that there is a separator, typically when the
+      separator is the last item in a folder.
+      Some other limitations/bugs like new tabs cannot refer to a parent tab, so they are
+      always created at end, and not besides current open tab. Or open bookmark in a new window
+      does not get the sidebar loaded, you have to go to the menus or to use the shortcut key
+      to force their loading. Or no way to have a timeout on failing connections, so favicon
+      retrieval can be slower in case of errors.
+      + Probably some others I didn't catch ..
+      => I strongly advise to upgrade to FF57 or higher !
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/23
+    - Changing minimum version of the add-on to be on FF 56, instead of FF 54. FF 56 appears to
+      be the real minimum I can support ..
+- 2.0.11 Bugs and improvements
+    - Some more robusteness against odd bookmarks
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/23
+    - Correct option "close search after show bookmark" to imply "leave tree open", else
+      user can end up not seeing the bookmark when the tree goes back to closed state.
+    - Changed the highlight behavior on focus and results to something hopefully simpler
+      and less confusing. Benefit is that after search pane close, a shown bookmark remains
+      highlighted if it is still visible.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/20
+- 2.0.10 Bugs and improvements
+    - Added option to immediately close search pane after showing a bookmark, per users
+      demand. Unchecked by default.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/20
+    - Added close of search pane when Esc is pressed anywhere in the sidebar, plus set focus
+      to the search box, if no context menu to close.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/20
+    - Tried to make faster and less conspicuous the change of position when opening bookmark
+      property popups, necessary because position is ignored by FF when creating popups/panels
+        https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
+    - Added support of two settings of FF which are made available to add-ons as of FF 59.x,
+      for opening bookmarks and search results in new tabs, instead of in current tab by
+      default:
+        about:config browser.tabs.loadBookmarksInTabs
+        about:config browser.search.openintab setting
+        Cf. https://github.com/aaFn/Bookmark-search-plus-2/issues/22
+    - Added robustness in the code for unusual cases where bookmarks have no type field, and
+      so we need to use the presence of the url field to distinguish between folders and bookmarks.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/23
+    - Removed a memory leak due to URL object which needs to be revoked after it has been
+      instantiated with "new URL (xx)", in favicon retrieval background process (worker),
+      as documented in https://developer.mozilla.org/en-US/docs/Web/API/URL/revokeObjectURL
+      and in https://developer.mozilla.org/en-US/docs/Web/API/URL/createObjectURL.
+      This could get to very high amounts of memory on initial load of the add-on when all
+      bookmarks require favicon retrieval, and crash FF.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/12
+- 2.0.9 Bugs and improvements
+    - Refresh search pane on favicon change/update for a bookmark when the pane is open,
+      in case a search result contains that bookmark, to display the favicon change in
+      "real time".
+    - Corrected a bug where pressing Enter in the Bookmark edition popup does not always save
+      last modifications.
+    - Corrected a bug which was not measuring properly save times for bookmark states when
+      enabling traces.
+    - Protect against oddities (neither bookmark nor folder nor separator, or bookmark
+      objects which are incomplete like without a URL), and trace them.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/23
+- 2.0.8 Improvements
+    - Save the bookmark property popup position when closing it, and restore it at the same
+      place. Exception: if invisible / in a different screen, then center it on same screen
+      as browser Window.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/19
+    - Added Escape and Enter keyboard shortcuts in the popup to Save/Add or Cancel/Close.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/19
+    - Changed behavior of the favicon fetches to avoid annoying user/password prompts by
+      default. This can somewhat decrease the success rate of getting favicons though, so adding
+      an option to enable cookies passing, with the annoying side effect of these prompts.
+      Note that clicking "Refresh favicon" on the context menu always includes authentication.
+      This allows to "force" favicon retrieval with higher chances.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/21
+- 2.0.7 Improvements
+    - Large performance improvement on insert / move / delete bookmark.
+      This was not visible with medium numbers of bookmarks (up to 10000), but getting more
+      and more visible with very big numbers beyond that (some people have nearly 80000 bookmarks).
+      This is now a constant and nearly instantaneous time to execute such operations on the tree,
+      independent of the number of bookmarks or of the distance between source and destination
+      positions in case of move.
+    - Introducing experimental mode of delaying load / display of non visible bookmarks, for
+      people having very big numbers of bookmarks (cf. nearly 80000 above).
+      However, hitting https://bugzilla.mozilla.org/show_bug.cgi?id=1396364 .. which is putting
+      to a halt that effort for now.
+      This would be a major breakthrough for those people, with fast availability of
+      the sidebar to start working with it, while hidden bookmarks are still being loaded in the
+      sidebar behind the scene.
+      So for now this mode is not effective, I am leaving the preference in the options page,
+      and the code for it inside, but not activating it, until either the bug is corrected,
+      or I devise a workaround.
+    - A few adjustments to preferences panel.
+    - Forbid a paste into cut folder (would lead to unpredicatble result ..).
+    - Added the version in the add-on title, and show it when hovering on the search magnifying
+      glass.
+- 2.0.6 Improvements
+    - Added dynamic refresh of search results (if there is a search active) when a bookmark or
+      folder (but not a separator) is created, modified or removed.
+      This allows to keep the search pane active for longer, while working on  the tree.
+    - Adapted fonts on Windows platform so that Windows 7 looks more in line with Windows 10,
+      specifying "Segoe UI" instead of "caption". This results in no change for Windows 10,
+      as "caption" is mapped to "Segoe UI" in that platform. However, "caption" was mapped to
+      "tahoma" under Windows 7, ending in a very different look.
+    - Decreased fonts from 13px to 12px on Mac, like in Linux, as it was a little too big
+      compared to native FF Bookmark sidebar.
+    - Added "Open parent(s)" action in context menu of a shown result, to open all parent
+      folders if the row was hidden, and if the preference "After "Show Bookmark", leave bookmark
+      open by default when closing search" is not set (if set, Open parent(s) is done automatically).
+    - Simplified wording for preferences, using shorter sentences for better readability.
+    - Gained around 10% on display performances during initial load by removing the usage of
+      DocumentFragment, which was supposed to improve things but apparently doesn't ..
+    - Prepared things for the experimental delayed load feature for large bookmark trees,
+      which should accelerate significantly the availability of the sidebar interface.
+      There is however a caveat :-(
+      Per documentation, FF does not give the separators when calling bookmarks.getChildren()
+      (nor bookmarks.get()) ..!
+      So I have to stick for now to bookmarks.getTree() (or bookmarks.getSubTree()) which is still
+      long in itself, and I have no way to break it in smaller pieces ..
+      However, from experience, this is around 1/3rd of the total time, so that should still allow
+      to be faster by a factor of around 3 for people with large number of bookmarks ...
 - 2.0.5 Bugs and improvements
     - Added support for drag and dropping the (i) icon of the Location bar
         https://github.com/aaFn/Bookmark-search-plus-2/issues/8
@@ -122,10 +415,6 @@ LIMitations / TODO's:
    This is a rare case, but it happens.
    For examble: https://sol-resine.ooreka.fr/comprendre/resine-sol-garage
  
-- TODO: Add massive refresh of all favicons, apart from the initial load at first start of the
-  sidebar just after installing the add-on.
-  For now, this can only be done individually by right clicking on bookmark items, one by one.
-
 - TODO: Add section to show the current tab as a "simili bookmark", allowing:
     - local (inside sidebar, more practical) drag & drop for bookmark creation,
     - on double click or right click menu, expands as a tabs panel for switching very quickly when we
@@ -150,11 +439,6 @@ LIMitations / TODO's:
   other page and finds a favicon ..
   Tried {redirect: "follow"} without success ... :-(
 
-- LIM: Pasting a folder and its object is slow. It has the approximate rhythm of 1 item by second.
-  That appears inherent to the Firefox bookmarks.create() method (bug ??).
-  I couldn't find any way to accelerate it, and there is no other available method to
-  create BookmarkTreeNode subtrees in one shot.
-
 - LIM: Did not find a way in Web Extension API's to open modal dialogs for "New bookmark.." and
   "New folder.." actions on context menus.
   So these are normal popups .. hope this won't be too much trouble. 
@@ -171,6 +455,19 @@ LIMitations / TODO's:
 
 - LIM: No management / display of bookmark tags, keywords, description field .. as Firefox does
   not expose those fields through its Web Extension API's.
+  See https://bugzilla.mozilla.org/show_bug.cgi?id=1225916
 
 - LIM: No way to synchronize the folders open state with the native FF bookmarks sidebar,
   or with the "All bookmarks" window, as this is not exposed by the Web Extension API's.
+  
+- LIM: The add-on works with FF56, however:
+    - Separators are not perfectly managed with the add-on because of FF56 limitations.
+    - It is not possible to create separators with the add-on, the function was made available
+      in the FF API only from version 57.
+    - Separators at end of a folder go undetected until there's seomthing added after them in
+      the bookmarks library in the native bookmark sidebar. Again goes away with FF57 and later.
+    - Also, the button is doing nothing, because the API function of opening/closing the sidebar
+      is only available with FF57 and higher.
+      So I am disabling it under FF56 .. Please remove it from the toolbar manually when using FF56,
+      it is useless in that version (but there is no way in code to make it appear conditionnally
+      to the FF version .. it is there for all or not there for all .. :-( ).
