@@ -1014,6 +1014,45 @@ function saveFldrOpen () {
 }
 
 /*
+ * Find the best bookmark title, similar to how FF works
+ *
+*/
+function getBestTitle(BTN, aDoNotCutTitle = true) {
+  let title;
+
+  // Normally, this is just the title, but we don't want empty items in
+  // the tree view so return a special string if the title is empty.
+  if (BTN.title) {
+    title = BTN.title;
+  } 
+  else {
+    // If node title is empty, try constructing it using the URI
+    try {
+      const uri = new URL(BTN.url);
+      let host = uri.host;
+      let pathname = uri.pathname;
+      let search = uri.search;
+      let hash = uri.hash;
+      
+      // If fileName is empty, use path to distinguish labels
+      if (aDoNotCutTitle) {
+        title = decodeURI(host + pathname + search + hash);
+      } else {
+        let fileName = pathname.substring(pathname.lastIndexOf("/") + 1, pathname.length);
+        title = decodeURI(host + (fileName ?
+                                  (host ? "/.../" : "") + fileName :
+                                    pathname + search + hash));
+      }
+    } 
+    catch (e) {
+      // Use (no title) for non-valid/standard URIs
+      title = "";
+    }
+  }
+  return title || "(no title)"; // TODO : move to _locales/en/messages.json
+}
+
+/*
  * Append a bookmark inside the search result sidebar table
  *
  * BTN = BookmarkTreeNode
@@ -1133,7 +1172,7 @@ function appendResult (BTN) {
 //      anchor.href = url;
 //    }
 //    anchor.classList.add("bkmkitem_b");
-    anchor.title = title+"\n"+url;
+    anchor.title = (title ? title + "\n" : "") + url;
 //    anchor.draggable = false;
     anchor.style.marginLeft = "16px";
 //    cell.appendChild(anchor);
@@ -1152,7 +1191,7 @@ function appendResult (BTN) {
 
 //    let span = document.createElement("span"); // Assuming it is an HTMLSpanElement
 //    span.classList.add("favtext");
-    span.textContent = title;
+    span.textContent = getBestTitle(BTN);
 //    span.draggable = false;
 //    anchor.appendChild(span);
     cell.appendChild(anchor);
@@ -2024,7 +2063,7 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
       anchor.href = url;
     }
 //    anchor.classList.add("bkmkitem_b");
-    anchor.title = title+"\n"+url;
+    anchor.title = (title ? title + "\n" : "") + url;
 //    anchor.draggable = false; // False by default for <div> 
     if (level > 0) {
       anchor.style.marginLeft = (LevelIncrementPx * level + 16)+"px";
@@ -2061,7 +2100,7 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
 
 //    let span = document.createElement("span"); // Assuming it is an HTMLSpanElement
 //    span.classList.add("favtext");
-    span.textContent = title;
+    span.textContent = getBestTitle(BN);
 //    span.draggable = false; // False by default for <span>
 //    anchor.appendChild(span);
     cell.appendChild(anchor);
@@ -2585,12 +2624,12 @@ function bkmkChangedHandler (id, changeInfo) {
   let item = row.firstElementChild.firstElementChild;
   if (isBookmark) { // item is a .bkmkitem_b <div>
     // item.title mixes both, so is always updated
-    item.title = BN.title+"\n"+BN.url;
+     item.title = (BN.title ? BN.title + "\n" : "") + BN.url;
 
     // Update what changed ...
     if (cTitle != undefined) { // Title changed
       let span = item.firstElementChild.nextElementSibling;
-      span.textContent = cTitle;
+      span.textContent = getBestTitle(BN);
     }
     if (cUrl != undefined) { // URL changed
       if (isSpecial) {
