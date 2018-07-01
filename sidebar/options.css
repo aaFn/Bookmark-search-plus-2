@@ -1,3 +1,16 @@
+.fontdflt {
+  font: caption;
+}
+
+.fontwin {
+  font: 12px "Segoe UI";
+}
+
+#group {
+  border: 1px solid #D7D7D7;
+  padding: 10px 10px;
+}
+
 img {
   border: 1px solid black;
 }

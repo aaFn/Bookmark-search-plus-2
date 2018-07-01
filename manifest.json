@@ -5,13 +5,17 @@
   "description": "Displays and filters bookmarks on search string, show parent folders.",
   "author": "aaFn",
 
-  "version": "2.0.5",
+  "version": "2.0.26",
 
   "applications": {
     "gecko": {
       "id": "bookmarksearchplus2@aafn.org",
-      "strict_min_version": "54.0a1"
+      "strict_min_version": "56.0"
     }
+  },
+
+  "background": {
+    "scripts": ["sidebar/background.js"]
   },
 
   "sidebar_action": {
@@ -20,7 +24,14 @@
     "default_panel": "sidebar/panel.html"
   },
 
-  "permissions": ["<all_urls>", "storage", "unlimitedStorage", "tabs", "bookmarks", "history"],
+  "browser_action": {
+    "browser_style": false,
+    "default_icon": "icons/star2.png",
+    "default_title": "Bookmark search plus 2"
+  },
+
+  "permissions": ["<all_urls>", "storage", "unlimitedStorage", "tabs", "bookmarks", "history",
+                  "browserSettings"],
 
   "options_ui": {
     "page": "sidebar/options.html",
