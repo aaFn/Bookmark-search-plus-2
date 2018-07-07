@@ -48,7 +48,7 @@ let backgroundPage;
 browser.runtime.getBackgroundPage()
 .then(
   function (page) {
-	// In a private browsing window (incognito), this will be null 
+	// In a private browsing window (incognito), this will be null
 	backgroundPage = page;
   },
   function (error) {
@@ -201,7 +201,7 @@ SeparatorTempl.appendChild(tmpElem1);
 //let anchor = document.createElement("a"); // Assuming it is an HTMLAnchorElement
 const BookmarkTempl = document.createElement("div"); // Assuming it is an HTMLDivElement
 BookmarkTempl.classList.add("bkmkitem_b");
-BookmarkTempl.draggable = false; // False by default for <div> 
+BookmarkTempl.draggable = false; // False by default for <div>
 tmpElem1 = document.createElement("img"); // Assuming it is an HTMLImageElement
 tmpElem1.classList.add("favicon");
 // Cannot prepare image as it is taking much time ..
@@ -221,7 +221,7 @@ BookmarkTempl.appendChild(tmpElem1);
 //let anchor = document.createElement("a"); // Assuming it is an HTMLAnchorElement
 const NFBookmarkTempl = document.createElement("div"); // Assuming it is an HTMLDivElement
 NFBookmarkTempl.classList.add("bkmkitem_b");
-NFBookmarkTempl.draggable = false; // False by default for <div> 
+NFBookmarkTempl.draggable = false; // False by default for <div>
 tmpElem1 = document.createElement("img"); // Assuming it is an HTMLImageElement
 tmpElem1.classList.add("nofavicon");
 tmpElem1.draggable = false; // True by defaul for <img>
@@ -301,47 +301,47 @@ let retainlastselectedbook_option = false ; // Boolean
  */
 function saveLastSelectedBN_id( bn_id ){
 
-  // save to storage    
+  // save to storage
   browser.storage.local.set({
       lastSelectedBN_id: bn_id
   })
 //  .then(function() {
-//      trace("saveLastSelectedBN_id | bn_id:"+bn_id+" done.");      
+//      trace("saveLastSelectedBN_id | bn_id:"+bn_id+" done.");
 //  });
 }
 
 /*
- * Jump to the last selected BN_id row 
- */ 
+ * Jump to the last selected BN_id row
+ */
 function gotoLastSelectedBN_id(){
 
   if( lastSelectedBN_id != undefined ) {
   	let jumpToRow = curRowList[lastSelectedBN_id];
     handleResultClick(jumpToRow);  // reuse handleResultClick()
-    
-    //trace("gotoLastSelectedBN_id | lastSelectedBN_id: "+lastSelectedBN_id);     
+
+    //trace("gotoLastSelectedBN_id | lastSelectedBN_id: "+lastSelectedBN_id);
   }
 }
 
 /*
  * Get row from the current target
- * 
+ *
  * target = object under mouse cursor
- * 
+ *
  * Return HTMLTableRowElement or undefined
- * 
- */ 
+ *
+ */
 function getCurBookRow (target) {
 
   let parent;
   let row;
   let level = 0;
-  
-  if( target.nodeName.toLowerCase() !== 'tr' ) { 
+
+  if( target.nodeName.toLowerCase() !== 'tr' ) {
     parent = target.parentElement ;
     while ( parent != null ){
       level++ ;
-      trace(".nodeName:"+parent.nodeName) ;
+      // trace(".nodeName:"+parent.nodeName) ;
       if( parent.nodeName.toLowerCase() === 'tr' ){ // a TR row found
         row = parent ;
         break ;
@@ -352,7 +352,7 @@ function getCurBookRow (target) {
   else{
     row = target ;
   }
-  console.log("getCurBookRow | Level:"+level+" target:"+target) ; 
+  // console.log("getCurBookRow | Level:"+level+" target:"+target) ;
   return(row) ;
 }
 // ####
@@ -408,7 +408,7 @@ function getCurBookRow (target) {
 // unmodifiable Optional
 //    undefined or a string as described by the type bookmarks.BookmarkTreeNodeUnmodifiable. Represents the reason that the node can't be changed.
 //    Always undefined today
-function BookmarkNode (id, type, level, parentId, dateAdded, protect = false, 
+function BookmarkNode (id, type, level, parentId, dateAdded, protect = false,
 		               title = undefined, faviconUri = undefined, fetchedUri = false, url = undefined,
 		               children = undefined, dateGroupModified = undefined,
 		               unmodifiable = undefined) {
@@ -430,7 +430,7 @@ function BookmarkNode (id, type, level, parentId, dateAdded, protect = false,
 
 /*
  * Recursively serialize (JSON like) the BN tree
- * 
+ *
  * Returns: a String of form: {toJSON1,toJSON2,... }
  * 		for all fieldx which are not undefined
  * 		where toJSONx is JSON.stringify(fieldx) for all
@@ -448,7 +448,7 @@ function BN_serialize (BN) {
 
 /*
  * Recursively deserialize (JSON like) the BN tree from a String
- * 
+ *
  * Returns: a BN tree
  */
 function BN_deserialize (jsonstr) {
@@ -528,7 +528,7 @@ function BN_lastDescendant (BN) {
 // Create recursively a copy of BookmarkNode.
 // Return the copy.
 function BN_copy (BN) {
-  let node = new BookmarkNode (BN.id, BN.type, BN.level, BN.parentId, BN.dateAdded, BN.protect, 
+  let node = new BookmarkNode (BN.id, BN.type, BN.level, BN.parentId, BN.dateAdded, BN.protect,
 		                       BN.title, BN.faviconUri, BN.fetchedUri, BN.url,
 		                       undefined, BN.dateGroupModified,
 		                       BN.unmodifiable);
@@ -642,9 +642,9 @@ function BN_insert (BN, parentBN, index = -1, real = true, bnList = curBNList) {
 
 /*
  * Get type from a BTN
- * 
+ *
  * BTN = BookmarkTreeNode
- * 
+ *
  * Returns BTN type as a String
  */
 function getType (BTN) {
@@ -824,7 +824,7 @@ function BN_create (BTN, level, parentBN = undefined) {
         faviconWorker.postMessage(["icon:"+uglyHackTabFavIconUrl, node, enableCookies_option]);
 //        trace("Retrieval demand 1 sent for icon:"+uglyHackTabFavIconUrl);
         uglyHackTabFavIconUrl = undefined; // One shot ..
-      } 
+      }
     }
   }
 
@@ -859,7 +859,7 @@ function BN_create (BTN, level, parentBN = undefined) {
 
 /*
  * Trace when needed ...
- * 
+ *
  * text = string to trace
  * force (optional) = if true, force putting trace in box even if not activated (for later display)
  */
@@ -871,7 +871,7 @@ function trace (text, force = false) {
 
 /*
  * Trace a bookmark item
- * 
+ *
  * BTN = BookmarkTreeNode
  */
 function traceBTN (BTN) {
@@ -882,7 +882,7 @@ function traceBTN (BTN) {
 
 /*
  * Rebuild the full BNList from a BN tree
- * 
+ *
  * Returns: nothing, just completes the BNList
  */
 function rebuildBNList (BNList, BN) {
@@ -936,10 +936,10 @@ function saveBNList () {
   else {
     let delay = curTime - lastSaveCallTime; // In ms
 	if (delay < 2000) { // Doing favicon fetching, increase to maximum
-	  saveHysteresis = SaveMaxHysteresis; 
+	  saveHysteresis = SaveMaxHysteresis;
 	}
 	else { // Reset to minimum
-  	  saveHysteresis = SaveMinHysteresis; 
+  	  saveHysteresis = SaveMinHysteresis;
 	}
 	lastSaveCallTime = curTime;
   }
@@ -1034,7 +1034,7 @@ function saveBNList () {
           faviconWorker.onmessageerror = msgerrorFavicon;
         }
       }
-      else { // Already saving .. queue and do only once later when ongoing one 
+      else { // Already saving .. queue and do only once later when ongoing one
              // + hysteresis is finished
         saveQueued = true;
         resolve(); // Send promise for anybody waiting ..
@@ -1237,7 +1237,7 @@ function clearCellHighlight () {
 
 /*
  * Set cell highlight
- * 
+ *
  * cell = .brow cell to set. Preserve the Reshidden flag if this is not changing cellHighlight.
  */
 function setCellHighlight (cell) {
@@ -1323,7 +1323,7 @@ function triggerUpdate () {
 /*
  * Call to refresh favicon of any result corresponding to a modified BTN in a bookmark search,
  * if there is one active.
- * 
+ *
  * btnId = Id of modified BookmarkTreeNode id string
  * uri = new URI for the favicon
  */
@@ -1406,7 +1406,7 @@ function manageSearchTextHandler () {
     resetTreeVisiblity();
 
     // Remember search pane height if needed
-    let sh = SearchResult.style.height; 
+    let sh = SearchResult.style.height;
     if (sh != "") { // The search result pane size is different
     	            // from its default value set in the CSS
     	            // which is 20% (as seen in Computed Style)
@@ -1446,9 +1446,9 @@ function clearSearchTextHandler () {
 /*
  * Get a cloned BTN object, but without the recursive structure of children.
  * This is to avoid structured cloning in postMessage().
- * 
+ *
  * BTN = a BookmarkTreeNode
- * 
+ *
  * Return another BookmarkTreeNode, copied from BTN, byut without the children tree
  */
 function cloneBTN (BTN) {
@@ -1469,9 +1469,9 @@ function cloneBTN (BTN) {
 /*
  * Select closest x-icon image as possible to 16x16, and return it
  * as an Uint8ClampedArray
- * 
+ *
  * uri = a data:image/x-icon base64 string describing the image
- * 
+ *
  * Returns null if no choice to make (or wrong format),
  * or an uri with a data:image/x-icon base64 string containing only the selected image
  */
@@ -1490,7 +1490,7 @@ function selectXIconImg (uri) {
 //  console.log("str.length: "+str.length);
   // Do a bit of verifications on structure as sometimes the mime type doesn't correspond
   // to contents !!
-  let header = str.slice(0,4); 
+  let header = str.slice(0,4);
   if ((header != XIconSignature1) && (header != XIconSignature2)) {
 //    console.log("not an x-icon: "+uri);
 	return(null);
@@ -1582,7 +1582,7 @@ function selectXIconImg (uri) {
       incr = end - i;
     }
     str += String.fromCharCode.apply(null, selIDData.subarray(i,i+incr));
-  }  
+  }
   uri += btoa(String.fromCharCode.apply(null, str));
 */
 /*
@@ -1617,7 +1617,7 @@ console.log("offset3: "+str.charCodeAt(21));
 
 /*
  * Our own 16x16 downscaling algorithm ..
- * 
+ *
  * srcIDData = an ImageData of source
  * tgtIDData = a 16x16 ImageData at target
  * nh = Integer, natural height
@@ -1668,7 +1668,7 @@ swy = 0;
 	  for (pyTmp=pyInt ; pyTmp<psyInt ; pyTmp++) {
 		srcIndex = pyTmp*rowsize + pxInt*4;
 		if (pyTmp == pyInt) {
-		  wy = pyInt + 1 - py;  
+		  wy = pyInt + 1 - py;
 		}
 		else if (pyTmp == psyInt_1) {
 		  wy = psy - psyInt_1;
@@ -1680,7 +1680,7 @@ swy = 0;
 //swx = 0;
 		for (pxTmp=pxInt ; pxTmp<psxInt ; pxTmp++) {
 		  if (pxTmp == pxInt) {
-		    wx = pxInt + 1 - px;  
+		    wx = pxInt + 1 - px;
 		  }
 		  else if (pxTmp == psxInt_1) {
 			wx = psx - psxInt_1;
@@ -1780,7 +1780,7 @@ function migrate16x16 () {
 		  if (migr16x16Len <= 0) {
 			// Set migration as finished
 			trace("Migration to 16x16 favicons complete");
-			trace("Count of abnormal favicons: "+count0x0Favicons, true); 
+			trace("Count of abnormal favicons: "+count0x0Favicons, true);
 		    structureVersion += VersionImg16;
 		    browser.storage.local.set({
 		  	  structureVersion: structureVersion
@@ -1880,7 +1880,7 @@ function migrate16x16 () {
   else {
 	// Set migration as finished
 	trace("Nothing to migrate to 16x16 favicons");
-	trace("Count of abnormal favicons: "+count0x0Favicons, true); 
+	trace("Count of abnormal favicons: "+count0x0Favicons, true);
 	structureVersion += VersionImg16;
 	browser.storage.local.set({
 	 structureVersion: structureVersion
@@ -1945,7 +1945,7 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
   let level = row.dataset.level = BN.level; // Keep level of bookmark in the data-level attribute
   if (level < highest_open_level)   highest_open_level = level;
   else if (level > highest_open_level) { // If not in an open part, hide the row
-    row.hidden = true; 
+    row.hidden = true;
   }
   row.draggable = true; // Always .. and we will use dataset.protect to forbid move
                         // of special elements.
@@ -2089,7 +2089,7 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
     }
 //    anchor.classList.add("bkmkitem_b");
     anchor.title = title+"\n"+url;
-//    anchor.draggable = false; // False by default for <div> 
+//    anchor.draggable = false; // False by default for <div>
     if (level > 0) {
       anchor.style.marginLeft = (LevelIncrementPx * level + 16)+"px";
     }
@@ -2159,9 +2159,9 @@ function insertFF56EndGapSep (parentBN) {
 
 /*
  * Calculate the real length of a folder, including itself, its bookmarks and length of sub-folders
- * 
+ *
  * folderBN = folder BookmarkNode
- * 
+ *
  * Returns the (integer) real length of the folder
  */
 /*
@@ -2182,10 +2182,10 @@ function realLength (folderBN) {
 
 /*
  * Calculate the real offset from parent, including length of sub-folders between parent and node
- * 
+ *
  * parentBN = BookmarkNode
- * internalPos = 0 based index of parentBN children 
- * 
+ * internalPos = 0 based index of parentBN children
+ *
  * Returns the (integer) real offset from parent for relative position inside bookmarksTable.
  */
 /*
@@ -2210,7 +2210,7 @@ function realOffset (parentBN, internalPos) {
  * parentRow = HTMLTableRowElement of the parent (when known)
  * parentLevel = integer, parent level (when known)
  * parentOpen = Boolean, whether the parent is intended to be open or not (when known)
- * 
+ *
  * Relies on a global variable insertRowIndex to be set by the caller, and maintains it
  *    = integer, position in bookmarksTable where to insert. (This is because there is
  *      no "pass by reference" in javascript ... only pass by value :-( )
@@ -2271,7 +2271,7 @@ function insertBkmks (BN, parentRow, parentLevel = undefined, parentOpen = undef
     row = insertBookmarkBN(BN); // Append row
     insertRowIndex++;
   }
-  else { 
+  else {
     row = insertBookmarkBN(BN, insertRowIndex++);
   }
 
@@ -2297,7 +2297,7 @@ function insertBkmks (BN, parentRow, parentLevel = undefined, parentOpen = undef
  *
  * BTN = BookmarkTreeNode
  * level = integer, the tree depth
- * 
+ *
  * Return created BookmarkNode tree
  */
 let countDuplicates = 0;
@@ -2305,8 +2305,8 @@ function buildTree (BTN, level) {
   let BTN_id = BTN.id;
 /*
   // Detect objects which would be structurally duplicated = appear several times
-  // with same bookmark is, supposed to be unique. 
-  let BN = curBNList[BTN_id]; 
+  // with same bookmark is, supposed to be unique.
+  let BN = curBNList[BTN_id];
   if (BN != undefined) { // Already exists !!
     let newId = "dup"+(countDuplicates++)+"-"+BTN_id;
     trace("Duplicate BTN.id = "+BTN_id+" !! Re-id to : "+newId, true);
@@ -2330,7 +2330,7 @@ function buildTree (BTN, level) {
 	    let index, id;
 	    let node1;
         for (let i of btnChildren) {
-    	  index = i.index; 
+    	  index = i.index;
     	  while (j < index) {
     	    id = "separator" + countSeparators;
     	    node1 = new BookmarkNode (id, "separator", level+1, BTN_id, 0,
@@ -2364,7 +2364,7 @@ function buildTree (BTN, level) {
  *
  * id = string. The new bookmark item's ID.
  * BTN = BookmarkTreeNode. Information about the new bookmark item.
- * 
+ *
  * Note: we got a problem: when creating several bookmarks in a row very fast, like in
  *       "Mark all tabs", since getSubTree() can be quite long, we're getting plenty of requests
  *       nearly at the same time just after the initial parent folder,  which are its children,
@@ -2377,7 +2377,7 @@ function buildTree (BTN, level) {
  * => Async/await is not helping ... still getting things in "paralleled" disorder :-(
  * => Would need semaphores or true synchronicity, but none of this exists in javascript :-(
  * => Have to implement a queueing mechanism at entry .. again, javascript is a crap language ..
- * 
+ *
  * Global variable isOtherThanSeparatorCreated is set to true if something other than a
  * separator (folder or bookmark) was created in the sequence.
  */
@@ -2387,8 +2387,8 @@ let isOtherThanSeparatorCreated;
 function handleCreateRequest () {
   // Get first element in queue
   let req = createReqQueue[0];
-  let id = req[0]; 
-  let BTN = req[1]; 
+  let id = req[0];
+  let BTN = req[1];
 //  trace("Processing id: "+id+" BTN: "+BTN);
 
   // We need the parent to calculate the real offset of insertion
@@ -2399,7 +2399,7 @@ function handleCreateRequest () {
   // Create the new BN tree and insert it under its parent
   let BN = buildTree(BTN, parentBN.level+1);
   BN_insert(BN, parentBN, index);
-  
+
   // Find insertion point, setting it in global variable insertRowIndex
   // We need to retrieve the insertion point the hard way if we do not want to call
   // getSubtree() which is very very long ...
@@ -2440,7 +2440,7 @@ function handleCreateRequest () {
 	isOtherThanSeparatorCreated = true;
   }
   saveBNList();
-  
+
 //  let t3 = new Date();
 //  trace(t3.getTime()+" Create handler delay: "+(t3.getTime() - t1.getTime()));
 
@@ -2576,7 +2576,7 @@ function bkmkRemovedHandler (id, removeInfo) {
   let row = curRowList[id];
 
   // Remove item and its children from curBNList
-  let bn = curBNList[id]; 
+  let bn = curBNList[id];
   BN_delete(bn, removeInfo.parentId);
 
   // Remove item and its children from display, and from the appropriate display lists
@@ -2692,7 +2692,7 @@ function bkmkChangedHandler (id, changeInfo) {
  *   {parentId: string. The new parent folder.
  *    index: integer. The new index of this item in its parent.
  *    oldParentId: string. The old parent folder.
- *    oldIndex: integer. The old index of the item in its parent. 
+ *    oldIndex: integer. The old index of the item in its parent.
  *   }
  *
  * Note: same problem as with bkmkCreatedHandler, since Firefox when reordering a folder contents
@@ -2706,8 +2706,8 @@ let moveReqQueue = []; // Array of move requests, to serialize and cadence their
 function handleMoveRequest () {
   // Get first element in queue
   let req = moveReqQueue[0];
-  let id = req[0]; 
-  let moveInfo = req[1]; 
+  let id = req[0];
+  let moveInfo = req[1];
 //  trace("Processing id: "+id+" moveInfo: "+moveInfo);
 
   // Retrieve the real BookmarkNode and all its children, and its new parent
@@ -2805,7 +2805,7 @@ function bkmkMovedHandler (id, moveInfo) {
  * id = string. ID of the folder whose children were reordered.
  * reorderInfo = an object containing info about the reordered item.
  *   {childIds: array of string. Array containing the IDs of all the bookmark items in this folder,
- *              in the order they now appear in the UI. 
+ *              in the order they now appear in the UI.
  *   }
  */
 function bkmkReorderedHandler (id, reorderInfo) {
@@ -2844,9 +2844,9 @@ function bkmkReorderedHandler (id, reorderInfo) {
 
 /*
  * Open parents of .reshidden row
- * 
+ *
  * row is an HTMLTableRowElement
- * 
+ *
  * Relies on Global variable firstVisibleParentRow, set by handleResultClick when highlighting
  * the source row of selected result, or by checkVisibility.
  */
@@ -2872,7 +2872,7 @@ function openResParents (row) {
       }
     }
   } while (BN.level > level); // The last ancestor is necessarily closed .. so do it also
-  
+
   // Save new open state
   saveFldrOpen();
 
@@ -2884,7 +2884,7 @@ function openResParents (row) {
  * Verify visiblity of a BookmarkNode
  *
  * BN_id is a String.
- * 
+ *
  * Return true if BN is visible, else false and set the global variable firstVisibleParentRow
  * to the lowest visible ancestor, from root.
  */
@@ -2936,7 +2936,7 @@ function handleResultClick (resultRow) {
   let srcRow = curRowList[resultBN_id];
   if (srcRow != undefined) { // Protect against unlisted bookmarks, like "Tous les marques-pages"
 	                         // which do not appear in getTree(), but appear in search() !!
-    
+
 //    trace("Row: "+rcRow+" resultBN_id: "+resultBN_id+" index: "+srcRow.rowIndex);
     let srcHidden = srcRow.hidden;
     if (srcHidden) {
@@ -2987,7 +2987,7 @@ function handleResultClick (resultRow) {
       	  curFldrOpenList[BN_id] = true;
         }
       }
-    
+
       // And now, unhide down all hidden elements after the shown item, until we find a
       // level < last_open_level or we reach end of table. Do that only on elements which are
       // at the same level than an ancestor we had to open => strictly increasing level sequence.
@@ -3189,7 +3189,7 @@ function resultsMouseHandler (e) {
 function bkmkMouseHandler (e) {
   let target = e.target; // Type depends ..
   let className = target.className;
-  trace("Bookmark click event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" target: "+target+" class: "+className);
+  // trace("Bookmark click event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" target: "+target+" class: "+className);
 
   // The click target is one of .brow cell, .twistiexx img (if folder),
   // .bkmkitem_x div, .favseparator div, .favicon or .favttext
@@ -3333,7 +3333,7 @@ function resultsAuxHandler (e) {
 function bkmkAuxHandler (e) {
   let target = e.target; // Type depends ..
   let className = target.className;
-  trace("Bookmark aux event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" phase: "+e.eventPhase+" target: "+target+" class: "+className);
+  // trace("Bookmark aux event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" phase: "+e.eventPhase+" target: "+target+" class: "+className);
 
   // Be careful, button 2 (contextmenu) also ends up here :-(
   if (e.button == 1) {
@@ -3381,7 +3381,7 @@ function bkmkAuxHandler (e) {
 
 /*
  * Display menu, at a point fully visible in the viewport
- * 
+ *
  * menu: an Element
  * posY: integer, initial position Y
  * posX: integer, initial position X
@@ -3416,7 +3416,7 @@ function drawMenu (menu, posY, posX) {
 
 /*
  * Clear any menu, if drawn
- * 
+ *
  * Returns true if at least one menu was closed
  */
 function clearMenu () {
@@ -3487,7 +3487,7 @@ function clearMenu () {
 
 /*
  * Receive event from right clicks on results table, and display context menu
- * 
+ *
  * e is of type MouseEvent (contextmenu)
  */
 function resultsContextHandler (e) {
@@ -3551,14 +3551,14 @@ function resultsContextHandler (e) {
 
 /*
  * Receive event from right clicks on bookmarks table, and display context menu
- * 
+ *
  * e is of type MouseEvent (contextmenu)
  */
 let noPasteMinRowIndex = -1;
 let noPasteMaxRowIndex = -1;
 function bkmkContextHandler (e) {
   let target = e.target; // Type depends ..
-  trace("Bookmark context event: "+e.type+" target: "+target+" class: "+target.classList);
+  // trace("Bookmark context event: "+e.type+" target: "+target+" class: "+target.classList);
 
   // Go up to the row level
   let className = target.className;
@@ -3707,9 +3707,9 @@ function bkmkContextHandler (e) {
 
 /*
  * Drag start event handler
- * 
+ *
  * e = DragEvent
- * 
+ *
  * Sets global variables rowDragged (HTMLRowElmeent) and BNDragged (BookmarkNode),
  * as well as the index min/max range indicating the no drop zone.
  */
@@ -3767,7 +3767,7 @@ function bkmkDragStartHandler (e) {
 
 /*
  * Drag end event handler. This is on the element which was in Drag start = HTMLTableRowElement
- * 
+ *
  * e = DragEvent
  */
 function bkmkDragEndHandler (e) {
@@ -3778,9 +3778,9 @@ function bkmkDragEndHandler (e) {
 
 /*
  * Check if we support darg and drop of the source element
- * 
+ *
  * dt = DataTransfer
- * 
+ *
  * Return Boolean = true if supported, else false
  */
 function checkDragType (dt) {
@@ -3808,9 +3808,9 @@ function checkDragType (dt) {
 
 /*
  * Get row from the current target
- * 
+ *
  * target = object under mouse cursor
- * 
+ *
  * Return HTMLTableRowElement
  * Also sets the global variables bkmkitem_x to the piece to highlight for insertion
  * and the Booleans isBkmkitem_f and isFolderClosed
@@ -3885,7 +3885,7 @@ function getDragToRow (target) {
 }
 
 /*
- * Function to handle a timeout on dragging over a closed folder, to open it 
+ * Function to handle a timeout on dragging over a closed folder, to open it
  */
 let openFolderTimerID = null;
 function openFolderTimeoutHandler () {
@@ -3904,9 +3904,9 @@ function openFolderTimeoutHandler () {
 
 /*
  * Highlight the insert point on bkmkitem_x
- * 
+ *
  * e = DragEvent
- * 
+ *
  * Return -1, 0 or +1 to indicate if before, on or after bkmkitem_x
  * Also activates a timer so that when staying on a closed folder for more than 1s, then
  * we open it.
@@ -3919,7 +3919,7 @@ function highlightInsert (e) {
 //  trace("x: "+bkmkRect.x+" y: "+bkmkRect.y+" left: "+bkmkRect.left+" top: "+bkmkRect.top+" right: "+bkmkRect.right+" bottom: "+bkmkRect.bottom+" width: "+bkmkRect.width+" height: "+bkmkRect.height)
 //  trace("clientX: "+e.clientX+" clientY: "+e.clientY+" offsetX: "+e.offsetX+" offsetY: "+e.offsetY+" pageX: "+e.pageX+" pageY: "+e.pageY+" screenX: "+e.screenX+" screenY: "+e.screenY)
   let insertPos;
-  let y = e.clientY; 
+  let y = e.clientY;
 
   if (isBkmkitem_f) { // We can drop inside a folder
 	if (!isProtected            // Cannot insert before or after a protected (= top) folder
@@ -3939,7 +3939,7 @@ function highlightInsert (e) {
         style.borderBottomWidth = "0";
       }
 	}
-	else if (!isProtected            // Cannot insert before or after a protected (= top) folder 
+	else if (!isProtected            // Cannot insert before or after a protected (= top) folder
 	         && (y >= bkmkRect.bottom - bkmkRect.height / 4)) {
 	  if (openFolderTimerID != null) { // Cancel timeout
 		clearTimeout(openFolderTimerID);
@@ -4013,9 +4013,9 @@ function highlightInsert (e) {
 
 /*
  * Remove insert point on bkmkitem_x
- * 
+ *
  * e = DragEvent
- * 
+ *
  * Cancels any folder closed timer
  */
 function highlightRemove (e) {
@@ -4037,7 +4037,7 @@ function highlightRemove (e) {
 
 /*
  * Drag enter event handler
- * 
+ *
  * e = DragEvent
  */
 function bkmkDragEnterHandler (e) {
@@ -4073,7 +4073,7 @@ function bkmkDragEnterHandler (e) {
 
 /*
  * Drag over event handler
- * 
+ *
  * e = DragEvent
  */
 function bkmkDragOverHandler (e) {
@@ -4109,7 +4109,7 @@ function bkmkDragOverHandler (e) {
 
 /*
  * Drag leave event handler
- * 
+ *
  * e = DragEvent
  */
 function bkmkDragLeaveHandler (e) {
@@ -4139,7 +4139,7 @@ function bkmkDragLeaveHandler (e) {
 
 /*
  * Drag exit event handler
- * 
+ *
  * e = DragEvent
  */
 function bkmkDragExitHandler (e) {
@@ -4169,7 +4169,7 @@ function bkmkDragExitHandler (e) {
 
 /*
  * Drag drop event handler
- * 
+ *
  * e = DragEvent
  */
 function bkmkDropHandler (e) {
@@ -4203,7 +4203,7 @@ function bkmkDropHandler (e) {
 	  let BN_id = row.dataset.id;
 	  let BN = curBNList[BN_id];
 
-	  // Get data to drop, and insert / move it 
+	  // Get data to drop, and insert / move it
 	  // When the dragged element is one of our bookmarks its dt.types will be
 	  //   dt.types        : application/x-bookmark,[text/uri-list,]text/plain
 	  // When it is a tab, it will be
@@ -4427,14 +4427,14 @@ function bkmkDropHandler (e) {
 /*
  * Paste bookmark contents (recursively because can only create one by one) at the
  * designated place.
- * 
+ *
  * BN = BookmarkNode to paste - If it is undefined, it signals last sibling reached at
  *      current recursion level.
  * newParentBN = BookmarkNode of new parent to paste into
  * index = integer position in parent
  * recurLevel (optional, default 0) = relative resursion level to initial paste - used to detect
  *                                    when to end
- * 
+ *
  * Relies on stackBN, stackNewBN and stackIndex global arrays to execute the recursion without
  * synchronous returns.
  */
@@ -4566,12 +4566,12 @@ function pasteBkmk (BN, newParentBN, index = undefined, recurLevel = 0) {
 
 /*
  * Move bookmark at the designated place.
- * 
+ *
  * BN = BookmarkNode to move
  * newParentBN = BookmarkNode of new parent to paste into
  * newIndex = integer position in parent
- * 
- * Return true if moved, else false. 
+ *
+ * Return true if moved, else false.
  */
 function moveBkmk (BN, newParentBN, newIndex = undefined) {
 //  trace("Move BN: "+BN.id+" Parent: "+newParentBN.id+" index: "+newIndex);
@@ -4606,9 +4606,9 @@ function moveBkmk (BN, newParentBN, newIndex = undefined) {
 
 /*
  * Retrieve rowIndex for an action in a context menu
- * 
+ *
  * item is an HTMLDivElement or and HTMLElement (<b>) in a menu
- * 
+ *
  * Returns the rowIndex
  */
 function getRowIndex (item) {
@@ -4627,9 +4627,9 @@ function getRowIndex (item) {
 
 /*
  * Retrieve row for an action in a context menu
- * 
+ *
  * item is an HTMLDivElement or and HTMLElement (<b>) in a menu
- * 
+ *
  * Returns the row in context
  */
 function getRow (item) {
@@ -4646,10 +4646,10 @@ function getRow (item) {
   let rowIndex = parseInt(menu.dataset.index, 10);
   let row;
   if (menu.id.startsWith("myr")) { // A results table menu
-	row = resultsTable.rows[rowIndex]; 
+	row = resultsTable.rows[rowIndex];
   }
   else { // A bookmarks table menu
-	row = bookmarksTable.rows[rowIndex]; 
+	row = bookmarksTable.rows[rowIndex];
   }
 
   return(row);
@@ -4657,14 +4657,14 @@ function getRow (item) {
 
 /*
  * Upon Bookmark creation menu event, open Window to let the user enter values in fields
- * 
+ *
  * BTN is of type BookmarkTreeNode (promise from browser.bookmarks.create())
  */
 function createBookmark (BTN) {
 //  let popupURL = browser.extension.getURL("sidebar/popup.html");
   // Did not find a good way to get a modal dialog so far :-(
   // 1) let sign = prompt("What's your sign?");
-  //    creates a modal inside the sidebar, half hidden if the sidebar is not large enough. 
+  //    creates a modal inside the sidebar, half hidden if the sidebar is not large enough.
   // 2) It appears window.open works outside of the .then, but not inside !!
   //    I do not understand why ..
   //    Anyway, "modal" is ignored, and I can't figure how to get
@@ -4707,14 +4707,14 @@ function createBookmark (BTN) {
   		popupleft_option: left
   	  });
   	}
-  	  
+
     browser.windows.create(
       {titlePreface: "New bookmark",
 	   type: "popup",
 //	   type: "detached_panel",
 	   // Using a trick with URL parameters to tell the window which type
        // it is, which bookmark id, .. etc .. since titlePreface doesn't appear to work
-	   // and there appears to be no way to pass parameters to the popup by the call. 
+	   // and there appears to be no way to pass parameters to the popup by the call.
 	   url: url,
 //----- Workaround for top and left position parameters being ignored for panels -----
 // Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
@@ -4724,7 +4724,7 @@ function createBookmark (BTN) {
 // internal resize seems to work after that.
 // Also tried to start minimized, but the window pops in a big size first before being minimized,
 // even les pretty.			   .
-// => .. FF does not seem very clean on all this .. :-( 
+// => .. FF does not seem very clean on all this .. :-(
 //       height: PopupHeight,
 //	     width: PopupWidth
 	   height: 40,
@@ -4742,7 +4742,7 @@ function createBookmark (BTN) {
 
 /*
  * Upon Folder creation menu event, open Window to let the user enter values in fields
- * 
+ *
  * BTN is of type BookmarkTreeNode (promise from browser.bookmarks.create())
  */
 function createFolder (BTN) {
@@ -4774,14 +4774,14 @@ function createFolder (BTN) {
   		popupleft_option: left
   	  });
   	}
-	  	  
+
     browser.windows.create(
       {titlePreface: "New folder",
 	   type: "popup",
 //	     type: "detached_panel",
 	   // Using a trick with URL parameters to tell the window which type
        // it is, which bookmark id, .. etc .. since titlePreface doesn't appear to work
-	   // and there appears to be no way to pass parameters to the popup by the call. 
+	   // and there appears to be no way to pass parameters to the popup by the call.
 	   url: PopupURL+"?type=newfldr&id="+BTN.id+"&title="+BTN.title,
 //----- Workaround for top and left position parameters being ignored for panels -----
 // Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
@@ -4791,7 +4791,7 @@ function createFolder (BTN) {
 // internal resize seems to work after that.
 // Also tried to start minimized, but the window pops in a big size first before being minimized,
 // even les pretty.			   .
-// => .. FF does not seem very clean on all this .. :-( 
+// => .. FF does not seem very clean on all this .. :-(
 //	     height: PopupHeight,
 //	     width: PopupWidth
 	   height: 40,
@@ -4810,7 +4810,7 @@ function createFolder (BTN) {
 /*
  * Receive event from keyboard anywhere in the sidebar panel, and also handle
  * menu actions
- * 
+ *
  * e is of type KeyboardEvent
  */
 function keyHandler (e) {
@@ -4835,14 +4835,14 @@ function keyHandler (e) {
 /*
  * Receive event from clicks anywhere in the sidebar panel, and also handle
  * menu actions
- * 
- * e is of type MouseEvent (click, but apparently works also with right and aux clicks .. 
+ *
+ * e is of type MouseEvent (click, but apparently works also with right and aux clicks ..
  *   still saying "click" .. wonder why .. => filtering this out)
  */
 function clickHandler (e) {
   let target = e.target; // Type depends ..
   let classList = target.classList;
-  trace("General click event: "+e.type+" button: "+e.button+" target: "+target+" class: "+target.classList);
+  // trace("General click event: "+e.type+" button: "+e.button+" target: "+target+" class: "+target.classList);
 
 // ####
   let curRow = getCurBookRow( target ) ;
@@ -4856,7 +4856,7 @@ function clickHandler (e) {
   if (!classList.contains("menudisabled")) { // Click on a disabled menu element
 	                                         // won't have any action
 	                                         // and won't make the menu disappear
-	let menuAction = false;  
+	let menuAction = false;
     // If a menu action is clicked, handle it
 	if (classList.contains("menushow")) { // Show source item in bookmarks table
 		                                  // This can only happen in the results table
@@ -5052,7 +5052,7 @@ function clickHandler (e) {
 	  // or append inside if this is a folder.
 	  if (type == "folder") {
 		if (BeforeFF57) {
-		  let msg = "Creating separators is not supported in WebExtension API before FF 57 !"; 
+		  let msg = "Creating separators is not supported in WebExtension API before FF 57 !";
 		  trace(msg);
 	      console.log(msg);
 		}
@@ -5066,7 +5066,7 @@ function clickHandler (e) {
 	  }
 	  else {
 		if (BeforeFF57) {
-		  let msg = "Creating separators is not supported in WebExtension API before FF 57 !"; 
+		  let msg = "Creating separators is not supported in WebExtension API before FF 57 !";
 		  trace(msg);
 	      console.log(msg);
 		}
@@ -5258,14 +5258,14 @@ function clickHandler (e) {
        		popupleft_option: left
        	  });
       	}
-        	  
+
 	    browser.windows.create(
 	      {titlePreface: "Properties of « "+BN.title+" »",
 		   type: "popup",
 //			 type: "detached_panel",
 		   // Using a trick with URL parameters to tell the window which type
 		   // it is, which bookmark id, .. etc .. since titlePreface doesn't appear to work
-		   // and there appears to be no way to pass parameters to the popup by the call. 
+		   // and there appears to be no way to pass parameters to the popup by the call.
 		   url: url,
 //----- Workaround for top and left position parameters being ignored for panels -----
 // Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
@@ -5275,7 +5275,7 @@ function clickHandler (e) {
 // internal resize seems to work after that.
 // Also tried to start minimized, but the window pops in a big size first before being minimized,
 // even les pretty.			   .
-// => .. FF does not seem very clean on all this .. :-( 
+// => .. FF does not seem very clean on all this .. :-(
 //           height: PopupHeight,
 //           width: PopupWidth
 		   height: 40,
@@ -5432,7 +5432,7 @@ async function completeFavicons (BN = undefined) {
 	    await sleep(0);
 	  }
 	}
-		
+
 	// Display the favicon
 	let row = curRowList[BN.id];
 	let img = row.firstElementChild.firstElementChild.firstElementChild;
@@ -5458,14 +5458,6 @@ function completeDisplay () {
     setTimeout(completeFavicons, 0);
   }
 
-  // General event handlers for a click anywhere in the document .. used to clear menus
-  // and prevent default menus
-  addEventListener("keyup", keyHandler);
-  addEventListener("click", clickHandler);
-  addEventListener("contextmenu", noDefaultAction);
-  addEventListener("auxclick", noDefaultAction);
-  window.addEventListener("blur", onBlur);
-
   // Setup mouse handlers for bookmarks and results
   SearchResult.addEventListener("click", resultsMouseHandler);
   Bookmarks.addEventListener("click", bkmkMouseHandler);
@@ -5474,6 +5466,13 @@ function completeDisplay () {
   SearchResult.addEventListener("contextmenu", resultsContextHandler);
   Bookmarks.addEventListener("contextmenu", bkmkContextHandler);
 
+  // General event handlers for a click anywhere in the document .. used to clear menus
+  // and prevent default menus
+  addEventListener("keyup", keyHandler);
+  addEventListener("click", clickHandler);
+  addEventListener("contextmenu", noDefaultAction);
+  addEventListener("auxclick", noDefaultAction);
+  window.addEventListener("blur", onBlur);
 
   // Detect when sidebar is closed
 //  window.addEventListener("beforeunload", closeHandler);
@@ -5588,7 +5587,7 @@ function completeBookmarks () {
  * id = string, the node id looked for
  * level = integer, the tree depth
  * force = boolean, force display even if empty (default, set to false for Mobile folder)
- * 
+ *
  * Return created BookmarkNode
  */
 function buildBookmarkId (a_BTN, id, level, force = true) {
@@ -5645,9 +5644,9 @@ completeDisplay();
  *
  * BTN = BookmarkTreeNode
  * level = integer, the tree depth
- * 
+ *
  * Queues to global variable delayedBookmarksQueue.
- * 
+ *
  * Note: make this an async function as we do not want any disorder ...
  */
 /*
@@ -5704,7 +5703,7 @@ async function delayLoadBkmkId (a_BTN, id, level) {
 /*
  * Store and display on the visible parts of the tree,
  * then load and display the hidden rest in background only.
- * 
+ *
  * a_BTN = array of root children
  */
 /*
@@ -5809,11 +5808,11 @@ else {
   }
   completeDisplay();
   completeBookmarks();
-  
+
   // ####
   if ( retainlastselectedbook_option )  gotoLastSelectedBN_id() ;
   // ####
-  
+
 //}
 }
 
@@ -5830,7 +5829,7 @@ function onRejected (error) {
 
 /*
  * Convert and store image in 16x16, triggered by end of CvtImage.src load
- * 
+ *
  * Uses global variables cvtUri, convertedUri, destCvtImg and destCvtBnId
  */
 let cvtUri;
@@ -5904,7 +5903,7 @@ console.log("convertedUri: "+convertedUri);
 
 /*
  * Error on loading the image to convert, triggered by error when loading CvtImage.src
- * 
+ *
  * Uses global variable destCvtBnId
  */
 function errorCvtOnLoad (error) {
@@ -6214,9 +6213,9 @@ browser.runtime.getPlatformInfo().then(function(info){
                                                ,"immediatefavdisplay_option"
 	                                           ,"delayLoad_option"
 	                                           ,"remembersizes_option"
-// ####                                             
+// ####
                                              ,"retainlastselectedbook_option"
-// ####                                             
+// ####
 	                                           ,"searchheight_option"
 	                                       	   ,"popupheight_option"
 	                                    	   ,"popupwidth_option"
@@ -6235,7 +6234,7 @@ browser.runtime.getPlatformInfo().then(function(info){
                                               ]);
   gettingItem.then((res) => {
 	let value;
-	
+
     WaitMsg.textContent = "Read DFF option..";
     if ((value = res.disablefavicons_option) != undefined) {
       disablefavicons_option = value;
@@ -6314,8 +6313,8 @@ browser.runtime.getPlatformInfo().then(function(info){
       if (remembersizes_option) {
     	// Get search pane height and set the pane properly
         if ((value = res.searchheight_option) != undefined) {
-          searchHeight = value; // Remember the current saved size 
-          SearchResult.style.height = searchHeight; 
+          searchHeight = value; // Remember the current saved size
+          SearchResult.style.height = searchHeight;
           // Note: to reset the height to CSS default ("20%"), just set
           //  SearchResult.style.height = "";
           //  let computedStyle = window.getComputedStyle(SearchResult, null);
@@ -6336,7 +6335,7 @@ browser.runtime.getPlatformInfo().then(function(info){
         browser.storage.local.remove("popupwidth_option");
       }
     }
-// ####    
+// ####
     WaitMsg.textContent = "Read retain last selected book option..";
     if ((value = res.retainlastselectedbook_option) != undefined) {
       retainlastselectedbook_option = value;
@@ -6346,7 +6345,7 @@ browser.runtime.getPlatformInfo().then(function(info){
         browser.storage.local.set({retainlastselectedbook_option: true});
       }
     }
-// ####    
+// ####
     WaitMsg.textContent = "Read trace option..";
     if ((value = res.traceEnabled_option) != undefined) {
       traceEnabled_option = value;
@@ -6464,14 +6463,14 @@ browser.runtime.getPlatformInfo().then(function(info){
     	structureVersion: structureVersion
       });
     }
-    
-    // #### 
+
+    // ####
     WaitMsg.textContent = "Read last selected bookmark id..";
     if ((value = res.lastSelectedBN_id) != undefined) {
       lastSelectedBN_id = value;
       // trace("Load lastSelectedBN_id:"+lastSelectedBN_id);
     }
-    // ####    
+    // ####
 
     res = undefined; // Free memory
 
@@ -6489,7 +6488,7 @@ browser.runtime.getPlatformInfo().then(function(info){
     // Get Id of the window the sidebar is running in
     // Note: there is an instance of sidebar run in each window as it seems
     browser.windows.getCurrent(
-//      {populate: true	
+//      {populate: true
 //      }
     )
     .then(
