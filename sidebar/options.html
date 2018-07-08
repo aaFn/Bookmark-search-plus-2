@@ -30,16 +30,20 @@
       <label for="advanced">Advanced click = <img src="/icons/clickshow.png"> "Show bookmark", or <img src="/icons/clickopen.png"> "Show bookmark" and "Open" bookmark in active tab</label>
     </div>
   <p>
+    <input type="checkbox" id="closesearch">
+    <label for="closesearch">After "Show bookmark", close search pane (implies leave bookmark tree open)</label>
+    <br>
     <input type="checkbox" id="opentree">
     <label for="opentree">After "Show Bookmark", leave bookmark tree open by default when closing search pane</label>
-    <br>
-    <input type="checkbox" id="closesearch">
-    <label for="closesearch">After "Show bookmark", close search pane (implies leave tree open)</label>
   </p>
   <p>
     <b>Performances:</b><br>
     <input type="checkbox" id="immediatefavdisplay">
     <label for="immediatefavdisplay">Revert to old behavior of immediate favicon display (slows down bookmark tree availability)</label>
+    <br>
+    <input type="checkbox" id="loadffapi">
+    <label for="loadffapi">Revert to old behavior of loading full bookmark tree from FF API at each FF restart (slows down bookmark tree availability)</label>
+    <button type="button" id="reloadffapi">Reload from FF API now</button>
     <br>
     <input type="checkbox" id="delayLoad" disabled>
     <label for="delayLoad"> (not yet effective) Load bookmarks only when required to (show result or open folder), do not load all at start - for large volumes</label>
@@ -57,6 +61,7 @@
     <br>
     <button type="button" id="resetmigr16x16" disabled>Re-trigger 16x16 favicon migration</button>
   </p>
+  <script src="libstore.js"></script>
   <script src="options.js"></script>
 </body>
 
