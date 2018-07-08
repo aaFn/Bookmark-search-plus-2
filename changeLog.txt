@@ -1,5 +1,42 @@
 Release notes:
 --------------
+- 2.0.28 Bugs & improvements
+    - Bug introduced in 2.0.27 with BSP2 waiting indefinitely on "Load FF API..". This was due
+      to a misunderstanding from me on how to use browser.runtime.onInstalled.addListener() = no
+      event is sent on it when FF regularly restarts, but the code was waiting on it to systematically
+      arrive in order to decide if we need to reload bookmarks from the FF API to resync or not .. and
+      so it was hanging on normal FF restarts.
+      This was working perfectly during test because the addon was tested as a temporary addon, and this
+      event always gets fired in such a mode ...
+      Cured by setting a 20 ms timeout on it, should suffice .. If timeout, this means no update
+      nor install.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/5
+    - Removed browser console traces on exchanged message with background task. They are not needed now.
+- 2.0.27 Bugs & improvements
+    - Implemented optimization of loading the bookmark tree from local store where the add-on keeps
+      it up to date, instead of from FF API each time. 
+      This should be the second major improvement for users with many bookmarks, after the
+      display acceleration in 2.0.26.
+      On my system, this is dividing by two the initial time before the tree is available when
+      starting FF, and dividing by 4 when switching off and on the sidebar with the Action button
+      in the toolbar (or with the shortcut key). Gains should be much bigger with high number of
+      bookmarks.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/5
+      This is roughly making no difference when the add-on is first installed, since on install
+      we have to read the FF API to get the initial bunch of bookmarks.
+    - Added an option to revert to old behavior of loading the bookmark tree from FF API at each
+      load.
+    - Adde a button on the options page to force FF API tree reload (disabled when in old behavior).
+    - Corrected a regression introduced in 2.0.26 where a bookmark drag and drop was not displaying
+      the favicon.
+    - Improved to interpret options changes real time and not on next activation.
+    - Disable "leave bookmark tree open" in options when "close search pane" is set.
+    - Some cleaning of code in favicon fetching.
+    - Corrected a 2.0.26 regression where the context menu was not showing when right clicking on
+      folder favicon.
+    - Added feature of displaying a suggested title calculated from the URL when a bookmark title
+      is empty - coming from pull request from jun1x
+        https://github.com/aaFn/Bookmark-search-plus-2/pull/45 
 - 2.0.26 Improvements
     - Accelerated display phase by a factor between 2 and 4 depending on cases, by using cloneNode()
       techniques, background images for folders and for disabled favicon mode, and most of all by
