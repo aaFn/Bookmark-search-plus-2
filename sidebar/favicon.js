@@ -1,5 +1,6 @@
 'use strict';
 
+
 /*
  * Worker for getting favicons in background, and populating the sidebar bookmarks table
  * and saved storage with an URI (data:....) to keep them in self contained form
@@ -22,6 +23,7 @@ const FReader = new FileReader();
  *  Global variables
  */
 let hysteresis = Cadence;
+let requestTimerID; // Hold current reference to timer if there is one active
 let fetchController = null;
 let reqQueue = []; // Array of input requests, to serialize and cadence their handling
 //let xmlHttpReq; // XMLHttpRequest
@@ -36,19 +38,22 @@ let fetchTimerID = null;
 /*
  * Send back to main thread the URI, and redispatch if more in the queue
  * 
- * BN is a BookmarkNode
+ * bnId = Id of BookmarkNode
  * uri is a String
  */
-function answerBack (BN, uri) {
+function answerBack (bnId, uri) {
 //  console.log("Answering [BN.id="+BN.id+",uri=<<"+uri.substr(0,40)+">>]");
-  postMessage([BN, uri]);
+//  postMessage([bnId, uri]);
+  asyncFavicon({data: [bnId, uri]});
 
   if (uri != "starting:") {
 	reqQueue.shift(); // Remove the element in queue we just processed (= first one)
 	if (reqQueue.length > 0) { // Still work in reqQueue, continue the cadence process
 //      console.log("Still work in queue: "+reqQueue.length+" - redispatching");
-      setTimeout(handleRequest, hysteresis);
-      hysteresis = Cadence;
+	  requestTimerID = setTimeout(handleRequest, hysteresis);
+	}
+	else {
+	  requestTimerID = undefined; // No more request running and scheduled for now
 	}
   }
 }
@@ -56,9 +61,9 @@ function answerBack (BN, uri) {
 /*
  * Global object to read URI encoded contents of blob and send back to main thread 
  */
-let readerBN; // BookmarkNode on which is the URI 
+let readerBNId; // Id of BookmarkNode on which is the URI 
 function readerLoad () {
-  answerBack(readerBN, FReader.result);
+  answerBack(readerBNId, FReader.result);
 }
 
 /*
@@ -88,7 +93,14 @@ const MyInitFF57 = {
   signal: null
 };
 
-function getUri (BN, url, enableCookies) {
+/*
+ * Fetch URI of a favicon
+ * 
+ * bnId = Id of BookmarkNode
+ * url = URL string
+ * enableCookies = a Boolean to "omit" (false) or "include" (true)
+ */
+function getUri (bnId, url, enableCookies) {
 //  console.log("Getting favicon contents from "+url);
   // Need to recreate the AbortController each time, or else all requests after
   // an abort will abort .. and there appears to be no way to remove / clear the abort signal
@@ -120,7 +132,7 @@ function getUri (BN, url, enableCookies) {
         response.blob().then(
           function (blob) { // blob is a Blob ..
 //            console.log("Contents: "+blob);
-            readerBN = BN;
+            readerBNId = bnId;
    	        FReader.readAsDataURL(blob);
           }
    	    )
@@ -128,7 +140,7 @@ function getUri (BN, url, enableCookies) {
       else {
     	let msg = "error: Looks like there was a URL fetch problem. Status Code: "+response.status;
         console.log(msg+" url: "+url);
-        answerBack(BN, msg+"\r\n"
+        answerBack(bnId, msg+"\r\n"
                        +"Full text: "+response.statusText);
       }
     }
@@ -140,7 +152,7 @@ function getUri (BN, url, enableCookies) {
       fetchTimerID = null;
       let msg = "Favicon fetch Error :-S "+err;
       console.log(msg, url);
-      answerBack(BN, "error: "+msg);
+      answerBack(bnId, "error: "+msg);
     }
   );
 
@@ -305,12 +317,12 @@ function retrieveFaviconUrl (text) {
 /*
  * Fetch favicon, and then get its URI
  * 
- * BN = BookmarkNode
+ * bnId = Id of BookmarkNode
  * bnUrl = URL string
  * myInit = fetch parameters
  * enableCookies = a Boolean to "omit" (false) or "include" (true)
  */
-function fetchFavicon (BN, bnUrl, myInit, enableCookies) {
+function fetchFavicon (bnId, bnUrl, myInit, enableCookies) {
   fetch(bnUrl, myInit)
   .then(
 	function (response) { // response is a Response object
@@ -335,12 +347,13 @@ function fetchFavicon (BN, bnUrl, myInit, enableCookies) {
 			                                       // we were redirected ..
 			  faviconUrl = urlObj.origin + "/favicon.ico";
 //				console.log("faviconUrl 2: <<"+faviconUrl+">>");
-			  URL.revokeObjectURL(urlObj);
-			  getUri(BN, faviconUrl, enableCookies);
+//			  URL.revokeObjectURL(urlObj);
+			  urlObj = undefined;
+			  getUri(bnId, faviconUrl, enableCookies);
 			}
 			else if (faviconUrl.startsWith("data:")) { // Cool, it is already a self contained piece ..
 //				console.log("Got it directly !");
-			  answerBack(BN, faviconUrl);
+			  answerBack(bnId, faviconUrl);
 			}
 			else if (!faviconUrl.startsWith("http")) { // Not an absolute URL, make it absolute
 			  let urlObj = new URL (response.url); // Use the URL of response in case
@@ -353,7 +366,7 @@ function fetchFavicon (BN, bnUrl, myInit, enableCookies) {
 			    let baseUrl = retrieveBaseUrl(text);
 //				  console.log("baseUrl 1: <<"+baseUrl+">>");
 			    if ((baseUrl != null) && (baseUrl.includes("://"))) {
-			      URL.revokeObjectURL(urlObj);
+//			      URL.revokeObjectURL(urlObj);
 			      urlObj = new URL (baseUrl);
 			    }
 			    faviconUrl = urlObj.origin + faviconUrl;
@@ -375,13 +388,14 @@ function fetchFavicon (BN, bnUrl, myInit, enableCookies) {
 			      faviconUrl = temp.slice(0, pos+1) + faviconUrl;
 			    }
 			  }
-		      URL.revokeObjectURL(urlObj);
+//		      URL.revokeObjectURL(urlObj);
+			  urlObj = undefined;
 //				console.log("faviconUrl 3: <<"+faviconUrl+">>");
-			  getUri(BN, faviconUrl, enableCookies);
+			  getUri(bnId, faviconUrl, enableCookies);
 			}
 			else {
 //				console.log("faviconUrl 4: <<"+faviconUrl+">>");
-			  getUri(BN, faviconUrl, enableCookies);
+			  getUri(bnId, faviconUrl, enableCookies);
 			}
 		  }
 		)
@@ -403,7 +417,7 @@ function fetchFavicon (BN, bnUrl, myInit, enableCookies) {
 	  fetchTimerID = null;
 	  let msg = "Page fetch Error :-S "+err;
 	  console.log(msg, bnUrl);
-	  answerBack(BN, "error: "+msg);
+	  answerBack(bnId, "error: "+msg);
 	}
   );
 }
@@ -413,31 +427,34 @@ function fetchFavicon (BN, bnUrl, myInit, enableCookies) {
  * Then re-dispatch itself if more work, after <cadence> milliseconds delay
  */
 function handleRequest () {
+  hysteresis = Cadence; // Hysteresis is a one shot only thing, for the first fetch of massive load,
+                        // so now reset to default.
   let request = reqQueue[0]; // This is [action, BN, enableCookies], with:
                              //
                              // action = a string, either "get" or "icon:<url>"
-                             // BN = a BookmarkNode of type "bookmark"
+                             // bnId = Id of a BookmarkNode of type "bookmark"
+                             // bnUrl = url of page ("get" & "get2") or of favicon ("icon")
                              // enableCookies = a Boolean to "omit" (false) or "include" (true)
                              //   cookies info chen getting favicon. Drawback = user/pwd prompts
                              //   on some sites.
   let action        = request[0];
-  let BN            = request[1];
-  let enableCookies = request[2];
+  let bnId          = request[1];
+  let bnUrl         = request[2];
+  let enableCookies = request[3];
 //  console.log("Dequeued request action: "+action);
-  if (BN != undefined) { // Protect against too many redispatch events 
-    let bnUrl = BN.url;
+  if (bnId != undefined) { // Protect against too many redispatch events 
 //    console.log("Dequeued request action: "+action+" BN.id: "+BN.id+" url: "+bnUrl+" remains: "+reqQueue.length);
 	if (bnUrl.startsWith("ftp:")) {
-	  answerBack(BN, "/icons/ftpfavicon.png");
+	  answerBack(bnId, "/icons/ftpfavicon.png");
 	}
-	else if (action.startsWith("icon:")) { // We already got the favicon URL (e.g. tab refresh)
-		                                   // so simply get it.
+	else if (action == "icon") { // We already got the favicon URL (e.g. tab refresh)
+		                         // so simply get it.
 //      console.log("faviconUrl: <<"+action.slice(5)+">> 2");
-	  answerBack(BN, "starting:"); // Signal we are starting to retrieve favicon for that BN
-	  getUri(BN, action.slice(5), enableCookies);
+	  answerBack(bnId, "starting:"); // Signal we are starting to retrieve favicon for that BN
+	  getUri(bnId, bnUrl, enableCookies);
 	}
 	else { // Normal get process
-	  answerBack(BN, "starting:"); // Signal we are starting to retrieve favicon for that BN
+	  answerBack(bnId, "starting:"); // Signal we are starting to retrieve favicon for that BN
       // This requires the "<all_urls>" permission in manifest.json
       // Get the page at bookmarked URL, following redirections,
 	  // and attempt to retrieve the favicon URL
@@ -462,13 +479,75 @@ function handleRequest () {
 	  }
 	  myInit.credentials = (enableCookies ? "include" : "omit");
 //      console.log("Fetching: "+bnUrl);
-	  fetchFavicon(BN, bnUrl, myInit, enableCookies);
+	  fetchFavicon(bnId, bnUrl, myInit, enableCookies);
 
       // Set timeout on fetch
       fetchTimerID = setTimeout(fetchTimeoutHandler, FetchTimeout);
 //      console.log("Finished sending request "+fetchTimerID);
     }
   }
+}
+
+/*
+ * Enqueue a request for processing, and trigger processing if needed.
+ */
+//Set up internal queueing for posted messages from main thread
+//let nbBN = 0;
+//let nbBNmin = 0;
+//let nbBNmax = nbBNmin + 100;
+function faviconWorkerPostMessage (e) { // e is of type MessageEvent,
+  // and its data contains [action, bnId, url, enableCookies], with:
+  //
+  // action = a string, either "get", "get2", "icon", "hysteresis" or "nohysteresis"
+  // bnId = Id of a BookmarkNode of type "bookmark"
+  // bnUrl = url of page ("get" & "get2") or of favicon ("icon")
+  // enableCookies = a Boolean to "omit" (false) or "include" (true)
+  //   cookies info chen getting favicon. Drawback = user/pwd prompts
+  //   on some sites when true.
+// Cannot use the browser.bookmarks interface from within the worker ...
+  let data = e.data;
+  let action = data[0];
+  if (action == "hysteresis") { // Next shot due to a bookmark create or an initial massive load
+                                // request will wait for Hysteresis time before really starting.
+//    console.log("Hysteresis");
+	hysteresis = Hysteresis;
+  }
+  else if (action == "nohysteresis") { // Remove the hysteresis now if nothing is scheduled,
+	                                   // else it will be naturally reset when the handler runs
+//    console.log("Remove Hysteresis");
+	if (requestTimerID == undefined) {
+	  hysteresis = Cadence;
+	}
+  }
+  else {
+	if (action == "get2") { // If this is a manual refresh favicon request, or an existing bookmark,
+	  						// put the request at front of the queue, and reset hysteresis to
+	  						// normal Cadence value.
+	  						// This will make it process immediately, or just after the current
+	  						// ongoing one if there is.
+//      console.log("Manual triggered fetch");
+	  if (hysteresis == Hysteresis) { // Reset hysteresis if there was one, we are accelerating
+		hysteresis = Cadence;
+		if (requestTimerID != undefined) { // A request is scheduled with Hysteresis
+		  clearTimeout(requestTimerID);
+		  requestTimerID = undefined; // It will get rescheduled a few lines below with the new Cadence
+		}
+	  }
+	  reqQueue.unshift(data); // Add new request at beginning
+	}
+	else {
+//      if (((nbBN >= nbBNmin) && (nbBN < nbBNmax)) || e.data[0].startsWith("icon:") || e.data[0].startsWith("get2")) {
+	  reqQueue.push(data); // Add new request at end
+	}
+	if (requestTimerID == undefined) { // No cadence process already running, start it
+//      console.log("There was no work in queue: "+reqQueue.length+" - dispatching");
+	  requestTimerID = setTimeout(handleRequest, hysteresis);
+	}
+  }
+//    let BN = data[1];
+//    console.log("Finished queueing request "+data[0]+" for BN.id: "+BN.id+" url: "+BN.url+" Queue length: "+reqQueue.length);
+//  }
+//  nbBN++;
 }
 
 
@@ -479,54 +558,4 @@ function handleRequest () {
 // Set up final structure for URI conversion
 FReader.addEventListener("load", readerLoad);
 
-// Set up internal queueing for posted messages from main thread
-//let nbBN = 0;
-//let nbBNmin = 0;
-//let nbBNmax = nbBNmin + 100;
-onmessage = function (e) { // e is of type MessageEvent,
-	                       // and its data contains [action, BN, enableCookies], with:
-                           //
-                           // action = a string, either "get" or "icon:<url>"
-	                       // BN = a BookmarkNode of type "bookmark"
-                           // enableCookies = a Boolean to "omit" (false) or "include" (true)
-	                       //   cookies info chen getting favicon. Drawback = user/pwd prompts
-                           //   on some sites.
-  // Cannot use the browser.bookmarks interface from within the worker ...
-  let data = e.data;
-  let action = data[0];
-  if (action == "hysteresis") { // Next shot due to a bookmark create or an initial massive load
-	                            // request will wait for Hysteresis time before really starting.
-//    console.log("Hysteresis");
-    hysteresis = Hysteresis;
-  }
-  else if (action == "nohysteresis") { // Remove the hysteresis now if it was not already removed
-	                                   // by a first favicon fetch.
-//    console.log("Remove Hysteresis");
-    hysteresis = Cadence;
-  }
-  else {
-	let len;
-	if (action == "get2") { // If this a manual refresh favicon request, or an exsiting bookmark,
-                            // put the request at front of the queue, and reset hysteresis to
-	                        // normal Cadence value.
-	                        // This will make it process immediately, or just after the current
-	                        // ongoing one if there is.
-//      console.log("Manual triggered fetch");
-      hysteresis = Cadence;
-      len = reqQueue.unshift(data); // Add new request at beginning
-    }
-    else {
-//      if (((nbBN >= nbBNmin) && (nbBN < nbBNmax)) || e.data[0].startsWith("icon:") || e.data[0].startsWith("get2")) {
-      len = reqQueue.push(data); // Add new request at end
-    }
-    if (len == 1) { // reqQueue was empty, need to start cadence process
-//      console.log("There was no work in queue: "+reqQueue.length+" - dispatching");
-	  setTimeout(handleRequest, hysteresis);
-	  hysteresis = Cadence; // Hysteresis is a one shot only thing, for the first fetch of massive load 
-	}
-  }
-//  let BN = data[1];
-//  console.log("Finished queueing request "+data[0]+" for BN.id: "+BN.id+" url: "+BN.url+" Queue length: "+reqQueue.length);
-//  }
-//  nbBN++;
-}
+//onmessage = faviconWorkerPostMessage;

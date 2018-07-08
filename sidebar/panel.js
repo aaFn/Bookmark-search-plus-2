@@ -43,28 +43,14 @@
  *  Mapi !
  */
 
-// Get background page asap
-let backgroundPage;
-browser.runtime.getBackgroundPage()
-.then(
-  function (page) {
-	// In a private browsing window (incognito), this will be null 
-	backgroundPage = page;
-  },
-  function (error) {
-	msg = "Can't access background page: "+error;
-	console.log(msg);
-	trace(msg, true);
-  }
-);
-
 
 /*
  * Constants
  */
-const VersionImg16 = "-img16"; // Signal that all favicons are in 16x16 format
+//Declared in libstore.js
+//const VersionImg16 = "-img16"; // Signal that all favicons are in 16x16 format
+//const VersionBNList = "-bnlist"; // Signal that we are in BookmarkNode tree format
 const Migr16x16Timeout = 60000; // Time to wait before triggering 16x16 favicon migration
-const VersionBNList = "-bnlist"; // Signal that we are in BookmarkNode tree format
 const Navigator = window.navigator; // Get version of navigator to detect unavailable features between FF 54 and FF 56
 const BuildID = Navigator.buildID; // BuildID: 20100101 means that we have the websites.resistFingerprinting setting
                                    // set .. see https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/privacy/websites
@@ -124,33 +110,17 @@ const PopupURL = browser.extension.getURL("sidebar/popup.html");
 const PopupWidth  = 375;
 const PopupHeight = 150;
 const OpenFolderTimeout = 1000; // Wait time in ms for opening a closed folder, when dragging over it
-const SaveMinHysteresis = 2000; // Space saves to lower memory consumption
-const SaveMaxHysteresis = 20000; // Space saves to lower memory consumption
-const CvtCanvas = document.createElement('canvas'); // For image conversion to 16 x 16
-CvtCanvas.height = 16;
-CvtCanvas.width = 16;
-const CvtCtx = CvtCanvas.getContext("2d");
-//const Ctx = Canvas.getContext("bitmaprenderer");
-//CvtCtx.fillStyle = "white";
-CvtCtx.imageSmoothingEnabled = false;
-CvtCtx.imageSmoothingQuality = "high";
-const CvtImage = new Image(16, 16);
-CvtImage.onload = convertOnLoad;
-CvtImage.onerror = errorCvtOnLoad;
-const CvtCanvas2 = document.createElement('canvas'); // For loading a favicon to downscale
-const CvtCtx2 = CvtCanvas2.getContext("2d");
-const CvtImageData = CvtCtx.createImageData(16, 16);
-const CvtIDData = CvtImageData.data;
 
 const Selhighlight = "selbrow"; // selhighlight class name in CSS
 const Reshidden = "reshidden"; // reshidden class name in CSS, to remember a shown row was hidden
 
 const LevelIncrementPx = 12; // Shift right in pixel from levle N to level N+1
-const Root = "root________";
-const PersonalToobar = "toolbar_____";
-const BookmarksMenu =  "menu________";
-const OtherBookmarks = "unfiled_____";
-const MobileBookmarks = "mobile______";
+//Declared in BookmarkNode.js
+//const Root = "root________";
+//const PersonalToobar = "toolbar_____";
+//const BookmarksMenu =  "menu________";
+//const OtherBookmarks = "unfiled_____";
+//const MobileBookmarks = "mobile______";
 /*
  *  Prepare standard Folder structure for node cloning
  */
@@ -236,41 +206,32 @@ tmpElem1 = undefined;
 /*
  * Global variables
  */
-let structureVersion = ""; // String signalling which migrations are done / current state
+let backgroundPage;
+let backgroundReady = false; // To signal background ready to private windows
+let waitingInitBckgnd = false; // To flag we're waiting for background init
+//Declared in libstore.js
+//let structureVersion = ""; // String signalling which migrations are done / current state
 let migration_img16 = false;
-let migration_bnlist = false;
 let migrationTimeout = null; // Timer to trigger migration
 let platformOs;
+let p_GetWindowId; // Promise on getting myWindowId
 let myWindowId;
-let bookmarksTree; // Type is array of BookmarkTreeNode
-let savedBkmkUriList; // Used to receive the favicon uri saved in storage - Will be deleted at end
-let savedfIndex, savedfTime, savedfTimeBak; // Use to receive information about what was last saved
-let savedBNList; // Used to receive the BookmarkNodes saved in storage - Will be deleted at end
-let savedFldrOpenList; // Used to receive the open state saved in storage - Will be deleted at end
+let openBookmarksInNewTabs_option = false; // Boolean
+let openSearchResultsInNewTabs_option = false; // Boolean
+// Declared in libstore.js
+//let savedBkmkUriList; // Used to receive the favicon uri saved in storage - Will be deleted at end
+//let savedBNList; // Used to receive the BookmarkNodes saved in storage - Will be deleted at end
+//let savedFldrOpenList; // Used to receive the open state saved in storage - Will be deleted at end
 let curRowList = {}; // Current map between BN.id and row for each bookmark item
 let curResultRowList = {}; // Current map between BTN.id and row for each result item
-let curBNList = {};  // Current list of BookmarkNode - Saved in storage at each modification
+let curBNList; // Current list of BookmarkNode - Saved in storage at each modification
 let rootBN; // Type is BookmarkNode. This is curBNList[0]
 let curFldrOpenList = {}; // Current open info for folders - Saved in storage at each modification
-let bkmkWorker; // For non blocking load of bookmark items
-let faviconWorker; // For background retrieval of favicons
-let resultsFragment; // Type is DocumentFragment
+let isDisplayComplete = false; // To indicate we are not anymore in initial load/display
+//let resultsFragment; // Type is DocumentFragment
 //let docFragment; // Type is DocumentFragment
 let resultsTable; // Assuming it is an HTMLTableElement
 let bookmarksTable; // Assuming it is an HTMLTableElement
-let immediateFavDisplay_option = false; // Boolean
-let disablefavicons_option = false; // Boolean
-let enableCookies_option = false; // Boolean
-let enableFlipFlop_option = false; // Boolean
-let advancedClick_option = false; // Boolean
-let openTree_option = false; // Boolean
-let closeSearch_option = false; // Boolean
-let delayLoad_option = false; // Boolean
-let remembersizes_option = false; // Boolean
-let searchHeight;
-let traceEnabled_option = false; // Boolean
-let openBookmarksInNewTabs_option = false; // Boolean
-let openSearchResultsInNewTabs_option = false; // Boolean
 let highest_open_level; // Indicator of what to hide / display when initially displaying the table
 let inputTimeout = null; // Timeout between keystrokes to trigger bookmarck search from inpu
 let cellHighlight = null; // Current highlight of a row in source bookmarks = cell
@@ -288,505 +249,16 @@ let bkmkClipboard = undefined; // Contains the bookmark node(s) being copied or 
 let rowClipboard = undefined; // Remains undefined in case of copy, else contains the row(s)
                               // being cut.
 
-let countBookmarks = 0, countFolders = 0, countSeparators = 0, countOddities = 0;
-let startTime, endLoadTime, endTreeLoadTime, endTreeBuildTime, endDisplayTime, endSaveTime,
-    endDelayedLoadTime;
+// Declared in BookmarkNode.js
+//var countBookmarks, countFolders, countSeparators, countOddities;
+let startTime, endLoadTime, endGetTreetime, endDisplayTime;
+let loadDuration, treeLoadDuration, treeBuildDuration, saveDuration;
 
 
 /*
  * Objects
  */
 
-//***************************************************
-// BookmarkNode "object".
-// Must be serializable .. so no function in it ..
-//***************************************************
-
-// Constructor:
-//-------------
-// id
-//    A string which uniquely identifies the node. Each ID is unique within the user's profile and remains unchanged across browser restarts.
-// type
-//    A bookmarks.BookmarkTreeNodeType object indicating whether this is a "bookmark", a "folder", or a "separator".
-// level
-//    A number which represents the depth level in the tree.
-//    -1 for root node.
-// parentId
-//    A string which specifies the ID of the parent folder. Is undefined in the root node.
-// dateAdded
-//    A number representing the creation date of the node in milliseconds since the epoch.
-// protect Optional
-//    A boolean representing the protected (true) or not (false) state of the object on UI.
-//    Protected cannot be modified, dragged .. etc ..
-//    Defaults to false.
-// title Optional
-//    A string which contains the text displayed for the node in menus and lists of bookmarks.
-//    undefined for separators and for root node.
-// faviconUri Optional
-//    A string URI (data: ..) holding the bookmark favicon, for display.
-//    undefined for separators and for root node, or for bookmarks for which we didn't yet
-//      retrieve the favicon.
-// fetchedUri Optional
-//    A boolean indicating for bookmark if the uri is internal or was fetched from Internet,
-//    and indicating for folder if this is a special folder favicon or a standard one.
-// url Optional
-//    A string which represents the URL for the bookmark.
-//    If the node represents a folder or a separator, this is undefined.
-// children Optional
-//    An array of BookmarkNode objects which represent the node's children. The list is ordered in the list in which the children appear in the user interface.
-//    This field is undefined if the node isn't a folder.
-// dateGroupModified Optional
-//    A number representing the date and time the contents of this folder last changed, in milliseconds since the epoch.
-//    Note that it is updated also when folder title has changed, or when a child has been moved
-//    or when a chiild of a child .. has been moved / added / removed.
-//    Does not change when a child or any child of child .. chnages of title / url.
-//    undefined if not a folder.
-// unmodifiable Optional
-//    undefined or a string as described by the type bookmarks.BookmarkTreeNodeUnmodifiable. Represents the reason that the node can't be changed.
-//    Always undefined today
-function BookmarkNode (id, type, level, parentId, dateAdded, protect = false, 
-		               title = undefined, faviconUri = undefined, fetchedUri = false, url = undefined,
-		               children = undefined, dateGroupModified = undefined,
-		               unmodifiable = undefined) {
-  this.id                = id;
-  this.type              = type;
-//  this.index             = index;
-  this.level             = level;
-  this.parentId          = parentId;
-  this.dateAdded         = dateAdded;
-  this.protect           = protect;
-  this.title             = title;
-  this.faviconUri        = faviconUri;
-  this.fetchedUri        = fetchedUri;
-  this.url               = url;
-  this.children          = children;
-  this.dateGroupModified = dateGroupModified;
-  this.unmodifiable      = unmodifiable;
-}
-
-/*
- * Recursively serialize (JSON like) the BN tree
- * 
- * Returns: a String of form: {toJSON1,toJSON2,... }
- * 		for all fieldx which are not undefined
- * 		where toJSONx is JSON.stringify(fieldx) for all
- * 		except children which is "children":[BN_serialize[0],BN_serialize[1],..] if not undefined
- */
-function BN_serialize (BN) {
-  let json;
-  try {
-	json = JSON.stringify(BN);
-  } catch (e) {
-    throw e;
-  }
-  return(json);
-}
-
-/*
- * Recursively deserialize (JSON like) the BN tree from a String
- * 
- * Returns: a BN tree
- */
-function BN_deserialize (jsonstr) {
-  return(JSON.parse(jsonstr));
-}
-
-// Trace object contents
-function BN_trace (BN) {
-  trace("---------------------");
-  trace("BookmarkNode");
-  trace("  id:                "+BN.id);
-  trace("  type:              "+BN.type);
-//  trace("  index:             "+BN.index);
-  trace("  level:             "+BN.level);
-  trace("  parentId:          "+BN.parentId);
-  trace("  dateAdded:         "+BN.dateAdded);
-  trace("  protect:           "+BN.protect);
-  trace("  title:             "+BN.title);
-  let uri = BN.faviconUri;
-  if (uri == undefined) {
-    trace("  faviconUri:        undefined");
-  }
-  else {
-    trace("  faviconUri:        "+BN.faviconUri.slice(0, 100));
-  }
-  trace("  fetchedUri:        "+BN.fetchedUri);
-  trace("  url:               "+BN.url);
-  let children = BN.children;
-  if (children == undefined) {
-    trace("  children:          undefined");
-  }
-  else {
-    trace("  children_length:   "+BN.children.length);
-  }
-  trace("  dateGroupModified: "+BN.dateGroupModified);
-  trace("  unmodifiable:      "+BN.unmodifiable);
-}
-
-// Get parent of BookmarkNode, from list bnList (curBNList by default)
-// Returns a BookmarkNode (or undefined if root node = no parent, or parent does not exist).
-function BN_getParentBN (BN, bnList = curBNList) {
-  let parentId;
-  if ((parentId = BN.parentId) == undefined) {
-	return(undefined);
-  }
-  return(bnList[parentId]);
-}
-
-// Get index of BookmarkNode within its parent, from list bnList (curBNList by default)
-// Returns an Integer = -1 if root node or if position is unknown for that parent
-function BN_getIndex (BN, parentBN = undefined, bnList = curBNList) {
-  if (parentBN == undefined) {
-    let parentId;
-    if ((parentId = BN.parentId) == undefined) {
-	  return(-1);
-    }
-    if ((parentBN = bnList[parentId]) == undefined) {
-	  return(-1);
-    }
-  }
-  return(parentBN.children.indexOf(BN));
-}
-
-// Return last descendant of a BookmarkNode (return BN itself if no child)
-function BN_lastDescendant (BN) {
-  let children = BN.children;
-  if (children == undefined) {
-	return(BN);
-  }
-  let len = children.length;
-  if (len == 0) {
-	return(BN);
-  }
-  return(BN_lastDescendant(children[len-1]));
-}
-
-// Create recursively a copy of BookmarkNode.
-// Return the copy.
-function BN_copy (BN) {
-  let node = new BookmarkNode (BN.id, BN.type, BN.level, BN.parentId, BN.dateAdded, BN.protect, 
-		                       BN.title, BN.faviconUri, BN.fetchedUri, BN.url,
-		                       undefined, BN.dateGroupModified,
-		                       BN.unmodifiable);
-  let children = BN.children;
-  if (children != undefined) {
-	let nodeChildren = node.children = new Array (children.length);
-	let j = 0;
-	for (let i of children) {
-	  nodeChildren[j++] = BN_copy(i);
-	}
-  }
-  return(node);
-}
-
-// Delete a BookmarkNode from its parent and from list bnList (curBNList by default) if real.
-// Note: for a move, set real to false for both delete and insert.
-function BN_delete (BN, parentId = undefined, real = true, bnList = curBNList) {
-  if (parentId == undefined) {
-	if ((parentId = BN.parentId) == undefined) {
-	  return; // Cannot delete root
-	}
-  }
-  let parentBN;
-  if ((parentBN = bnList[parentId]) == undefined) { // No parent .. error case, for robustness..
-    if (real) {
-      delete bnList[BN.id];
-    }
-	return;
-  }
-  let index = parentBN.children.indexOf(BN);
-  if (index != -1) {
-    parentBN.children.splice(index, 1);
-    if (real) {
-      delete bnList[BN.id];
-    }
-  }
-}
-
-// Recursively update the level of a BookmarkNode tree
-function BN_updateLevel (BN, level) {
-  BN.level = level;
-  let children = BN.children;
-  if (children != undefined) {
-    for (let i of BN.children) {
-	  BN_updateLevel(i, level+1);
-    }
-  }
-}
-
-// Insert a BookmarkNode under its parent and in list bnList (curBNList by default) if real
-// at 0-based position index (if -1, append at end)
-// Note: for a move, set real to false for both delete and insert.
-function BN_insert (BN, parentBN, index = -1, real = true, bnList = curBNList) {
-  if (parentBN == undefined) {
-    return; // Cannot insert root
-  }
-
-  // Add under parent children
-  let level = parentBN.level + 1;
-  let parentId = parentBN.id;
-  if (index == -1) {
-	parentBN.children.push(BN);
-  }
-  else {
-	if (BeforeFF57) {
-	  let children = parentBN.children;
-	  if (children == undefined) {
-		children = parentBN.children = new Array (0);
-	  }
-	  let len = children.length;
-	  if (index <= len) { // Insert before end or just at end, no surprise ..
-		 children.splice(index, 0, BN);
-	  }
-	  else { // There is a gap ... create separators in between
-	    let j = len;
-	    let node;
-	    let id;
-    	while (j < index) {
-		  id = "separator" + countSeparators;
-		  node = new BookmarkNode (id, "separator", level, parentId, 0,
-		                           ((countSeparators++ == 0) ? true : false)
-		                          );
-		  children.push(node);
-		  bnList[node.id] = node; // Add gap separator in list
-		  j++;
-		  insertFF56EndGapSep(parentBN); // Update display
-    	}
-        children.push(BN);
-	  }
-    }
-	else {
-	  let children = parentBN.children;
-	  if (children == undefined) {
-		children = parentBN.children = new Array (0);
-	  }
-	  children.splice(index, 0, BN);
-	}
-  }
-  // Also add in list if required
-  if (real) {
-    bnList[BN.id] = BN;
-  }
-
-  // Firm up some details ...
-  BN.parentId = parentId;
-  if (BN.level != level) {
-	BN_updateLevel(BN, level);
-  }
-}
-
-
-/*
- * Get type from a BTN
- * 
- * BTN = BookmarkTreeNode
- * 
- * Returns BTN type as a String
- */
-function getType (BTN) {
-//  traceBTN(BTN);
-  let type = BTN.type;
-  if (type == undefined) {
-	if (BTN.url == undefined)
-	  if (BTN.dateGroupModified == undefined)   type = "separator";
-	  else   type = "folder";
-	else   type = "bookmark";
-  }
-  return(type);
-}
-
-// "Constructor" from a BTN, and append/insert as child if parentBN is provided.
-// BTN = BookmarkTreeNode
-// level = depth in tree.
-// Trigger favicon fetching if missing
-// Not recursive, i.e. does not handle BTN.children.
-//
-// Returns the created node.
-let uglyHackTabFavIconUrl = undefined; // Used by bkmkDropHandler() to speed up favIconUrl
-                                       // retrieval process when dragging & dropping a tab,
-                                       // since there is no way to pass the favicon to the
-                                       // bookmarks.create() call.
-function BN_create (BTN, level, parentBN = undefined) {
-  let node;
-  let BTN_id = BTN.id;
-  let index = BTN.index;
-  let type = getType(BTN);
-  let protect;
-  if (type == "folder") {
-    countFolders++;
-
-    let uri, fetchedUri;
-    if (BTN_id == PersonalToobar) {
-      uri = "/icons/toolbarbkmk.png";
-      protect = true;
-      fetchedUri = true;
-    }
-    else if (BTN_id == BookmarksMenu) {
-      uri = "/icons/menubkmk.png";
-      protect = true;
-      fetchedUri = true;
-    }
-    else if (BTN_id == OtherBookmarks) {
-      uri = "/icons/otherbkmk.png";
-      protect = true;
-      fetchedUri = true;
-    }
-    else if (BTN_id == MobileBookmarks) {
-      uri = "/icons/folder.png";
-      protect = true;
-      fetchedUri = false;
-    }
-    else {
-      uri = "/icons/folder.png";
-      protect = false;
-      fetchedUri = false;
-    }
-
-    // Pre-create an empty array of children if needed
-    let children = BTN.children;
-    if (children != undefined) {
-      children = new Array (children.length);
-    }
-
-    // Create new node
-    node = new BookmarkNode (
-      BTN_id, "folder", level, BTN.parentId, BTN.dateAdded, protect,
-      BTN.title, uri, fetchedUri, undefined,
-      children, BTN.dateGroupModified
-    );
-  }
-  else if (type == "separator") {
-    if ((countSeparators++ == 0) || BeforeFF57) { // First separator is not draggable,
-                                                  // or all separators when FF < 57
-	  protect = true;
-	}
-    else {
-      protect = false;
-    }
-    node = new BookmarkNode (
-      BTN_id, type, level, BTN.parentId, BTN.dateAdded, protect
-    );
-  }
-  else { // Presumably "bookmark" type
-	if (type == "bookmark")
-	  countBookmarks++;
-	else {
-	  trace("Odd bookmark type: "+type);
-	  countOddities++;
-	}
-
-	let uri, fetchedUri;
-    let triggerFetch = false;
-	let url = BTN.url;
-    if (url == undefined) {
-   	  trace("Bookmark with undefined URL !");
-   	  traceBTN(BTN);
-   	  url = "<undefined!>";
-      uri = "/icons/nofavicon.png";
-      fetchedUri = false;
-      protect = false;
-    }
-    else if (url.startsWith("place:")) {
-      uri = "/icons/specfavicon.png";
-      fetchedUri = false;
-      protect = true;
-    }
-    else if (url.startsWith("about:")) { // about: is protected - security error ..
-      uri = "/icons/nofavicon.png";
-      fetchedUri = false;
-      protect = (url != "about:blank"); // about:blank is not protected ...
-                                        // It is draggable, but keep favicon = nofavicon
-    }
-    else if (disablefavicons_option) {
-      uri = undefined;
-      fetchedUri = false;
-      protect = false;
-    }
-    else {
-      // Retrieve saved uri or set to undefined by default
-      // and trigger favicon retrieval in background
-      uri = undefined;
-      if (savedBkmkUriList != undefined) { // We are migrating to BN list ..
-        uri = savedBkmkUriList[BTN_id];
-        if ((uri == "/icons/nofavicontmp.png")  // Last time we stopped the sidebar
-          	|| (uri == "/icons/waiting.gif")    // it didn't have time to fetch that
-           ) {                                  // favicon .. so let's do it now.
-       	  uri = undefined;
-        }
-      }
-      else if (savedBNList != undefined) { // We are still at initial load ..
-    	let BN = savedBNList[BTN_id];
-    	if (BN != undefined) {
-          uri = BN.faviconUri;
-          if (delayLoad_option && (uri != undefined)) { // Remove element from saved list to
-                                                        // have it only once
-            delete savedBNList[BTN_id];
-          }
-          if ((uri == "/icons/nofavicontmp.png")  // Last time we stopped the sidebar
-              || (uri == "/icons/waiting.gif")    // it didn't have time to fetch that
-             ) {                                  // favicon .. so let's do it now.
-            uri = undefined;
-          }
-    	}
-      }
-      protect = false;
-
-      // Trigger asynchronous favicon retrieval process if favicon uri not found
-      if (uri == undefined) {
-
-          // Set tmp favicon and remember it in case the add-on is stopped before we had
-      	// a chance to get its image.
-      	uri = "/icons/nofavicontmp.png";
-        fetchedUri = false;
-        triggerFetch = true;
-      }
-      else {
-        fetchedUri = true;
-      }
-    }
-
-    node = new BookmarkNode (
-      BTN_id, type, level, BTN.parentId, BTN.dateAdded, protect,
-      BTN.title, uri, fetchedUri, url
-    );
-
-    if (triggerFetch) {
-      if (uglyHackTabFavIconUrl == undefined) {
-        // This is a bookmark, so here no need for cloneBN(), there is no tree below
-        faviconWorker.postMessage(["get", node, enableCookies_option]);
-      }
-      else {
-        // This is a bookmark, so here no need for cloneBN(), there is no tree below
-        faviconWorker.postMessage(["icon:"+uglyHackTabFavIconUrl, node, enableCookies_option]);
-//        trace("Retrieval demand 1 sent for icon:"+uglyHackTabFavIconUrl);
-        uglyHackTabFavIconUrl = undefined; // One shot ..
-      } 
-    }
-  }
-
-  // Add child to parentBN if provided, adjusting index of other children as needed
-  if (parentBN != undefined) {
-    let children = parentBN.children;
-    if (children == undefined) { // No list of children so far
-      parentBN.children = [node];
-//      node.index = 0;
-    }
-    else if (index >= children.length) { // Append child at end
-//      node.index =
-	  children.push(node);
-    }
-    else { // Insert child at position
-	  children.splice(index, 0, node);
-	  // Reindex next children
-//      let len = children.length;
-//      for (let i=index+1 ; i<len ; i++) {
-//        children[i].index = i;
-//      }
-    }
-  }
-
-  return(node);
-}
 
 /*
  * Functions
@@ -806,182 +278,6 @@ function trace (text, force = false) {
 }
 
 /*
- * Trace a bookmark item
- * 
- * BTN = BookmarkTreeNode
- */
-function traceBTN (BTN) {
-  trace("  "+Object.keys(BTN));
-  trace("  "+Object.values(BTN));
-  trace("---------------------");
-}
-
-/*
- * Rebuild the full BNList from a BN tree
- * 
- * Returns: nothing, just completes the BNList
- */
-function rebuildBNList (BNList, BN) {
-  BNList[BN.id] = BN;
-  if (BN.type == "folder") {
- 	let children = BN.children;
- 	if (children != undefined) {
- 	  for (let i of children) {
- 	    rebuildBNList(BNList, i);
- 	  }
-    }
-  }
-}
-
-/*
- * Save curBNList (serialized) including full tree structure at entry 0
- * Includes an hysteresis mechanism to space saves when they are frequent
- *   (typically during favicon fetching).
- * Returns a promise to signal save completion
- */
-let saving = false;
-let saveQueued = false;
-let saveHysteresis = SaveMinHysteresis;
-let lastSaveCallTime = undefined;
-function recallSaveBNList () {
-  setTimeout(
-  function () {
-    saving = false; // Clear flag, we're not busy anymore
-    if (saveQueued) { // Something more to save, so save now
-      saveQueued = false;
-      saveBNList();
-    }
-  }
-  , saveHysteresis);
-}
-
-const saveObject0 = {savedBNList: undefined, fTime: undefined};
-const saveObject1 = {savedBNListBak: undefined, fTimeBak: undefined};
-let fIndex = 0;
-const saveFIndex = {fIndex: fIndex};
-function saveBNList () {
-//  trace("saveBNList");
-//  let t1 = new Date();
-
-  // Recalculate hysteresis in function of call frequency
-  let curDate = new Date ();
-  let curTime = curDate.getTime();
-  if (lastSaveCallTime == undefined) {
-	lastSaveCallTime = curTime;
-  }
-  else {
-    let delay = curTime - lastSaveCallTime; // In ms
-	if (delay < 2000) { // Doing favicon fetching, increase to maximum
-	  saveHysteresis = SaveMaxHysteresis; 
-	}
-	else { // Reset to minimum
-  	  saveHysteresis = SaveMinHysteresis; 
-	}
-	lastSaveCallTime = curTime;
-  }
-
-  // Execute or register save request for later
-  let p = new Promise (
-    (resolve, reject) => {
-      if (!saving) { // Avoid doing too many saves at same time.
-        saving = true;
-        try {
-          let saveObj;
-//          if (delayLoad_option && (savedBNList != undefined)) { // Merge both list when saving to
-//                                                                // keep what was not yet verified
-//            saveObj = Object.assign({}, savedBNList, curBNList);
-//          }
-//          else {
-          saveObj = curBNList;
-//          }
-          let json = BN_serialize(saveObj[0]);
-          saveObj = undefined; // Free pointer on object
-//console.log("json.length = "+json.length);
-//recallSaveBNList();
-//resolve();
-
-          let saveObject;
-          if (!enableFlipFlop_option || (fIndex == 0)) {
-        	saveObject = saveObject0;
-        	saveObject0.savedBNList = json;
-        	saveObject0.fTime = curTime;
-//        	console.log("savedBNList");
-          }
-          else {
-          	saveObject = saveObject1;
-  		    saveObject1.savedBNListBak = json;
-        	saveObject1.fTimeBak = curTime;
-//        	console.log("savedBNListBak");
-          }
-          json = undefined; // Free pointer on string
-          browser.storage.local.set(saveObject)
-          .then(
-            function () { // Save finished
-              //trace("Saved curBNList");
-// 	            let t2 = new Date ();
-//              trace("End of saveBNList. Delay = "+(t2.getTime() - t1.getTime())+" ms", true);
-              // Record last slot which was saved
-              saveFIndex.fIndex = fIndex;
-              browser.storage.local.set(saveFIndex)
-              .then(
-                function () {
-//                  console.log("saveFIndex: "+fIndex);
-                  if (enableFlipFlop_option) { // Go to other slot on next save
-                    fIndex = 1 - fIndex;
-                  }
-                }
-              );
-              // Introduce an hysteresis before clearing flags
-              // and triggering another save.
-              recallSaveBNList();
-              resolve(); // Send promise for anybody waiting ..
-            }
-          )
-          .catch ( // Asynchronous also, like .then
-            function (err) {
-        	  let msg = "saveBNList() error when writing to local storage: "+err;
-              trace(msg, true);
-              console.log(msg);
-              recallSaveBNList();
-              reject();
-            }
-          );
-
-          // Free json string and time
-		  delete saveObject0.savedBNList;
-      	  delete saveObject0.fTime;
-		  delete saveObject1.savedBNListBak;
-      	  delete saveObject1.fTimeBak;
-        } catch (error) { // Most probably out of memory error
-        	              // Calm down, stop the save chain
-          console.log("saveBNList() error: "+error);
-
-          // Clear flags, we're not busy anymore
-          saving = false;
-          saveQueued = false;
-          reject();
-
-          // Stop and restart the favicon worker so that refresh favicon remains operational
-          // (often, the worker gets "killed" by the out of memory situation)
-          faviconWorker.terminate();
-          faviconWorker = new Worker("favicon.js");
-          faviconWorker.onmessage = asyncFavicon;
-          faviconWorker.onerror = errorFavicon;
-          faviconWorker.onmessageerror = msgerrorFavicon;
-        }
-      }
-      else { // Already saving .. queue and do only once later when ongoing one 
-             // + hysteresis is finished
-        saveQueued = true;
-        resolve(); // Send promise for anybody waiting ..
-      }
-    }
-  );
-
-  return(p); // Return promise
-}
-
-/*
  * Save the folders open state in storage, indexed by their stable bookmark id
  * Returns a promise to signal save completion
  */
@@ -989,13 +285,7 @@ function saveFldrOpen () {
   let p = new Promise (
     (resolve, reject) => {
       let saveObj;
-      if (delayLoad_option && (savedFldrOpenList != undefined)) { // Merge both list when saving to
-	                                                              // keep what was not yet verified
-	    saveObj = Object.assign({}, savedFldrOpenList, curFldrOpenList);
-      }
-      else {
-	    saveObj = curFldrOpenList;
-      }
+      saveObj = curFldrOpenList;
       browser.storage.local.set({
         savedFldrOpenList: saveObj
       })
@@ -1014,42 +304,35 @@ function saveFldrOpen () {
 }
 
 /*
- * Find the best bookmark title, similar to how FF works
- *
-*/
-function getBestTitle(BTN, aDoNotCutTitle = true) {
+ * Estimate a bookmark title for display from the URL, similar to how FF works, when there is no title
+ * From pull request submitted by jun1x
+ *   https://github.com/aaFn/Bookmark-search-plus-2/pull/45
+ *   https://github.com/aaFn/Bookmark-search-plus-2/pull/45/commits/1b9a4169a84123681de1729564907b23db0537cf
+ * 
+ * url = String, URL of the bookmark item
+ * 
+ * Returns a String = suggested title to display for the bookamark
+ */
+function suggestDisplayTitle(url) {
   let title;
 
-  // Normally, this is just the title, but we don't want empty items in
-  // the tree view so return a special string if the title is empty.
-  if (BTN.title) {
-    title = BTN.title;
-  } 
-  else {
-    // If node title is empty, try constructing it using the URI
-    try {
-      const uri = new URL(BTN.url);
-      let host = uri.host;
-      let pathname = uri.pathname;
-      let search = uri.search;
-      let hash = uri.hash;
+  // Try constructing the title using the URI
+  try {
+	let urlObj = new URL (url);
+	let host = urlObj.host;
+	let pathname = urlObj.pathname;
+	let search = urlObj.search;
+	let hash = urlObj.hash;
       
-      // If fileName is empty, use path to distinguish labels
-      if (aDoNotCutTitle) {
-        title = decodeURI(host + pathname + search + hash);
-      } else {
-        let fileName = pathname.substring(pathname.lastIndexOf("/") + 1, pathname.length);
-        title = decodeURI(host + (fileName ?
-                                  (host ? "/.../" : "") + fileName :
-                                    pathname + search + hash));
-      }
-    } 
-    catch (e) {
-      // Use (no title) for non-valid/standard URIs
-      title = "";
-    }
+	// If fileName is empty, use path to distinguish labels
+	title = decodeURI(host + pathname + search + hash);
+  } 
+  catch (e) {
+	// Use (no title) for non-valid/standard URIs
+	title = "(no title)"; // TODO : move to _locales/en/messages.json
   }
-  return title || "(no title)"; // TODO : move to _locales/en/messages.json
+
+  return(title);
 }
 
 /*
@@ -1146,7 +429,7 @@ function appendResult (BTN) {
     let span;
     // Retrieve current uri or set to nofavicon.png by default
     let uri = curBNList[BTN_id].faviconUri;
-    if (disablefavicons_option || (uri == undefined)) { // Clone with nofavicon image background
+    if (disableFavicons_option || (uri == undefined)) { // Clone with nofavicon image background
       anchor = NFBookmarkTempl.cloneNode(true);
       span = anchor.firstElementChild.nextElementSibling;
     }
@@ -1172,7 +455,14 @@ function appendResult (BTN) {
 //      anchor.href = url;
 //    }
 //    anchor.classList.add("bkmkitem_b");
-    anchor.title = (title ? title + "\n" : "") + url;
+    if (title == "") {
+      anchor.title = url;
+      span.textContent = suggestDisplayTitle(url);
+    }
+    else {
+      anchor.title = title+"\n"+url;
+      span.textContent = title;
+    }
 //    anchor.draggable = false;
     anchor.style.marginLeft = "16px";
 //    cell.appendChild(anchor);
@@ -1191,7 +481,6 @@ function appendResult (BTN) {
 
 //    let span = document.createElement("span"); // Assuming it is an HTMLSpanElement
 //    span.classList.add("favtext");
-    span.textContent = getBestTitle(BTN);
 //    span.draggable = false;
 //    anchor.appendChild(span);
     cell.appendChild(anchor);
@@ -1371,7 +660,7 @@ function manageSearchTextHandler () {
     // Discard the results table
     SearchResult.removeChild(resultsTable);
     resultsTable = null;
-    resultsFragment = null;
+//    resultsFragment = null;
     curResultRowList = {};
 
     // If a row was highlighted, do not highlight it anymore
@@ -1385,7 +674,7 @@ function manageSearchTextHandler () {
     if (sh != "") { // The search result pane size is different
     	            // from its default value set in the CSS
     	            // which is 20% (as seen in Computed Style)
-      if (remembersizes_option) {
+      if (rememberSizes_option) {
     	if (searchHeight != sh) { // Save only if different from already saved
     	  searchHeight = sh;
     	  browser.storage.local.set({
@@ -1419,448 +708,16 @@ function clearSearchTextHandler () {
 }
 
 /*
- * Get a cloned BTN object, but without the recursive structure of children.
- * This is to avoid structured cloning in postMessage().
- * 
- * BTN = a BookmarkTreeNode
- * 
- * Return another BookmarkTreeNode, copied from BTN, byut without the children tree
- */
-function cloneBTN (BTN) {
-  let newBTN = Object.create(Object.getPrototypeOf(BTN));
-  // console.log("BTN.children: "+BTN.children+" newBTN.children: "+newBTN.children);
-  newBTN.dateAdded         = BTN.dateAdded;
-  newBTN.dateGroupModified = BTN.dateGroupModified;
-  newBTN.id                = BTN.id;
-  newBTN.index             = BTN.index;
-  newBTN.parentId          = BTN.parentId;
-  newBTN.title             = BTN.title;
-  newBTN.type              = getType(BTN);
-  newBTN.unmodifiable      = BTN.unmodifiable;
-  newBTN.url               = BTN.url;
-  return(newBTN);
-}
-
-/*
- * Select closest x-icon image as possible to 16x16, and return it
- * as an Uint8ClampedArray
- * 
- * uri = a data:image/x-icon base64 string describing the image
- * 
- * Returns null if no choice to make (or wrong format),
- * or an uri with a data:image/x-icon base64 string containing only the selected image
- */
-// x-icon signatures .. Cf. https://mimesniff.spec.whatwg.org/#image-type-pattern-matching-algorithm
-const XIconSignature1 = String.fromCharCode(0, 0, 1, 0);
-const XIconSignature2 = String.fromCharCode(0, 0, 2, 0);
-function selectXIconImg (uri) {
-  let pos = uri.indexOf("base64,");
-  if (pos == -1) {
-//    console.log("not an x-icon: "+uri);
-	return(null);
-  }
-  let str = atob(uri.slice(pos+7)); // Get the binary part
-
-  // Explore structure, as docupmented here: https://en.wikipedia.org/wiki/ICO_(file_format)
-//  console.log("str.length: "+str.length);
-  // Do a bit of verifications on structure as sometimes the mime type doesn't correspond
-  // to contents !!
-  let header = str.slice(0,4); 
-  if ((header != XIconSignature1) && (header != XIconSignature2)) {
-//    console.log("not an x-icon: "+uri);
-	return(null);
-  }
-//  console.log("x-icon: "+uri);
-
-  // First get the npmber of images
-  let nbImg = str.charCodeAt(4) + str.charCodeAt(5) * 256;
-//  console.log("  nbImg: "+nbImg);
-  if (nbImg == 1) {
-	return(null);
-  }
-
-  // Now go through the image directory to find the closest one
-  let index = 6; // Start of first image entry
-  const entryLen = 16; // Length of an image entry
-  let selEntry, selSize, selOffset, selNbColors, height, width, nbColors, distance;
-  let selH = 512; // Arbitrary big number above 256 which is the max size
-  let selW = 512;
-  let selDist = (selH - 16) * (selH - 16) + (selW - 16) * (selW - 16);
-  let selIDData;
-  for (let i=0 ; i<nbImg ; i++,index+=entryLen) {
-	// Get image size
-	width = str.charCodeAt(index);
-	if (width == 0)   width = 256;
-	height = str.charCodeAt(index+1);
-	if (height == 0)   height = 256;
-//    console.log("  width,height: "+width+","+height);
-
-	// Compare with last one selected in terms of distance to 16,16
-    distance = (height - 16) * (height - 16) + (width - 16) * (width - 16);
-    nbColors = str.charCodeAt(index+2);
-    if (nbColors == 0)   nbColors = 256;
-//    console.log("  distance,selDist,nbColors,selNbColors: "+distance+","+selDist+","+nbColors+","+selNbColors);
-	if ((distance < selDist)
-		|| ((distance == selDist) && (nbColors > selNbColors))
-	   ) {
-	  selEntry = index;
-	  selDist = distance;
-	  selH = height;
-	  selW = width;
-	  selNbColors = nbColors;
-//      console.log("  selected: "+selW+","+selH+","+selNbColors);
-	  selSize = str.charCodeAt(index+8)
-                + str.charCodeAt(index+9) * 256
-                + str.charCodeAt(index+10) * 65536
-                + str.charCodeAt(index+11) * 16777216;
-	  selOffset = str.charCodeAt(index+12)
-	              + str.charCodeAt(index+13) * 256
-	              + str.charCodeAt(index+14) * 65536
-	              + str.charCodeAt(index+15) * 16777216;
-//      console.log("  size,offset: "+selSize+","+selOffset);
-	}
-  }
-
-  // Allocate array to hold selected image, and fill it with data
-  // Rebuild header
-  selIDData = new Uint8ClampedArray(selSize+22);
-  selIDData[0] = selIDData[1] = selIDData[5] = selIDData[19] = selIDData[20] = selIDData[21] = 0;
-  selIDData[2] = str.charCodeAt(2); // Keep same type as src image
-  selIDData[3] = str.charCodeAt(3);
-  selIDData[4] = 1; // 1 image
-  // Recopy image entry except offset which will change
-  index = selEntry;
-  for (let i=6 ; i<18 ; i++,index++) {
-    selIDData[i] = str.charCodeAt(index);
-  }
-  selIDData[18] = 22;
-  index = selOffset;
-  let end = 22+selSize;
-  for (let i=22 ; i<end ; i++,index++) {
-	selIDData[i] = str.charCodeAt(index);
-//    console.log("  src,clamped: "+selIDData[i]+","+str.charCodeAt(index));
-  }
-//  console.log("  selected: "+selW+","+selH);
-
-  // Return result as an uri
-  // See https://stackoverflow.com/questions/6965107/converting-between-strings-and-arraybuffers
-  //   for the fastest method to convert an array to a string ... :-)
-  //   then used in btoa()
-  uri = "data:image/x-icon;base64,"
-	    + btoa(String.fromCharCode.apply(null, selIDData));
-/*
-  uri = "data:image/x-icon;base64,";
-  let incr = 1024;
-  str = "";
-  for(let i=0 ; i<end ; i+=incr){
-    if (i + incr > end){
-      incr = end - i;
-    }
-    str += String.fromCharCode.apply(null, selIDData.subarray(i,i+incr));
-  }  
-  uri += btoa(String.fromCharCode.apply(null, str));
-*/
-/*
-console.log("  uri: "+uri);
-str = atob(uri.slice(25));
-console.log("str.length: "+str.length);
-console.log("reserved0: "+str.charCodeAt(0));
-console.log("reserved1: "+str.charCodeAt(1));
-console.log("type0: "+str.charCodeAt(2));
-console.log("type1: "+str.charCodeAt(3));
-console.log("#images0: "+str.charCodeAt(4));
-console.log("#images1: "+str.charCodeAt(5));
-console.log("width: "+str.charCodeAt(6));
-console.log("height: "+str.charCodeAt(7));
-console.log("colors: "+str.charCodeAt(8));
-console.log("reserved: "+str.charCodeAt(9));
-console.log("cplanes0: "+str.charCodeAt(10));
-console.log("cplanes1: "+str.charCodeAt(11));
-console.log("bperpixel0: "+str.charCodeAt(12));
-console.log("bperpixel1: "+str.charCodeAt(13));
-console.log("size0: "+str.charCodeAt(14));
-console.log("size1: "+str.charCodeAt(15));
-console.log("size2: "+str.charCodeAt(16));
-console.log("size3: "+str.charCodeAt(17));
-console.log("offset0: "+str.charCodeAt(18));
-console.log("offset1: "+str.charCodeAt(19));
-console.log("offset2: "+str.charCodeAt(20));
-console.log("offset3: "+str.charCodeAt(21));
-*/
-  return(uri);
-}
-
-/*
- * Our own 16x16 downscaling algorithm ..
- * 
- * srcIDData = an ImageData of source
- * tgtIDData = a 16x16 ImageData at target
- * nh = Integer, natural height
- * nw = Integer, natural width
- */
-function downscaleImg (srcIDData, tgtIDData, nh, nw) {
-  let rowsize = nw * 4;
-  let sx = nw / 16.0;
-  let sy = nh / 16.0;
-  let sxy = sx * sy;
-//  console.log("sx: "+sx+" sy: "+sy+" sxy: "+sxy);
-  let px; // Start of square to average
-  let py = 0.0;
-  let psx, psy; // End of square to average
-  let pxInt, pyInt, psxInt, psyInt; // Smallest bounding square in integer coordinates
-  let psxInt_1, psyInt_1; // psxInt and psyInt minus 1 when psx and psy are not integers
-  let i, j;
-  let pxTmp, pyTmp;
-  let r, g, b, a, avgR, avgG, avgB, avgA; // Average per channel
-  let wx, wy, wxy; // Weights to apply to each point
-//let swx, swy;
-  let waxay, swaxay;
-  let srcIndex;
-  let tgtIndex = 0;
-  for (j=0 ; j<16 ; j++,py=psy) { // Go through each target point (i,j)
-    psy = py + sy;
-    pyInt = Math.trunc(py);
-	psyInt = psyInt_1 = Math.trunc(psy);
-	if (psyInt < psy)   psyInt++;
-	px = 0.0;
-	for (i=0 ; i<16 ; i++,px=psx) {
-	  psx = px + sx;
-	  pxInt = Math.trunc(px);
-	  psxInt = psxInt_1 = Math.trunc(psx);
-	  if (psxInt < psx)   psxInt++;
-/*
-if (py < 2)
-console.log("px,py,psx,psy: "+px+","+py+","+psx+","+psy+",");
-if (py < 2)
-console.log("pxInt,pyInt,psxInt,psyInt: "+pxInt+","+pyInt+","+psxInt+","+psyInt+",");
-swy = 0;
-*/
-	  // One pixel in target image corresponds to a square (px,py,psx,psy) of pixels at source
-	  // Do an average of that square.
-	  // Note: IDData objects are Uint8ClampedArray in RGBA order (4 bytes each pixel)
-      swaxay = avgR = avgG = avgB = avgA = 0;
-	  // Go through each point in (pxInt,pyInt,psxInt,psyInt)
-	  for (pyTmp=pyInt ; pyTmp<psyInt ; pyTmp++) {
-		srcIndex = pyTmp*rowsize + pxInt*4;
-		if (pyTmp == pyInt) {
-		  wy = pyInt + 1 - py;  
-		}
-		else if (pyTmp == psyInt_1) {
-		  wy = psy - psyInt_1;
-		}
-		else {
-		  wy = 1;
-		}
-//swy += wy;
-//swx = 0;
-		for (pxTmp=pxInt ; pxTmp<psxInt ; pxTmp++) {
-		  if (pxTmp == pxInt) {
-		    wx = pxInt + 1 - px;  
-		  }
-		  else if (pxTmp == psxInt_1) {
-			wx = psx - psxInt_1;
-		  }
-		  else {
-			wx = 1;
-		  }
-//swx += wx;
-          r = srcIDData[srcIndex++];
-          g = srcIDData[srcIndex++];
-          b = srcIDData[srcIndex++];
-          a = srcIDData[srcIndex++];
-		  wxy = wx * wy;
-          // Account for transparency in the weighted sum
-		  waxay = wx * a / 255 * wy * a / 255;
-		  swaxay += waxay;
-		  avgR += r * waxay;
-		  avgG += g * waxay;
-		  avgB += b * waxay;
-		  avgA += a * wxy;
-//if (py < 2)
-//console.log("wx,wy,wxy,waxay,R,G,B,A: "+wx+","+wy+","+wxy+","+waxay+","+avgR+","+avgG+","+avgB+","+avgA+",");
-		}
-//if (py < 2)
-//console.log("swx: "+swx);
-	  }
-//if (py < 2)
-//console.log("swy: "+swy);
-/*
-	  // Take the closest pixel to center of the square (px,py,psx,psy)
-	  pyTmp = py + sy / 2;
-	  pxTmp = px + sx / 2;
-	  pyInt = Math.round(pyTmp);
-	  pxInt = Math.round(pxTmp);
-	  srcIndex = pyInt*rowsize + pxInt*4;
-	  avgR = srcIDData[srcIndex++];
-	  avgG = srcIDData[srcIndex++];
-	  avgB = srcIDData[srcIndex++];
-	  avgA = srcIDData[srcIndex];
-	  sxy = 1;
-*/
-//console.log("swaxay,sxy,swxy: "+swaxay+","+sxy+","+swx*swy);
-      if (swaxay == 0) {
-  	    tgtIDData[tgtIndex++] = 0;
-	    tgtIDData[tgtIndex++] = 0;
-	    tgtIDData[tgtIndex++] = 0;
-	    tgtIDData[tgtIndex++] = avgA / sxy;
-      }
-      else {
-	    tgtIDData[tgtIndex++] = avgR / swaxay;
-	    tgtIDData[tgtIndex++] = avgG / swaxay;
-	    tgtIDData[tgtIndex++] = avgB / swaxay;
-	    tgtIDData[tgtIndex++] = avgA / sxy;
-      }
-	}
-  }
-}
-
-/*
- * Migration of existing favicons to 16x16
+ * Trigger 16x16 migration in background
  */
 let migr16x16ConvertList = [];
 let migr16x16Len = 0;
-let count0x0Favicons = 0;
-function migrate16x16 () {
-  trace ("Migrating "+migr16x16Len+" favicons to 16x16");
-
-  let row;
-  let img;
-  let nh, nw;
-
-  // Process list
-  if (migr16x16Len > 0) {
-	const MigrCanvas = document.createElement('canvas'); // For image conversion to 16 x 16
-	MigrCanvas.height = 16;
-	MigrCanvas.width = 16;
-	const MigrCtx = MigrCanvas.getContext("2d");
-	MigrCtx.imageSmoothingEnabled = false;
-	MigrCtx.imageSmoothingQuality = "high";
-	const MigrImage = new Image(16, 16);
-	const MigrCanvas2 = document.createElement('canvas'); // For loading a favicon to downscale
-	const MigrCtx2 = MigrCanvas2.getContext("2d");
-	const MigrImageData = MigrCtx.createImageData(16, 16);
-	const MigrIDData = MigrImageData.data;
-	const MigrCadence = 200; // Wait time in milliseconds between a migration request completion
-	                         // and start next one in queue
-    let migrUri;
-	let migratedUri;
-    let migrSecondPass = false;
-	let destImg;
-	let destBnId;
-
-	// Loop on list with MigrCadence intervals
-	function loop () {
-	  setTimeout(
-		function () {
-		  if (migr16x16Len <= 0) {
-			// Set migration as finished
-			trace("Migration to 16x16 favicons complete");
-			trace("Count of abnormal favicons: "+count0x0Favicons, true); 
-		    structureVersion += VersionImg16;
-		    browser.storage.local.set({
-		  	  structureVersion: structureVersion
-		    });
-		    migration_img16 = false;
-	      }
-		  else {
-			destBnId = migr16x16ConvertList.shift();
-			migr16x16Len--;
-			row = curRowList[destBnId];
-			if (row != undefined) { // Still there (could have been deleted by the time ...)
-			  destImg = row.firstElementChild.firstElementChild.firstElementChild;
-//              console.log("Rescaling: "+destImg.src.substr(0,50)+" - "+row.firstElementChild.firstElementChild.title);
-			  // Special handling for x-icons, which are libraries of icons, not well handded
-			  // by Canvas 2d context drawImage(), since it takes only the first icon in the librrary.
-			  // Verify if this is an x-icon by header .. because the mime type is not always reliable !!
-			  let uri = destImg.src;
-			  migrUri = selectXIconImg(uri);
-			  if (migrUri != null) { // It is an x-ixon and there was more than 1, go with selected image
-//                console.log("  go with selected uri: "+migrUri);
-			    uri = migrUri;
-			  }
-		      MigrImage.src = migrUri = uri;
-			}
-			else {
-			  loop();
-			}
-		  }
-		}
-		, MigrCadence
-	  );
-	}
-
-	// When image loaded, convert it
-	function migrateOnLoad () {
-	  let nh = MigrImage.naturalHeight;
-	  let nw = MigrImage.naturalWidth;
-	  try {
-	    if ((nh > 16) && (nw > 16)) { // Only downscaling .. avoid FF canvas native algo,
-	    	                          // not really good
-	      try {
-	  	    // Get ImageData.data of the image
-	  	    MigrCanvas2.height = nh;
-	  	    MigrCanvas2.width = nw;
-	  	    MigrCtx2.drawImage(MigrImage, 0, 0);
-	  	    let srcIDData = MigrCtx2.getImageData(0, 0, nw, nh).data;
-
-	  	    // Downscale into MigrImageData
-	        downscaleImg(srcIDData, MigrIDData, nh, nw);
-
-	  	    // Put MigrImageData into MigrCtx and get base64 uri
-	  	    MigrCtx.putImageData(MigrImageData, 0, 0);
-	  	    migratedUri = MigrCanvas.toDataURL();
-	      }
-	      catch (error) {
-	  	    console.log("migrateOnLoad error: "+error.type+" for "+MigrImage.src+" - "+destBnId+" - "+destImg.parentElement.title);
-	    	loop();
-	      }
-	  	}
-	  	else {
-	      migrSecondPass = false;
-		  MigrCtx.clearRect(0, 0, 16, 16);
-		  MigrCtx.drawImage(MigrImage, 0, 0, 16, 16);
-		  migratedUri = MigrCanvas.toDataURL();
-	  	}
-
-	    // Save new favicon
-		destImg.src = migratedUri;
-		destImg = undefined; // Forget img object
-		curBNList[destBnId].faviconUri = migratedUri;
-		saveBNList();
-
-		// Call refresh search if there is one active to update any result with that BTN
-		refreshFaviconSearch(destBnId, migratedUri);
-	  }
-	  catch (error) { // Error on rescale, keep original in place, no change
-        migrSecondPass = false;
-		console.log("migrateOnLoad error: "+error);
-	  }
-
-	  // Next iteration
-	  loop();
-	}
-
-	// If error on load, set to no favicon and go to next
-	function errorMigrOnLoad (error) {
-	  setNoFavicon(destBnId);
-	  loop();
-	}
-
-
-	// Initiate migration loop
-	MigrImage.onload = migrateOnLoad;
-	MigrImage.onerror = errorMigrOnLoad;
-	loop();
+function trigMigrate16x16 () {
+  if (backgroundPage == undefined) {
+	sendAddonMsgMigr16x16(migr16x16ConvertList, migr16x16Len);
   }
   else {
-	// Set migration as finished
-	trace("Nothing to migrate to 16x16 favicons");
-	trace("Count of abnormal favicons: "+count0x0Favicons, true); 
-	structureVersion += VersionImg16;
-	browser.storage.local.set({
-	 structureVersion: structureVersion
-	});
-	migration_img16 = false;
+	backgroundPage.signalMigrate16x16(migr16x16ConvertList, migr16x16Len);
   }
 }
 
@@ -1889,7 +746,7 @@ function migr16x16OnLoad () {
     if (migrationTimeout != null) {
       clearTimeout(migrationTimeout);
     }
-    migrationTimeout = setTimeout(migrate16x16, Migr16x16Timeout);
+    migrationTimeout = setTimeout(trigMigrate16x16, Migr16x16Timeout);
   }
 }
 
@@ -1953,10 +810,6 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
 	let open = undefined;
     if (savedFldrOpenList != undefined) {
       open = savedFldrOpenList[BN_id];
-      if (delayLoad_option && (open != undefined)) { // Remove element from saved list to
-                                                     // have it only once
-        delete savedFldrOpenList[BN_id];
-      }
     }
     else {
       // Verify if we already know about it
@@ -1974,7 +827,7 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
     // Create elements
     let div2 = document.createElement("div"); // Assuming it is an HTMLDivElement
     // Look at children to set the twistie
-    if (!delayLoad_option)
+//    if (!delayLoad_option)
       children = BN.children;
     if ((children == undefined) || (children.length == 0))
       div2.classList.add("twistiena");
@@ -2053,7 +906,7 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
     //let anchor = document.createElement("a"); // Assuming it is an HTMLAnchorElement
 //    let anchor = document.createElement("div"); // Assuming it is an HTMLDivElement
     let anchor;
-    if (disablefavicons_option) { // Clone with nofavicon image background
+    if (disableFavicons_option) { // Clone with nofavicon image background
       anchor = NFBookmarkTempl.cloneNode(true);
     }
     else { // clone normal one, we will fill the image later
@@ -2063,7 +916,6 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
       anchor.href = url;
     }
 //    anchor.classList.add("bkmkitem_b");
-    anchor.title = (title ? title + "\n" : "") + url;
 //    anchor.draggable = false; // False by default for <div> 
     if (level > 0) {
       anchor.style.marginLeft = (LevelIncrementPx * level + 16)+"px";
@@ -2083,7 +935,9 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
       span = img.nextElementSibling;
     }
     else {
-      if (immediateFavDisplay_option) {
+      if (immediateFavDisplay_option
+    	  || isDisplayComplete			// Do not defer once initial load/display is complete
+    	 ) {
         let img = anchor.firstElementChild;
         let uri = BN.faviconUri;
         img.src = (uri == undefined ? "/icons/nofavicon.png" : uri);
@@ -2100,7 +954,14 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
 
 //    let span = document.createElement("span"); // Assuming it is an HTMLSpanElement
 //    span.classList.add("favtext");
-    span.textContent = getBestTitle(BN);
+    if (title == "") {
+      anchor.title = url;
+      span.textContent = suggestDisplayTitle(url);
+    }
+    else {
+      anchor.title = title+"\n"+url;
+      span.textContent = title;
+    }
 //    span.draggable = false; // False by default for <span>
 //    anchor.appendChild(span);
     cell.appendChild(anchor);
@@ -2108,75 +969,6 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
 
   return(row);
 }
-
-/*
- * A gap at end of parent children was detected in FF 56, a separator was created,
- * display it.
- *
- * parentBN = parent BookmarkNode of already appended gap end BookmarkNode separator
- *
- * Uses and maintain global variable highest_open_level.
- */
-function insertFF56EndGapSep (parentBN) {
-  let children = parentBN.children;
-  let len = children.length;
-  let previousBN = children[len-2]; // Is there since next one is a gap after it
-  let prevRow = curRowList[previousBN.id];
-  let index = prevRow.rowIndex + 1; // Gap separator is inserted just after
-  if (prevRow.hidden) { // Previous row not visible, so this one shouldn't be either
-    highest_open_level = 0; // Min possible, to make it simple ..
-  }
-  else {
-	highest_open_level = parentBN.Level + 1; // Will be visible
-  }
-  insertBookmarkBN(children[len-1], index);
-}
-
-/*
- * Calculate the real length of a folder, including itself, its bookmarks and length of sub-folders
- * 
- * folderBN = folder BookmarkNode
- * 
- * Returns the (integer) real length of the folder
- */
-/*
-function realLength (folderBN) {
-  let length = 1; // At least the folder item
-  let children = folderBN.children;
-  if (children != undefined) {
-    for (let i of children) {
-      if (getType(i) == "folder") {
-	    length += realLength(i);
-	  }
-	  else   length++;
-    }
-  }
-  return(length);
-}
-*/
-
-/*
- * Calculate the real offset from parent, including length of sub-folders between parent and node
- * 
- * parentBN = BookmarkNode
- * internalPos = 0 based index of parentBN children 
- * 
- * Returns the (integer) real offset from parent for relative position inside bookmarksTable.
- */
-/*
-function realOffset (parentBN, internalPos) {
-  let offset = 1;
-  let children = parentBN.children;
-  let BN;
-  for (let i=0 ; i<internalPos ; i++) {
-    if ((BN = children[i]).type) {
-	  offset += realLength(BN);
-	}
-	else   offset++;
-  }
-  return(offset);
-}
-*/
 
 /*
  * Insert one or more (if folder) bookmarks in the existing table
@@ -2267,114 +1059,21 @@ function insertBkmks (BN, parentRow, parentLevel = undefined, parentOpen = undef
 }
 
 /*
- * Recursively explore depth first a BookmarkTreeNode and its children,
- * and build corresponding BN tree.
- *
- * BTN = BookmarkTreeNode
- * level = integer, the tree depth
- * 
- * Return created BookmarkNode tree
- */
-let countDuplicates = 0;
-function buildTree (BTN, level) {
-  let BTN_id = BTN.id;
-/*
-  // Detect objects which would be structurally duplicated = appear several times
-  // with same bookmark is, supposed to be unique. 
-  let BN = curBNList[BTN_id]; 
-  if (BN != undefined) { // Already exists !!
-    let newId = "dup"+(countDuplicates++)+"-"+BTN_id;
-    trace("Duplicate BTN.id = "+BTN_id+" !! Re-id to : "+newId, true);
-    traceBTN(BTN);
-    BTN.id = BTN_id = newId;
-    trace("---------------", true);
-    trace("Duplicate with:", true);
-    BN_trace(BN);
-    trace("---------------", true);
-  }
-*/
-  let node = curBNList[BTN_id] = BN_create(BTN, level);
-
-  // If there are children, recursively display them
-  if (BeforeFF57) {
-	if (node.type == "folder") {
-	  let btnChildren = BTN.children;
-	  if (btnChildren != undefined) {
-	    let children = node.children;
-	    let j = 0;
-	    let index, id;
-	    let node1;
-        for (let i of btnChildren) {
-    	  index = i.index; 
-    	  while (j < index) {
-    	    id = "separator" + countSeparators;
-    	    node1 = new BookmarkNode (id, "separator", level+1, BTN_id, 0,
-                                      ((countSeparators++ == 0) ? true : false)
-                                     );
-            children[j++] = node1;
-    	  }
-          children[j++] = buildTree(i, level+1);
-        }
-	  }
-    }
-  }
-  else {
-   	if (node.type == "folder") {
-  	  let btnChildren = BTN.children;
-	  if (btnChildren != undefined) {
-	    let children = node.children;
-	    let j = 0;
-        for (let i of btnChildren) {
-          children[j++] = buildTree(i, level+1);
-        }
-	  }
-    }
-  }
-
-  return(node);
-}
-
-/*
  * Handle bookmark creation event
  *
- * id = string. The new bookmark item's ID.
- * BTN = BookmarkTreeNode. Information about the new bookmark item.
- * 
- * Note: we got a problem: when creating several bookmarks in a row very fast, like in
- *       "Mark all tabs", since getSubTree() can be quite long, we're getting plenty of requests
- *       nearly at the same time just after the initial parent folder,  which are its children,
- *       and while still processing the parent folder, because of the Promise mechanism. And
- *       it frequently happens that children are processed faster than their parent, so their
- *       result happen before ..! And that ends up in a mess, with exceptions since for ex.
- *       curRowList is not yet filled with the parent when children get executed,
- *       and so parentRowIndex is null, and we're calling insertBkmks with therefore a null
- *       returned by bookmarksTable.rows[parentRowIndex] !! Total disorder .. !!
- * => Async/await is not helping ... still getting things in "paralleled" disorder :-(
- * => Would need semaphores or true synchronicity, but none of this exists in javascript :-(
- * => Have to implement a queueing mechanism at entry .. again, javascript is a crap language ..
- * 
- * Global variable isOtherThanSeparatorCreated is set to true if something other than a
- * separator (folder or bookmark) was created in the sequence.
+ * BN = new BookmarkNode subtree which is added
+ * index = insertion point under parent
  */
-let createReqQueue = []; // Array of create requests, to serialize and cadence their handling
-//let t1;
-let isOtherThanSeparatorCreated;
-function handleCreateRequest () {
-  // Get first element in queue
-  let req = createReqQueue[0];
-  let id = req[0]; 
-  let BTN = req[1]; 
-//  trace("Processing id: "+id+" BTN: "+BTN);
-
-  // We need the parent to calculate the real offset of insertion
-  let parentId = BTN.parentId;
+function bkmkCreated (BN, index) {
+  let parentId = BN.parentId;
   let parentBN = curBNList[parentId];
-  let index = BTN.index;
+  if (backgroundPage == undefined) { // Redo insertion in our own copy of curBNList
+//	  trace(t1.getTime()+" Create event on: "+BN.id+" type: "+BN.type+" parentId: "+parentId+" index: "+index);
 
-  // Create the new BN tree and insert it under its parent
-  let BN = buildTree(BTN, parentBN.level+1);
-  BN_insert(BN, parentBN, index);
-  
+	// Insert the new BN tree under its parent
+	BN_insert(BN, parentBN, index);
+  }
+
   // Find insertion point, setting it in global variable insertRowIndex
   // We need to retrieve the insertion point the hard way if we do not want to call
   // getSubtree() which is very very long ...
@@ -2389,8 +1088,17 @@ function handleCreateRequest () {
 	let len = children.length - 1; // Be careful that we already inserted BN there ..
 	if (index < len) { // Easy case, we insert just before next sibling
 	  let nextBN = children[index+1]; // index is us ...
-	  row = curRowList[nextBN.id]; // Cannot be null
-	  insertRowIndex = row.rowIndex;
+	  row = curRowList[nextBN.id];
+	  // Cannot be undefined, except rare case under FF56, where we are discovering 2 or more separators
+	  // in a row and they were already added in the BN tree by the background task, but not yes on display
+	  if (row == undefined) { // Then act as insert as last child of its parent, having already children
+		let previousBN = BN_lastDescendant(children[index-1]);
+		row = curRowList[previousBN.id];
+		insertRowIndex = row.rowIndex + 1; // Can be at end of bookmarks table
+	  }
+	  else {
+		insertRowIndex = row.rowIndex;
+	  }
 	}
 	else { // Harder case, we are inserting as last child of its parent, having already children
 	  // Find last child / grand child under that previous sibling, and insert just after
@@ -2402,47 +1110,17 @@ function handleCreateRequest () {
 
   // We got the insertion point, proceed to insertion
   row = insertBkmks(BN, parentRow);
-//  let t2 = new Date();
-//  trace(t2.getTime()+" Create handler intermediate delay: "+(t2.getTime() - t1.getTime()));
 
-  // Save new current info
+  // Save new current info and refresh search
   let type = BN.type;
-  if (type == "folder") {
-	isOtherThanSeparatorCreated = true;
-	saveFldrOpen(); // If real folder creation, there is no children (yet)
-  }
-  else if (type == "bookmark") {
-	isOtherThanSeparatorCreated = true;
-  }
-  saveBNList();
-  
-//  let t3 = new Date();
-//  trace(t3.getTime()+" Create handler delay: "+(t3.getTime() - t1.getTime()));
+  if (type != "separator") {
+	if (type == "folder") {
+	  saveFldrOpen(); // If real folder creation, there is no children (yet)
+	}
 
-  // Check if there is more in queue
-  createReqQueue.shift(); // Remove the element in queue we just processed (= first one)
-  if (createReqQueue.length > 0) { // Still work in queue, continue the cadence process
-//    trace("Still work in create queue: "+createReqQueue.length+" - redispatching");
-    handleCreateRequest();
+	// Call refresh search if there is one active
+	triggerUpdate();
   }
-  else { // No more creation request in queue
-    // Call refresh search if there is one active and something other than a separator was created
-	if (isOtherThanSeparatorCreated)
-	  triggerUpdate();
-  }
-}
-
-function bkmkCreatedHandler (id, BTN) {
-//  t1 = new Date();
-//  trace(t1.getTime()+" Create event on: "+id+" type: "+BTN.type+" parentId: "+BTN.parentId+" index: "+BTN.index);
-
-  let len = createReqQueue.push([id, BTN]);
-  if (len == 1) { // createReqQueue was empty, need to start cadence process
-//    trace("There was no work in create queue: "+createReqQueue.length+" - dispatching");
-	isOtherThanSeparatorCreated = false;
-	handleCreateRequest();
-  }
-//  trace("Finished queueing request id: "+id+" BTN: "+BTN);
 }
 
 /*
@@ -2538,21 +1216,19 @@ function removeBkmks (row, cleanup) {
 /*
  * Handle bookmark deletion event
  *
- * id = string. ID of the item that was removed.
- * removeInfo = an object containing info about the removed item.
- *   {parentId: string. ID of the item's parent in the tree.
- *    index:    integer. Zero-based index position of this item in its parent.
- *    node:     BookmarkTreeNode. Detailed information about the item that was removed.
- *   }
+ * bnId = id of BookmarkNode subtree to remove.
  */
-function bkmkRemovedHandler (id, removeInfo) {
+function bkmkRemoved (bnId) {
 //  trace("Remove event on: "+id+" title: <<"+removeInfo.node.title+">> type: "+removeInfo.node.type);
-  // Retrieve position of removed item in the bookmarks table
-  let row = curRowList[id];
+  // Retrieve removed subtree
+  let BN = curBNList[bnId]; 
+  if (backgroundPage == undefined) { // Redo deletion in our own copy of curBNList
+	// Remove item and its children from curBNList
+	BN_delete(BN);
+  }
 
-  // Remove item and its children from curBNList
-  let bn = curBNList[id]; 
-  BN_delete(bn, removeInfo.parentId);
+  // Retrieve position of removed item in the bookmarks table
+  let row = curRowList[bnId];
 
   // Remove item and its children from display, and from the appropriate display lists
   // The returned value is the row which took its place in the table (or none if at end).
@@ -2561,97 +1237,72 @@ function bkmkRemovedHandler (id, removeInfo) {
   // Save new current info
   // A folder delete can presumably delete bookmarks, and a bookmark delete can
   // also change the open state of its parent if it was the only children in there,
-  // so save all.
-  saveBNList();
+  // so save at all times.
   saveFldrOpen();
 
   // Call refresh search if there is one active
-  if (isOtherThanSeparatorRemoved) // Global variable set by removeBkmks()
+  if (isOtherThanSeparatorRemoved) { // Global variable set by removeBkmks()
 	triggerUpdate();
+  }
 }
 
 /*
  * Handle bookmark changed event
  *
- * id = string. ID of the item that was changed.
- * changeInfo = an object containing info about the changed item.
- *   {title: string containing the item's title if that changed, else undefined
- *    url: string containing the item's URL if that changed, else undefined
- *   }
+ * bnId = string. ID of the item that was changed.
+ * isBookmark = boolean, true if the changed item is a bookmark, else false
+ * title = string. Latest title value (chnaged or not)
+ * url = string. Latest url value (chnaged or not)
+ * uri = string. Latest faviconUri value (chnaged or not)
  */
-function bkmkChangedHandler (id, changeInfo) {
+function bkmkChanged (bnId, isBookmark, title, url, uri) {
 //  trace("Change event on: "+id+" title: <<"+changeInfo.title+">> url: "+changeInfo.url);
-  // Retrieve the real BookmarkNode for complete information
-  let BN = curBNList[id];
-
-  // Retrieve changed item in the bookmarks table
-  let row = curRowList[id];
-  let type = BN.type;
-  let isBookmark = (type == "bookmark");
-//  trace("Change event on: "+id+" title: <<"+changeInfo.title+">> url: <<"+changeInfo.url+">> isBookmark: "+isBookmark);
-
-  // Update BookmarkNode contents and fetch new favicon if needed
-  let cTitle = changeInfo.title;
-  if (cTitle != undefined) // Did change
-    BN.title = cTitle;
-  let cUrl = changeInfo.url;
-  let isSpecial;
-  if (cUrl != undefined) { // Did change, and is not a folder
-	BN.url = cUrl;
-    isSpecial = cUrl.startsWith("place:");
-    if (isSpecial) {
-      BN.faviconUri = "/icons/specfavicon.png";
-    }
-    else if (cUrl.startsWith("about:")) { // about: is protected - security error ..
-      // Set uri to nofavicon.png
-      BN.faviconUri = "/icons/nofavicon.png";
-    }
-    else if (disablefavicons_option) {
-  	  BN.faviconUri = undefined;
-    }
-    else {
-      // Trigger asynchronous favicon retrieval process in background
-	  BN.faviconUri = "/icons/nofavicontmp.png";
-      // This is a bookmark, so here no need for cloneBN(), there is no tree below
-      faviconWorker.postMessage(["get2", BN, enableCookies_option]);
-    }
+  if (backgroundPage == undefined) { // Redo change in our own copy of curBNList
+	// Retrieve changed item
+	let BN = curBNList[bnId]; 
+	// Change item
+	BN.title = title;
+	if (isBookmark) {
+	  BN.url = url;
+	  BN.faviconUri = uri;
+	}
   }
 
-  // Save new values
-  saveBNList();
+  // Retrieve changed item in the bookmarks table
+  let row = curRowList[bnId];
 
   // Update display
   let item = row.firstElementChild.firstElementChild;
   if (isBookmark) { // item is a .bkmkitem_b <div>
     // item.title mixes both, so is always updated
-     item.title = (BN.title ? BN.title + "\n" : "") + BN.url;
-
-    // Update what changed ...
-    if (cTitle != undefined) { // Title changed
-      let span = item.firstElementChild.nextElementSibling;
-      span.textContent = getBestTitle(BN);
+    // Update all
+    let span = item.firstElementChild.nextElementSibling;
+    if (title == "") {
+      item.title = url;
+      span.textContent = suggestDisplayTitle(url);
     }
-    if (cUrl != undefined) { // URL changed
-      if (isSpecial) {
-        if (item.hasAttribute("href")) { // It was not special before .. remove the href
-          item.removeAttribute("href");
-        }
-      }
-      else { // Set the new href value
-        item.href = cUrl;
-      }
-
-      let img = item.firstElementChild; // Assuming it is an HTMLImageElement
-      img.src = BN.uri;
+    else {
+      item.title = title+"\n"+url;
+      span.textContent = title;
     }
+    let isSpecial = url.startsWith("place:");
+    if (isSpecial) {
+      if (item.hasAttribute("href")) { // It was not special before .. remove the href
+    	item.removeAttribute("href");
+      }
+    }
+    else { // Set the new href value
+      item.href = url;
+    }
+
+    let img = item.firstElementChild; // Assuming it is an HTMLImageElement
+    img.src = uri;
   }
   else { // Can only be a folder, per spec of the event, not a separator
          // => item is a ".twistie.." <div>
-    if (cTitle != undefined) { // Title changed
-      // Get to the <span> in .bkmkmitem_f <div>
-      let span = item.nextElementSibling.firstElementChild.nextElementSibling;
-      span.textContent = cTitle;
-    }
+	// Get to the <span> in .bkmkmitem_f <div>
+	let span = item.nextElementSibling.firstElementChild.nextElementSibling;
+	span.textContent = title;
   }
 
   // Trigger an update as results can change, if there is a search active
@@ -2662,44 +1313,27 @@ function bkmkChangedHandler (id, changeInfo) {
 /*
  * Handle bookmark moved event
  *
- * id = string. ID of the item that was moved.
- * moveInfo = an object containing info about the moved item.
- *   {parentId: string. The new parent folder.
- *    index: integer. The new index of this item in its parent.
- *    oldParentId: string. The old parent folder.
- *    oldIndex: integer. The old index of the item in its parent. 
- *   }
- *
- * Note: same problem as with bkmkCreatedHandler, since Firefox when reordering a folder contents
- *       doesnt appear to use the reorder event (bkmkReorderedHandler), but results in a close
- *       series of move .. which can result in the same parallel disorder problem because
- *       of the Promise mechnanism.
- *       Won't repeat what I think of javascript .. anyway, no other choice to write an extension
- *       for our favorite browser :-(
+ * bnId = string. ID of the item that was moved.
+ * curParentId = string. ID of the current parent folder.
+ * targetParentId = string. ID of the new parent folder.
+ * targetIndex = integer. The new index of this item in its parent.
  */
-let moveReqQueue = []; // Array of move requests, to serialize and cadence their handling
-function handleMoveRequest () {
-  // Get first element in queue
-  let req = moveReqQueue[0];
-  let id = req[0]; 
-  let moveInfo = req[1]; 
-//  trace("Processing id: "+id+" moveInfo: "+moveInfo);
+function bkmkMoved (bnId, curParentId, targetParentId, targetIndex) {
+//trace("Move event on: "+id+" from: <<"+moveInfo.oldParentId+", "+moveInfo.oldIndex+">> to: <<"+moveInfo.parentId+", "+moveInfo.index+">>");
 
   // Retrieve the real BookmarkNode and all its children, and its new parent
-  let BN = curBNList[id];
-  let curParentId = moveInfo.oldParentId;
-  let targetParentId = moveInfo.parentId;
+  let BN = curBNList[bnId];
   let targetParentBN = curBNList[targetParentId];
-  let targetIndex = moveInfo.index;
-
-  // Remove item and its children from its current parent, but keep them in list
-  // as this is only a move.
-  BN_delete(BN, curParentId, false);
-  // Then insert it at new place, again not touching the list
-  BN_insert(BN, targetParentBN, targetIndex, false);
+  if (backgroundPage == undefined) { // Redo change in our own copy of curBNList
+	// Remove item and its children from its current parent, but keep them in list
+	// as this is only a move.
+	BN_delete(BN, curParentId, false);
+	// Then insert it at new place, again not touching the list
+	BN_insert(BN, targetParentBN, targetIndex, false);
+  }
 
   // Get move description in current (= old) reference
-  let movedRow = curRowList[id];
+  let movedRow = curRowList[bnId];
   let curRowIndex = movedRow.rowIndex;
   let targetParentRow = curRowList[targetParentId];
   let targetCurIndex = targetIndex;
@@ -2717,8 +1351,18 @@ function handleMoveRequest () {
 	let len = children.length - 1; // Be careful that we already inserted us there ..
 	if (targetCurIndex < len) { // Easy case, we insert just before next sibling
 	  let nextBN = children[targetCurIndex+1]; // targetCurIndex is us ...
-	  targetRow = curRowList[nextBN.id]; // Cannot be null
-	  targetCurRowIndex = targetRow.rowIndex;
+	  targetRow = curRowList[nextBN.id];
+	  // Cannot be undefined, except rare case under FF56, where we are discovering 2 or more separators
+	  // in a row and they were already added in the BN tree by the background task, but not yes on display
+	  if (targetRow == undefined) { // Then act as insert as last child of its parent, having already children
+		let previousBN = BN_lastDescendant(children[targetCurIndex-1]);
+		targetRow = curRowList[previousBN.id];
+		targetCurRowIndex = targetRow.rowIndex + 1; // Can be at end of bookmarks table
+		targetRow = targetRow.nextElementSibling; // Can be null if we move at end
+	  }
+	  else {
+		targetCurRowIndex = targetRow.rowIndex;
+	  }
 	}
 	else { // Harder case, we are inserting as last child of its parent, having already children
 	  // Find last child / grand child under that previous sibling, and insert just after
@@ -2754,67 +1398,56 @@ function handleMoveRequest () {
 
   // State of parent folders may change, so save folder open state
   saveFldrOpen();
-
-  // Check if there is more in queue
-  moveReqQueue.shift(); // Remove the element in queue we just processed (= first one)
-  if (moveReqQueue.length > 0) { // Still work in queue, continue the cadence process
-//    trace("Still work in move queue: "+moveReqQueue.length+" - redispatching");
-    handleMoveRequest();
-  }
-}
-
-function bkmkMovedHandler (id, moveInfo) {
-//  trace("Move event on: "+id+" from: <<"+moveInfo.oldParentId+", "+moveInfo.oldIndex+">> to: <<"+moveInfo.parentId+", "+moveInfo.index+">>");
-
-  let len = moveReqQueue.push([id, moveInfo]);
-  if (len == 1) { // moveReqQueue was empty, need to start cadence process
-//    trace("There was no work in move queue: "+moveReqQueue.length+" - dispatching");
-    handleMoveRequest();
-  }
-//  trace("Finished queueing move request id: "+id+" moveInfo: "+moveInfo);
 }
 
 /*
  * Handle bookmark reordered event
  *
- * id = string. ID of the folder whose children were reordered.
+ * bnId = string. ID of the folder whose children were reordered.
  * reorderInfo = an object containing info about the reordered item.
  *   {childIds: array of string. Array containing the IDs of all the bookmark items in this folder,
  *              in the order they now appear in the UI. 
  *   }
  */
-function bkmkReorderedHandler (id, reorderInfo) {
+function bkmkReordered (bnId, reorderInfo) {
 //  trace("Reorder event on: "+id);
 
   // We need the BN to get real info
-  let folderBN = curBNList[id];
+  let folderBN = curBNList[bnId];
+  let children = folderBN.children;
+  if (children != undefined) {
+	if (backgroundPage == undefined) { // Redo change in our own copy of curBNList
+	  // Create a new array with all children of folderBN in new order
+	  let len = children.length;
+	  children = folderBN.children = new Array (len); // Start new list from scratch, discarding the old one
+	  let j = 0;
+	  for (let i of reorderInfo) {
+		children[j++] = curBNList[i];
+	  }
+  	}
 
-  // Delete all children of folderBN on display, if any (no cleanup)
-  let folderRow = curRowList[id];
-  let rowIndex = folderRow.rowIndex + 1;
-  let level = folderBN.level;
-  let nextRow = folderRow.nextElementSibling;
-  while ((nextRow != null) && (parseInt(nextRow.dataset.level, 10) > level)) {
-    // rowIndex is constant since the next row takes the place each time
-    nextRow = nextRow.nextElementSibling; // Do it before delete to not get a null ..
-    bookmarksTable.deleteRow(rowIndex);
-  }
+  	// Delete all children of folderBN on display, if any (no cleanup)
+  	let folderRow = curRowList[bnId];
+  	let rowIndex = folderRow.rowIndex + 1;
+  	let level = folderBN.level;
+  	let nextRow = folderRow.nextElementSibling;
+  	while ((nextRow != null) && (parseInt(nextRow.dataset.level, 10) > level)) {
+  	  // rowIndex is constant since the next row takes the place each time
+  	  nextRow = nextRow.nextElementSibling; // Do it before delete to not get a null ..
+  	  bookmarksTable.deleteRow(rowIndex);
+  	}
 
-  // And reinsert all children of folderBN in new order
-  if (folderBN.children != undefined) {
-	let len = folderBN.children.length;
-	folderBN.children = new Array (len); // Start new list from scratch, discarding the old one
-   	let open = curFldrOpenList[id]; // Retrieve our intended open state
+  	// And reinsert all children of folderBN in new order
+   	let open = curFldrOpenList[bnId]; // Retrieve our intended open state
    	insertRowIndex = rowIndex;
-   	let j = 0;
    	let childBN;
    	for (let i of reorderInfo) {
-   	  childBN = folderBN.children[j++] = curBNList[i];
+   	  childBN = curBNList[i];
    	  insertBkmks(childBN, folderRow, level+1, open);
    	}
   }
 
-  // No folder or uri info changed, so nothing to save
+  // No folder state changed, so nothing to save
 }
 
 /*
@@ -3084,7 +1717,7 @@ function resultsMouseHandler (e) {
     // The click target is one of .brow cell,
     // .bkmkitem_x div or anchor, .favicon img or .favttext span
     // Handle click, and go to the parent row
-    if (className.startsWith("fav")) { // <div>, <img> or <span> -> got to .bkmkitem_x
+    if (className.includes("fav")) { // <div>, <img> or <span> -> got to .bkmkitem_x
     	                               // when advanced or Alt key, else go to .brow
       if (advancedClick_option || e.altKey) {
 	    target = target.parentElement;
@@ -3171,7 +1804,7 @@ function bkmkMouseHandler (e) {
   // Act only if the user clicked on .twistieax img, .bkmkitem_x, .favicon or .favtext
   // If favicon or favtext, get parent instead to handle click
   let twistie;
-  if (className.startsWith("fav")) {
+  if (className.includes("fav")) {
 	target = target.parentElement;
 	className = target.className;
   }
@@ -3255,7 +1888,7 @@ function resultsAuxHandler (e) {
     // The click target is one of .brow cell,
     // .bkmkitem_x div or anchor, .favicon img or .favttext span
     // Handle click, and go to the parent row
-    if (className.startsWith("fav")) { // <div>, <img> or <span>
+    if (className.includes("fav")) { // <div>, <img> or <span>
       target = target.parentElement;
       className = target.className;
     }
@@ -3316,7 +1949,7 @@ function bkmkAuxHandler (e) {
     // .bkmkitem_x div or anchor, .favseparator div, .favicon or .favttext
     // Act only if the user clicked on .twistieax img, .bkmkitem_x, .favicon or .favtext
     // If favicon or favtext, get parent instead to handle click
-    if (className.startsWith("fav")) {
+    if (className.includes("fav")) {
 	  target = target.parentElement;
 	  className = target.className;
     }
@@ -3538,7 +2171,7 @@ function bkmkContextHandler (e) {
   // Go up to the row level
   let className = target.className;
   let row;
-  if(className.startsWith("fav")) {
+  if(className.includes("fav")) {
 	row = target.parentElement.parentElement.parentElement;
   }
   else if (className.startsWith("bkmkitem_") || className.startsWith("twistie")) {
@@ -3580,7 +2213,7 @@ function bkmkContextHandler (e) {
           if (MyBResBkmkMenuPaste.className == "menupaste")
       	    MyBResBkmkMenuPaste.className = "menudisabled";
         }
-        if (disablefavicons_option) {
+        if (disableFavicons_option) {
           MyBResBkmkMenuFavicon.className = "menudisabled";
         }
         myBResBkmkMenu_open = true;
@@ -3596,7 +2229,7 @@ function bkmkContextHandler (e) {
           if (MyBBkmkMenuPaste.className == "menupaste")
       	    MyBBkmkMenuPaste.className = "menudisabled";
         }
-        if (disablefavicons_option) {
+        if (disableFavicons_option) {
           MyBBkmkMenuFavicon.className = "menudisabled";
         }
         myBBkmkMenu_open = true;
@@ -3809,7 +2442,7 @@ function getDragToRow (target) {
 	  else   isFolderClosed = false;
 	}
   }
-  else if (className.startsWith("fav")) {
+  else if (className.includes("fav")) {
 	row = (bkmkitem_x = target.parentElement).parentElement.parentElement;
 	isProtected = (row.dataset.protect == "true");
 	isBkmkitem_f = (row.dataset.type == "folder");
@@ -5174,7 +3807,14 @@ function clickHandler (e) {
       if ((url != undefined)
        	  && !url.startsWith("about:")) { // about: is protected - security error ..
        	// This is a bookmark, so here no need for cloneBN(), there is no tree below
-        faviconWorker.postMessage(["get2", BN, true]);
+//        faviconWorker.postMessage(["get2", BN_id, url, true]);
+    	let postMsg = ["get2", BN_id, url, true];
+    	if (backgroundPage == undefined) {
+    	  sendAddonMsgGetFavicon(postMsg);
+    	}
+    	else {
+    	  backgroundPage.faviconWorkerPostMessage({data: postMsg});
+    	}
       }
 	}
 	else if (classList.contains("menuprop")) { // Edit properties of an existing bookmark
@@ -5286,10 +3926,23 @@ function noDefaultAction (e) {
 /*
  * Handle responses or errors when talking with background
  */
+let f_initializeNext;
 function handleMsgResponse (message) {
   // Is always called, even is destination didn't specifically reply (then message is undefined)
   if (message != undefined) {
-    console.log("Background sent a response: "+message.content+" received in "+myWindowId);
+	let msg = message.content;
+//    console.log("Background sent a response: <<"+msg+">> received in sidebar:"+myWindowId);
+    if (msg == "getCurBNList") {
+      curBNList = message.json;
+      f_initializeNext();
+    }
+    else if (msg == "Ready") {
+      backgroundReady = true; // Signal background ready for private windows for asking curBNList
+      if (waitingInitBckgnd) { // We were waiting for it to continue
+//    	console.log("Background is Ready 3");
+        f_initializeNext();
+      }
+    }
   }
 }
 
@@ -5309,20 +3962,139 @@ function sendAddonMessage (msg) {
 }
 
 /*
+ * Send list of favicon for 16x16 migration to Background (when we are a private window)
+ * 
+ * migr16x16ConvertList = Array of bnId's to convert
+ * migr16x16Len = size of array
+ */
+function sendAddonMsgMigr16x16 (migr16x16ConvertList, migr16x16Len) {
+  browser.runtime.sendMessage(
+	{source: "sidebar:"+myWindowId,
+	 content: "signalMigrate16x16",
+	 list: migr16x16ConvertList,
+	 len: migr16x16Len
+	}
+  ).then(handleMsgResponse, handleMsgError);
+}
+
+/*
+ * Send a fetch favicon command to Background (when we are a private window)
+ * 
+ * a_msg = an array ["<cmd>", bnId, url, enableCookies_option]
+ */
+function sendAddonMsgGetFavicon (a_msg) {
+  browser.runtime.sendMessage(
+	{source: "sidebar:"+myWindowId,
+	 content: "getFavicon",
+	 postMsg: a_msg
+	}
+  ).then(handleMsgResponse, handleMsgError);
+}
+
+/*
  * Get and handle messages from background script
  */
 function handleAddonMessage (request, sender, sendResponse) {
-  if (request.source == "background") { // Ignore message from other sidebars
-    // When coming from background:
-    //   sender.url: moz-extension://28a2a188-53d6-4f91-8974-07cd0d612f9e/_generated_background_page.html
-    // When coming from sidebar:
-    //   sender.url: moz-extension://28a2a188-53d6-4f91-8974-07cd0d612f9e/sidebar/panel.html
-    console.log("Got message <<"+request.content+">> from "+request.source+" in "+myWindowId);
-    console.log("  sender.tab: "+sender.tab);
-    console.log("  sender.frameId: "+sender.frameId);
-    console.log("  sender.id: "+sender.id);
-    console.log("  sender.url: "+sender.url);
-    console.log("  sender.tlsChannelId: "+sender.tlsChannelId);
+  try{ // Use a try catch structure, as any exception will be caught as an error response to calling part
+	let source = request.source;
+	if (source == "background") { // Ignore message from other sidebars
+	  // When coming from background:
+	  //   sender.url: moz-extension://28a2a188-53d6-4f91-8974-07cd0d612f9e/_generated_background_page.html
+	  // When coming from sidebar:
+	  //   sender.url: moz-extension://28a2a188-53d6-4f91-8974-07cd0d612f9e/sidebar/panel.html
+	  let msg = request.content;
+//	  console.log("Got message <<"+msg+">> from "+request.source+" in "+myWindowId);
+//      console.log("  sender.tab: "+sender.tab);
+//    	console.log("  sender.frameId: "+sender.frameId);
+//    	console.log("  sender.id: "+sender.id);
+//    	console.log("  sender.url: "+sender.url);
+//    	console.log("  sender.tlsChannelId: "+sender.tlsChannelId);
+
+	  if (msg == "Ready") { // Background initialization is ready
+		backgroundReady = true; // Signal background ready for private windows for asking curBNList
+		if (waitingInitBckgnd) { // We were waiting for it to continue
+//		  console.log("Background is Ready 2");
+		  f_initializeNext();
+		}
+	  }
+	  else if (msg.startsWith("savedOptions")) { // Option page changed something to options, reload them
+		// Look at what changed
+  	  	let enableCookies_option_old = enableCookies_option;
+  	  	let enableFlipFlop_option_old = enableFlipFlop_option;
+  	  	let advancedClick_option_old = advancedClick_option;
+  	  	let closeSearch_option_old = closeSearch_option;
+  	  	let openTree_option_old = openTree_option;
+  	  	let traceEnabled_option_old = traceEnabled_option;
+
+  	  	// Function to process option changes
+  	  	function changedOptions () {
+  	  	  // If trace option changed
+  	  	  if (traceEnabled_option_old != traceEnabled_option) {
+  	  		TracePlace.hidden = !traceEnabled_option;
+  	  	  }
+  	  	}
+
+  	  	// Refresh options
+  	  	if ((backgroundPage == undefined) || (backgroundPage.ready == undefined)) { // Load by ourselves
+  	  	  refreshOptionsLStore()
+  	  	  .then(changedOptions);
+  	  	}
+  	  	else { // Bacground page is accessible, all was loaded inside it, so get from there
+  	  	  refreshOptionsBgnd(backgroundPage);
+  	  	  changedOptions();
+  	  	}
+	  }
+	  else if (msg.startsWith("resetSizes")) { // Option page reset sizes button was pressed
+		// Reset of search pane height
+		SearchResult.style.height = "";
+	  }
+	  else if (msg.startsWith("reload")) { // Reload ourselves
+		window.location.reload();
+	  }
+	  else if (msg.startsWith("asyncFavicon")) { // Got a favicon uri to display
+		let bnId = request.bnId;
+		let uri = request.uri;
+		if (backgroundPage == undefined) { // If we are a private window, we have our own copy of curBNList
+		  // Maintain it up to date
+		  curBNList[bnId].faviconUri = uri;
+		}
+
+		// Set image
+		let row = curRowList[bnId]; // Retrieve row holding the icon
+//        trace("BN.id: "+bnId+" index: "+row.rowIndex+" Row id: "+row.dataset.id+" uri: "+uri);
+		let img = row.firstElementChild.firstElementChild.firstElementChild;
+		img.src = uri;
+
+		// Call refresh search if there is one active to update any result with that BTN
+		refreshFaviconSearch(bnId, uri);
+	  }
+	  else if (msg.startsWith("bkmkCreated")) { // Got a BN subtree to add to display
+		bkmkCreated(BN_deserialize(request.newtree), request.index);
+	  }
+	  else if (msg.startsWith("bkmkRemoved")) {
+		bkmkRemoved(request.bnId);
+	  }
+	  else if (msg.startsWith("bkmkChanged")) {
+		bkmkChanged(request.bnId, request.isBookmark, request.title, request.url, request.uri);
+	  }
+	  else if (msg.startsWith("bkmkMoved")) {
+		bkmkMoved(request.bnId, request.curParentId, request.targetParentId, request.targetIndex);
+	  }
+	  else if (msg.startsWith("bkmkReordered")) {
+		bkmkReordered(request.bnId, request.reorderInfo);
+	  }
+	}
+
+	// Answer
+	sendResponse(
+	  {content: "Sidebar:"+myWindowId+" response to "+request.source		
+	  }
+	);
+  }
+  catch (error) {
+	console.log("Error processing message: "+request.content);
+	console.log("message:    "+error.message);
+	console.log("lineNumber: "+error.lineNumber);
   }
 }
 /*
@@ -5351,12 +4123,12 @@ function onBlur(aEvent) {
 /*
  * A "Promise-ified" sleep based on setTimeout ..
  */
-function sleep(ms) {
+function sleep (ms) {
   return new Promise (resolve => setTimeout(resolve, ms));
 }
 
 /*
- * Complete the initial display of favicons
+ * Finish the initial display of favicons in background after display of bookmark tree
  */
 const Fluidity = 40;
 const Bunch = 250;
@@ -5410,19 +4182,25 @@ async function completeFavicons (BN = undefined) {
  * Complete the initial display of bookmarks table
  */
 function completeDisplay () {
+  savedFldrOpenList = undefined;
+  isDisplayComplete = true;
   WaitingImg.hidden = true; // Stop displaying the waiting glass
 //  if (delayLoad_option)
 //    Bookmarks.appendChild(docFragment); // Display the table of bookmarks + reflow
   endDisplayTime = new Date ();
-  trace("Display duration: "+(endDisplayTime.getTime() - endTreeBuildTime.getTime())+" ms", true);
-
-  // Remove the faviconworker delay at start if nothing queued
-  faviconWorker.postMessage(["nohysteresis"]);
+  trace("Display duration: "+(endDisplayTime.getTime() - endGetTreetime.getTime())+" ms", true);
+  trace("Total duration: "+(endDisplayTime.getTime() - startTime.getTime())+" ms", true);
 
   // Finish displaying favicons asynchronously
-  if (!disablefavicons_option && !immediateFavDisplay_option) {
+  if (!disableFavicons_option && !immediateFavDisplay_option) {
     setTimeout(completeFavicons, 0);
   }
+
+  // If 16x16 migration is planned but nothing scheduled yet, do it
+  if (migration_img16 && (migrationTimeout == null)) {
+	migrationTimeout = setTimeout(trigMigrate16x16, Migr16x16Timeout);
+  }
+
 
   // Setup mouse handlers for bookmarks and results
   SearchResult.addEventListener("click", resultsMouseHandler);
@@ -5455,17 +4233,6 @@ function completeDisplay () {
   Bookmarks.addEventListener("dragexit", bkmkDragExitHandler);
   Bookmarks.addEventListener("drop", bkmkDropHandler);
 
-  // Setup event handlers for bookmark modifications
-  browser.bookmarks.onCreated.addListener(bkmkCreatedHandler);
-  browser.bookmarks.onRemoved.addListener(bkmkRemovedHandler);
-  browser.bookmarks.onChanged.addListener(bkmkChangedHandler);
-  browser.bookmarks.onMoved.addListener(bkmkMovedHandler);
-  // onChildrenReordered doesn't seem implemented for now ... :-(
-  // It apears to use a sequence of Move instead ...
-  // See https://bugzilla.mozilla.org/show_bug.cgi?id=1319530 ??
-  if (browser.bookmarks.onChildrenReordered != undefined) {
-    browser.bookmarks.onChildrenReordered.addListener(bkmkReorderedHandler);
-  }
   let computedStyle = window.getComputedStyle(MyBProtMenu, null);
   trace("fontFamily = '"+computedStyle["fontFamily"]+"'", true);
   trace("fontSize   = '"+computedStyle["fontSize"]+"'", true);
@@ -5474,100 +4241,24 @@ function completeDisplay () {
 //  }
 
   // Signal to background page we are here
-  if (backgroundPage != undefined) {
-    backgroundPage.newSidebar(myWindowId);
+  if (backgroundPage == undefined) {
+	sendAddonMessage("New:"+myWindowId);
   }
   else {
-	sendAddonMessage("New:"+myWindowId);
+	// Trace stats
+	trace("Stats:\r\n------", true);
+	trace("Bookmarks:  "+countBookmarks, true);
+	trace("Folders:    "+countFolders, true);
+	trace("Separators: "+countSeparators, true);
+	trace("Oddities:   "+countOddities, true);
+	trace("--------------------", true);
+
+	backgroundPage.newSidebar(myWindowId);
   }
 
   // Focus on searchtext input at initial load
   window.focus();
   SearchTextInput.focus();
-}
-
-/*
- * Complete load of bookmarks table
- */
-function completeBookmarks () {
-  if (delayLoad_option) {
-	endDelayedLoadTime = new Date();
-    trace("Complete delayed load duration: "+(endDelayedLoadTime.getTime() - endDisplayTime.getTime())+" ms", true);
-
-    // Cleanup saved info and release memory, all is now maintained in cur... lists
-	savedBkmkUriList = undefined;
-	savedBNList = undefined;
-	savedFldrOpenList = undefined;
-	bookmarksTree = undefined;
-  }
-  else {
-	// If we got so far, we can remove the backup version now, the next save will be on primary
-	browser.storage.local.remove(["savedBNListBak", "fTimeBak"]);
-    // Save current info
-    let p1 = saveBNList();
-    let p2 = saveFldrOpen();
-    Promise.all([p1, p2])
-    .then(
-      function() {
-    	endSaveTime = new Date();
-    	trace("Save duration: "+(endSaveTime.getTime() - endDisplayTime.getTime())+" ms", true);
-
-    	// Cleanup saved info and release memory, all is now maintained in cur... lists
-    	savedBkmkUriList = undefined;
-    	savedBNList = undefined;
-    	savedFldrOpenList = undefined;
-    	bookmarksTree = undefined;
-      }
-    );
-  }
-
-  // Trace stats
-  trace("Stats:\r\n------", true);
-  trace("Bookmarks:  "+countBookmarks, true);
-  trace("Folders:    "+countFolders, true);
-  trace("Separators: "+countSeparators, true);
-  trace("Oddities:   "+countOddities, true);
-  trace("--------------------", true);
-
-  // If 16x16 migration is planned but nothing scheduled yet, do it
-  if (migration_img16 && (migrationTimeout == null)) {
-	migrationTimeout = setTimeout(migrate16x16, Migr16x16Timeout);
-  }
-
-  // If BNList migration was ongoing, complete it
-  if (migration_bnlist) {
-  	browser.storage.local.remove("savedBkmkUriList");
-	structureVersion += VersionBNList;
-	browser.storage.local.set({
-	 structureVersion: structureVersion
-	});
-	migration_bnlist = false;
-  }
-}
-
-/*
- * Search for and recursively build depth first a BookmarkNode tree of a given id in the
- * BTN array
- *
- * a_BTN = array of BookmarkTreeNode
- * id = string, the node id looked for
- * level = integer, the tree depth
- * force = boolean, force display even if empty (default, set to false for Mobile folder)
- * 
- * Return created BookmarkNode
- */
-function buildBookmarkId (a_BTN, id, level, force = true) {
-  let node;
-  for (let i of a_BTN) {
-    if (i.id == id) {
-      if ((i.children.length > 0) || force) {
-        node = buildTree(i, level);
-      }
-      break;
-    }
-  }
-
-  return(node);
 }
 
 /*
@@ -5586,23 +4277,6 @@ function displayTreeBN (BN) {
     }
   }
 }
-
-/*
- * Receive event from worker to display a new bookmark
- *
- * e is of type MessageEvent, containing a [BTN, level]
- */
-/*
-function asyncDisplayBookmark (e) {
-//  trace("asyncDisplayBookmark");
-  let level = e.data[1];
-  if (level == -1) { // Reached the end of the table, this is the last async event to close
-completeDisplay();
-    completeBookmarks();
-  }
-  else   insertBookmark(e.data[0], level);
-}
-*/
 
 /*
  * Recursively explore depth first a bookmark and its children if open/visible, else enqueue
@@ -5667,335 +4341,7 @@ async function delayLoadBkmkId (a_BTN, id, level) {
 */
 
 /*
- * Store and display on the visible parts of the tree,
- * then load and display the hidden rest in background only.
- * 
- * a_BTN = array of root children
- */
-/*
-async function delayLoadTree (a_BTN) {
-  endTreeLoadTime = new Date();
-  trace("Delayed loading..", true);
-  trace("Root children load duration: "+(endTreeLoadTime.getTime() - endLoadTime.getTime())+" ms", true);
-  trace("      Number of children nodes: "+a_BTN.length, true);
-
-//  docFragment = document.createDocumentFragment();
-  bookmarksTable = document.createElement("table");
-//  docFragment.appendChild(bookmarksTable);
-  Bookmarks.appendChild(bookmarksTable);
-
-  highest_open_level = 0;
-  // First, display the Personal toolbar  "toolbar_____"
-  await delayLoadBkmkId(a_BTN, PersonalToobar, 0);
-  // Then, display the Bookmarks menu     "menu________"
-  await delayLoadBkmkId(a_BTN, BookmarksMenu, 0);
-  // And last, display the Other bookmarks    "unfiled_____"
-  await delayLoadBkmkId(a_BTN, OtherBookmarks, 0);
-
-  completeDisplay();
-
-  // And now start to asynchronously load and display hidden objects, in background,
-  // by dequeueing delayedBookmarksQueue
-}
-*/
-
-/*
- * Store promised entire bookmark tree in a global variable,
- * then display it in the bookmarks table
- *
- * a_BTN = array of BookmarkTreeNode
- */
-function storeAndDisplayTree (a_BTN) {
-//  trace("storeAndDisplayTree");
-  bookmarksTree = a_BTN;
-  endTreeLoadTime = new Date();
-  trace("Tree load duration: "+(endTreeLoadTime.getTime() - endLoadTime.getTime())+" ms", true);
-
-  // Build the BookmarkNode tree
-  WaitMsg.textContent = "New tree build..";
-  let root = bookmarksTree[0]; // Id is "root________" and type is "folder"
-//  trace("Root: <<"+root.id+">>"+"<<"+root.title+">>"+"<<"+root.type+">>");
-  rootBN = new BookmarkNode (root.id, "folder", -1, undefined, root.dateAdded, true);
-  curBNList[0] = curBNList[root.id] = rootBN;
-  if (delayLoad_option) {
-	delete savedBNList[0];
-  }
-
-  // First, build the Personal toolbar  "toolbar_____"
-  let child1 = buildBookmarkId(root.children, PersonalToobar, 0);
-  // Then, build the Bookmarks menu     "menu________"
-  let child2 = buildBookmarkId(root.children, BookmarksMenu, 0);
-  // Then, build the Other bookmarks    "unfiled_____"
-  let child3 = buildBookmarkId(root.children, OtherBookmarks, 0);
-  // And last, build the Mobile bookmarks    "mobile______"
-  let child4 = buildBookmarkId(root.children, MobileBookmarks, 0, false);
-
-  // Add them to rootBN
-  let children;
-  if (child4 == undefined) {
-	children = rootBN.children = [child1, child2, child3];
-  }
-  else {
-	children = rootBN.children = [child1, child2, child3, child4];
-  }
-  endTreeBuildTime = new Date();
-  trace("Tree build duration: "+(endTreeBuildTime.getTime() - endTreeLoadTime.getTime())+" ms", true);
-
-  // Display the bookmarks tree inside the sidebar table
-  // Create a Document Fragment to go faster (work is in memory only, no reflow.
-  // It will get appended at end, when last bookmark item is created
-  // Well, as a matter of fact, this is slightly longer by 10% ... I guess because doing it
-  //  while not yet displaying ...
-  WaitMsg.textContent = "Prepare tree display..";
-//  docFragment = document.createDocumentFragment();
-  bookmarksTable = document.createElement("table");
-//  docFragment.appendChild(bookmarksTable);
-  Bookmarks.appendChild(bookmarksTable);
-
-  highest_open_level = 0;
-  // ** Old attempt to asynchronous load, remove ***
-  // If async, use a worker to recursively explore the tree.
-  // Then the worker posts back each bookmark to display (append).
-  // The worker will send back messages of type [BTN, level].
-  // At the end, it will send a final [null, -1] and close itself, no need to terminate it.
-/*  if (delayLoad_option) { // If load bookmarks in non-blocking mode ..
-	trace("Delayed loading..");
-  // Prepare worker to explore and display bookmarks tree
-  bkmkWorker = new Worker("initTree.js");
-  bkmkWorker.onmessage = asyncDisplayBookmark;
-
-  // Start worker
-  bkmkWorker.postMessage(root); // Structured clone of root object => full copy
-}
-else {
-*/
-  for (let i of children) {
-	displayTreeBN(i);
-  }
-  completeDisplay();
-  completeBookmarks();
-//}
-}
-
-/*
- * Log error
- *
- * error is whatever the Promise sent as error ... don't want to guess
- */
-function onRejected (error) {
-  let msg = "BookmarkSearchPlus2 FF API load tree error: "+error;
-  console.log(msg);
-  trace(msg, true);
-}
-
-/*
- * Convert and store image in 16x16, triggered by end of CvtImage.src load
- * 
- * Uses global variables cvtUri, convertedUri, destCvtImg and destCvtBnId
- */
-let cvtUri;
-let convertedUri;
-let destCvtImg;
-let destCvtBnId;
-function convertOnLoad () {
-  let nh = CvtImage.naturalHeight;
-  let nw = CvtImage.naturalWidth;
-//  console.log("  nh,nw: "+nh+","+nw);
-  if ((nh > 0) && (nw > 0) && ((nh != 16) || (nw != 16))) {
-    try {
-	  if ((nh > 16) && (nw > 16)) { // Only downscaling .. avoid FF canvas native algo, not really good
-//        console.log("  downscale");
-        // Get ImageData.data of the image
-        let srcIDData;
-	    CvtCanvas2.height = nh;
-	    CvtCanvas2.width = nw;
-	    CvtCtx2.drawImage(CvtImage, 0, 0);
-	    srcIDData = CvtCtx2.getImageData(0, 0, nw, nh).data;
-
-	    // Downscale into CvtImageData
-        downscaleImg(srcIDData, CvtIDData, nh, nw);
-
-	    // Put CvtImage into CvtCtx and get base64 uri
-	    CvtCtx.putImageData(CvtImageData, 0, 0);
-        convertedUri = CvtCanvas.toDataURL();
-//        console.log("  convertedUri: "+convertedUri);
-	  }
-	  else {
-	    //Ctx.fillRect(0, 0, 16, 16);
-	    CvtCtx.clearRect(0, 0, 16, 16);
-	    CvtCtx.drawImage(CvtImage, 0, 0, 16, 16);
-	    //Ctx.drawImage(CvtImage, 0, 0);
-        convertedUri = CvtCanvas.toDataURL();
-
-/*
-	    createImageBitmap(CvtImage)
-	    .then(
-		  function (imageBitmap) {
-console.log("imageBitmap: "+imageBitmap.height+","+imageBitmap.width);
-		    CvtCtx.transferFromImageBitmap(imageBitmap);
-		    imageBitmap.close();
-
-		    let convertedUri = CvtCanvas.toDataURL();
-console.log("convertedUri: "+convertedUri);
-		  }
-	    );
-*/
-	  }
-    }
-	catch (error) { // Error on rescale, keep original
-	  console.log("convertOnLoad error: "+error.type+" for "+CvtImage.src+" - "+destCvtBnId+" - "+destCvtImg.parentElement.title);
-	  convertedUri = cvtUri;
-	}
-  }
-  else { // Cannot rescale or no need to, keep original
-//    console.log("No rescale: "+nh+","+nw+" for "+CvtImage.src.substr(0,50)+" - "+destCvtBnId);
-	convertedUri = cvtUri;
-  }
-
-  // Save new favicon
-  destCvtImg.src = convertedUri;
-  destCvtImg = undefined; // Forget img object
-  curBNList[destCvtBnId].faviconUri = convertedUri;
-  saveBNList();
-
-  // Call refresh search if there is one active to update any result with that BTN
-  refreshFaviconSearch(destCvtBnId, convertedUri);
-}
-
-/*
- * Error on loading the image to convert, triggered by error when loading CvtImage.src
- * 
- * Uses global variable destCvtBnId
- */
-function errorCvtOnLoad (error) {
-  console.log("error: "+error.type+" for "+CvtImage.src+" - "+destCvtBnId+" - "+destCvtImg.parentElement.title);
-  destCvtImg = undefined; // Forget img object
-  setNoFavicon(destCvtBnId);
-}
-
-/*
- * Set Favicon on screen and in storage
- *
- * bnId is BookmarkNode id string
- * uri is the image to set
- */
-function setFavicon (bnId, uri) {
-  let row = curRowList[(destCvtBnId = bnId)]; // Retrieve row holding the icon
-//  trace("BN.id: "+bnId+" index: "+row.rowIndex+" Row id: "+row.dataset.id);
-//  console.log("setFavicon for: "+bnId+" uri: "+uri);
-  destCvtImg = row.firstElementChild.firstElementChild.firstElementChild;
-
-  // Special handling for x-icons, which are libraries of icons, not well handded
-  // by Canvas 2d context drawImage(), since it takes only the first icon in the librrary.
-  // Verify if this is an x-icon by header .. because the mime type is not always reliable !!
-  cvtUri = selectXIconImg(uri);
-  if (cvtUri != null) { // It is an x-ixon and there was more than 1, go with selected image
-//    console.log("  go with selected uri: "+cvtUri);
-    uri = cvtUri;
-  }
-  CvtImage.src = cvtUri = uri;
-/*
-  let data = '<svg xmlns="http://www.w3.org/2000/svg" width="16px" height="16px">' +
-             '<foreignObject width="100%" height="100%">' +
-             '<img xmlns="http://www.w3.org/1999/xhtml" src="'+uri+'" height="16px" width="16px"/>' +
-             '</foreignObject>' +
-             '</svg>';
-console.log("data: "+data);
-  data = encodeURIComponent(data);
-  CvtImage.src = "data:image/svg+xml," + data;
-*/
-}
-
-/*
- * Set Favicon on screen to waiting its new value
- *
- * bnId is BookmarktreeNode id string
- */
-function setWaitingFavicon (bnId) {
-  let row = curRowList[bnId]; // Retrieve row holding the icon
-  let uri = "/icons/waiting.gif";
-//  trace("BN.id: "+BN.id+" index: "+row.rowIndex+" Row id: "+row.dataset.id+" set to waiting");
-  let img = row.firstElementChild.firstElementChild.firstElementChild;
-  img.src = uri;
-
-  // Keep waiting image in memory only, do not save (it has the temporary one on disk anyway)
-  curBNList[bnId].faviconUri = uri;
-
-  // Call refresh search if there is one active to update any result with that BTN
-  refreshFaviconSearch(bnId, uri);
-}
-
-/*
- * Set Favicon on screen to nofavicon.png
- *
- * bnId is BookmarktreeNode id string
- */
-function setNoFavicon (bnId) {
-  let row = curRowList[bnId]; // Retrieve row holding the icon
-  let uri = "/icons/nofavicon.png";
-//  trace("BN.id: "+bnId+" index: "+row.rowIndex+" Row id: "+row.dataset.id+" uri: "+uri);
-  let img = row.firstElementChild.firstElementChild.firstElementChild;
-  img.src = uri;
-
-  // Save new icon
-  curBNList[bnId].faviconUri = uri;
-  saveBNList();
-
-  // Call refresh search if there is one active to update any result with that BTN
-  refreshFaviconSearch(bnId, uri);
-}
-
-/*
- * Favicon background retrieval process
- *
- * e is of type MessageEvent, containing a [BN, uri]
- */
-function asyncFavicon (e) {
-  let BN = e.data[0]; // BookmarkNode
-  let bnId = BN.id;
-  let uri = e.data[1]; // String
-//  trace("Async uri received for BN.id: "+BN.id+" url: "+BN.url+" uri: <<"+uri.substr(0,50)+">>");
-
-  // Refresh display of the icon, and save it
-  if (uri.startsWith("error:")) { // Got an error ... trace it
-    trace("Error on getting favicon for "+bnId+":\r\n"
-          +"title: "+BN.title+"\r\n"
-          +"url:   "+BN.url+"\r\n"
-          +uri+"\r\n"
-          +"--------------------");
-    setNoFavicon(bnId);
-  }
-  else if (uri.startsWith("starting:")) { // We started retrieving a new favicon, signal it
-                                          // on the bookmarks table by a "waiting" icon
-    setWaitingFavicon(bnId);
-  }
-  else if (!uri.startsWith("data:image/")
-           && !uri.startsWith("data:application/octet-stream")
-           && !uri.startsWith("data:text/plain")
-           && !uri.startsWith("data:text/html")
-           && !uri.startsWith("/icons/")
-          ) { // Received another data type than image ...!
-    trace("Didn't get an image on favicon for "+bnId+":\r\n"
-          +"url:   "+BN.url+"\r\n"
-          +uri+"\r\n"
-          +"--------------------");
-    setNoFavicon(bnId);
-  }
-  else { // Valid URI returned
-    setFavicon(bnId, uri);
-  }
-}
-
-function errorFavicon () {
-  console.log('There is an error with faviconWorker !');
-}
-
-function msgerrorFavicon () {
-  console.log('There is a message error with faviconWorker !');
-}
-
-/*
- * When a tab gets new contents, very its URL and if matching, get its Favicon
+ * When a tab gets new contents, verify its URL and if matching, get its Favicon
  *
  * tabId integer. ID of the tab that was updated.
  * changeInfo object. Contains properties for the tab properties that have changed. See changeInfo below.
@@ -6017,7 +4363,7 @@ function tabModified (tabId, changeInfo, tabInfo) {
        +"tabInfo.url: "+tabInfo.url+"\r\n"
        );
 */
-  if (!disablefavicons_option				// Ignore if disablefavicons_option is set
+  if (!disableFavicons_option				// Ignore if disablefavicons_option is set
 	  && (tabInfo.status == "complete")) {
     let tabUrl = tabInfo.url;
     let tabFaviconUrl = tabInfo.favIconUrl;
@@ -6044,8 +4390,16 @@ function tabModified (tabId, changeInfo, tabInfo) {
             }
             else {
               // Presumably a bookmark, so no need for cloneBTN(), there is no tree below
-              BN = curBNList[i.id];
-              faviconWorker.postMessage(["icon:"+tabFaviconUrl, BN, enableCookies_option]);
+              let bnId = i.id;
+              BN = curBNList[bnId];
+//              faviconWorker.postMessage(["icon", bnId, tabFaviconUrl, enableCookies_option]);
+              let postMsg = ["icon", bnId, tabFaviconUrl, enableCookies_option];
+              if (backgroundPage == undefined) {
+            	sendAddonMsgGetFavicon(postMsg);
+              }
+              else {
+            	backgroundPage.faviconWorkerPostMessage({data: postMsg});
+              }
 //              trace("Retrieval demand 2 sent for icon:"+tabFaviconUrl);
             }
           }
@@ -6085,46 +4439,148 @@ function openSearchResultsInNewTabs_change (value) {
 }
 
 /*
- * Callback for changes to storage, to catch options changes "real time"
+ * Initialization phase 2: we loaded all, either locally (private browsing),
+ * either through background + local.
+ * Finalize getting the tree and then display it.
  */
-function storageChanged (changes, areaName) {
-//  console.log("Storage change to: "+areaName);
-//  console.log("  keys: "+Object.keys(changes));
-//  for (let i in changes) {
-//    console.log("  changes["+i+"]: oldValue="+changes[i].oldValue+" newValue="+changes[i].newValue);
-//  }
-  if ((areaName == "local") && ("searchheight_option" in changes)) {
-	if (changes.searchheight_option.newValue == undefined) {
-	  // Reset of search pane height
-	  SearchResult.style.height = "";
-	  searchHeight = undefined;
-	}
+function initialize2 () {
+  waitingInitBckgnd = false; // not waiting anymore
+
+  // Get data from appropriate source
+  if (backgroundPage == undefined) { // We just received a json-ified BookmarkNode tree in curBNList from Background msg
+	rootBN = BN_deserialize(curBNList);
+	curBNList = {};
+	rebuildBNList(curBNList, rootBN);
+	curBNList[0] = rootBN;
   }
+  else { // Get values directly from background which is now ready
+	// Get stats
+	loadDuration = backgroundPage.loadDuration;
+	trace("Background load local store duration: "+loadDuration+" ms", true);
+	treeLoadDuration = backgroundPage.treeLoadDuration;
+	if (backgroundPage.bypassedFFAPI) {
+	  trace("Background bypassed FF API for tree load", true);
+	}
+	trace("Background tree load duration: "+treeLoadDuration+" ms", true);
+	treeBuildDuration = backgroundPage.treeBuildDuration;
+	trace("Background tree build duration: "+treeBuildDuration+" ms", true);
+	saveDuration = backgroundPage.saveDuration;
+	trace("Background save duration: "+saveDuration+" ms", true);
+	countBookmarks = backgroundPage.countBookmarks;
+	countFolders = backgroundPage.countFolders;
+	countSeparators = backgroundPage.countSeparators;
+	countOddities = backgroundPage.countOddities;
+
+	// Get options and curBNList / rootBN
+	refreshOptionsBgnd(backgroundPage);
+	TracePlace.hidden = !traceEnabled_option;
+
+	curBNList = backgroundPage.curBNList;
+	rootBN = backgroundPage.rootBN;
+  }
+  endGetTreetime = new Date ();
+  trace("Get tree duration: "+(endGetTreetime.getTime() - endLoadTime.getTime())+" ms", true);
+
+  if (searchHeight != undefined) { // Set current saved size 
+	SearchResult.style.height = searchHeight; 
+	// Note: to reset the height to CSS default ("20%"), just set
+	//  SearchResult.style.height = "";
+	//  let computedStyle = window.getComputedStyle(SearchResult, null);
+	//  console.log("computed height: "+computedStyle["height"]);
+	// will show "20%"
+  }
+//	else {
+//	  // Reset of search pane height
+//	  SearchResult.style.height = "";
+//	}
+
+  trace("structureVersion: "+structureVersion, true);
+  trace("disableFavicons_option: "+disableFavicons_option, true);
+  if (!structureVersion.includes(VersionImg16)) {
+	// Remember to trigger img16 migration later
+	migration_img16 = true;
+  }
+
+  // Catch changes to the search box contents
+  // (including when we clear its contents programmatically ..)
+  SearchTextInput.addEventListener("input", manageSearchTextHandler);
+
+  // Catch clicks on the Cancel search button
+  CancelSearchInput.addEventListener("click", clearSearchTextHandler);
+//    CancelSearchInput.addEventListener("contextmenu", contextSearchTextHandler);
+
+  // Display the bookmarks tree inside the sidebar table
+  // Create a Document Fragment to go faster (work is in memory only, no reflow.
+  // It will get appended at end, when last bookmark item is created
+  // Well, as a matter of fact, this is slightly longer by 10% ... I guess because doing it
+  //  while not yet displaying ...
+  WaitMsg.textContent = "Prepare tree display..";
+//  docFragment = document.createDocumentFragment();
+  bookmarksTable = document.createElement("table");
+//  docFragment.appendChild(bookmarksTable);
+  Bookmarks.appendChild(bookmarksTable);
+
+  highest_open_level = 0;
+  for (let i of rootBN.children) {
+	displayTreeBN(i);
+  }
+  completeDisplay();
+
+  // Display our version number
+  browser.management.getSelf()
+  .then(
+	function (extensionInfo) {
+	  let name = extensionInfo.name;
+	  let version = extensionInfo.version;
+	  trace("BSP2 version: "+version, true);
+	  let title1 = name + " v" +version;
+	  let title2 = name + "\nv" +version;
+	  browser.sidebarAction.setTitle(
+		{title: title1
+		}
+	  );
+	  MGlassImg.title = title2;
+	}
+  );
+
+  // Watch for tabs loading new URL's .. if one matches one of our bookmarks,
+  // then get the favicon from that tab and refresh our bookmarks table and saved storage
+  // with it.
+  browser.tabs.onUpdated.addListener(tabModified);
+
+  // Make sure sidebar.popup.html does not polute history
+  browser.history.onVisited.addListener(onVisited);
 }
 
-
+/*
+ * Initialization phase 1 for private windows = get CurBNList from background
+ * and then link to initialization phase 2
+ */
+function initializePriv () {
+  f_initializeNext = initialize2;
+  sendAddonMessage("getCurBNList");
+}
 
 /*
- * Main code:
- * ----------
-*/
-// Retrieve browser settings for bookmarks and search results
-//let gettingSetting = browser.browserSettings.openBookmarksInNewTabs.get({});
-//gettingSetting.then(
-//  function (details) {
-//    console.log("Value: "+details.value);
-//  }
-//);
+ * Display wait message on screen
+ * 
+ * text = message to display
+ * force = display even if trace not enabled
+ */
+function waitMsg (text) {
+  WaitMsg.textContent = text;
+}
 
-// Retrieve Platform, and config options
-browser.runtime.getPlatformInfo().then(function(info){
+/*
+ * Initialization phase 0
+ */
+function initialize () {
   // Some variations depending on platform
   // Font "caption" turns to:
   // Windows 10 -> font: 12px "Segoe UI";
-	// Windows 7  -> font: 12px serif; However 12px "Segoe UI" seems to work also, so forcing it
-	// Linux      -> font: 13px "Sans"; Using a size of "12px", better
-	// Mac        -> font: 13px "-apple-system"; Using a size of "12px", better
-  platformOs = info.os;
+  // Windows 7  -> font: 12px serif; However 12px "Segoe UI" seems to work also, so forcing it
+  // Linux      -> font: 13px "Sans"; Using a size of "12px", better
+  // Mac        -> font: 13px "-apple-system"; Using a size of "12px", better
   if (BeforeFF57) {
     trace("FF before 57.0: "+BuildID, true);
   }
@@ -6158,348 +4614,81 @@ browser.runtime.getPlatformInfo().then(function(info){
 	SearchTextInput.style.fontSize = fontSize;
   }
 
-/*  browser.storage.local.remove("savedBNList")
-  .then(
-    function () {
-      console.log("There");
-    }
-  );
-*/
-  startTime = new Date();
-  let gettingItem = browser.storage.local.get(["disablefavicons_option"
-	                                           ,"enablecookies_option"
-	                                           ,"advanced_option"
-                                               ,"opentree_option"
-                                               ,"closesearch_option"
-                                               ,"immediatefavdisplay_option"
-	                                           ,"delayLoad_option"
-	                                           ,"remembersizes_option"
-	                                           ,"searchheight_option"
-	                                       	   ,"popupheight_option"
-	                                    	   ,"popupwidth_option"
-                                               ,"traceEnabled_option"
-                                               ,"fIndex"
-                                               ,"fTime"
-                                               ,"fTimeBak"
-                                               ,"savedBNList"
-                                               ,"savedBNListBak"
-                                               ,"savedBkmkUriList"
-//                                               ,"savedBkmkUriList2"
-//                                               ,"savedBkmkUriList3"
-                                               ,"savedFldrOpenList"
-                                               ,"structureVersion"
-                                              ]);
-  gettingItem.then((res) => {
-	let value;
-	
-    WaitMsg.textContent = "Read DFF option..";
-    if ((value = res.disablefavicons_option) != undefined) {
-      disablefavicons_option = value;
-      // Cleaning of local store old version .. delete on long term (2.0.30+)
-      if (disablefavicons_option == "true") {
-   	    disablefavicons_option = true;
-        browser.storage.local.set({disablefavicons_option: true});
-	  }
-	}
-//disablefavicons_option = true;
-//TracePlace.hidden = false;
-    WaitMsg.textContent = "Read EC option..";
-    if ((value = res.enablecookies_option) != undefined) {
-      enableCookies_option = value;
-      // Cleaning of local store old version .. delete on long term (2.0.30+)
-      if (enableCookies_option == "true") {
-        enableCookies_option = true;
-        browser.storage.local.set({enablecookies_option: true});
-      }
-    }
-    WaitMsg.textContent = "Read EFF option..";
-    if ((value = res.enableflipflop_option) != undefined) {
-      enableFlipFlop_option = value;
-    }
-    WaitMsg.textContent = "Read advanced option..";
-    if ((value = res.advanced_option) != undefined) {
-      advancedClick_option = value;
-      // Cleaning of local store old version .. delete on long term (2.0.30+)
-      if (advancedClick_option == "true") {
-        advancedClick_option = true;
-        browser.storage.local.set({advanced_option: true});
-      }
-    }
-    WaitMsg.textContent = "Read OT option..";
-    if ((value = res.opentree_option) != undefined) {
-      openTree_option = value;
-      // Cleaning of local store old version .. delete on long term (2.0.30+)
-      if (openTree_option == "true") {
-        openTree_option = true;
-        browser.storage.local.set({opentree_option: true});
-      }
-    }
-    WaitMsg.textContent = "Read CS option..";
-    if ((value = res.closesearch_option) != undefined) {
-      closeSearch_option = value;
-      // Cleaning of local store old version .. delete on long term (2.0.30+)
-      if (closeSearch_option == "true") {
-        closeSearch_option = true;
-        browser.storage.local.set({closesearch_option: true});
-      }
-      if (closeSearch_option) {
-        openTree_option = true;
-      }
-    }
-    WaitMsg.textContent = "Read IFD option..";
-    if ((value = res.immediatefavdisplay_option) != undefined) {
-      immediateFavDisplay_option = value;
-    }
-    WaitMsg.textContent = "Read DL option..";
-    if ((value = res.delayLoad_option) != undefined) {
-      delayLoad_option = value;
-      // Cleaning of local store old version .. delete on long term (2.0.30+)
-      if (delayLoad_option == "true") {
-        delayLoad_option = true;
-        browser.storage.local.set({delayLoad_option: true});
-      }
-    }
-    WaitMsg.textContent = "Read RS options..";
-    if ((value = res.remembersizes_option) != undefined) {
-      remembersizes_option = value;
-      // Cleaning of local store old version .. delete on long term (2.0.30+)
-      if (remembersizes_option == "true") {
-    	remembersizes_option = true;
-        browser.storage.local.set({remembersizes_option: true});
-      }
-      if (remembersizes_option) {
-    	// Get search pane height and set the pane properly
-        if ((value = res.searchheight_option) != undefined) {
-          searchHeight = value; // Remember the current saved size 
-          SearchResult.style.height = searchHeight; 
-          // Note: to reset the height to CSS default ("20%"), just set
-          //  SearchResult.style.height = "";
-          //  let computedStyle = window.getComputedStyle(SearchResult, null);
-          //  console.log("computed height: "+computedStyle["height"]);
-          // will show "20%"
-        }
-      }
-    }
-    if (!remembersizes_option) {
-   	  // Remove the remembered sizes when they exist
-      if (res.searchheight_option != undefined) {
-        browser.storage.local.remove("searchheight_option");
-      }
-      if (res.popupheight_option != undefined) {
-        browser.storage.local.remove("popupheight_option");
-      }
-      if (res.popupwidth_option != undefined) {
-        browser.storage.local.remove("popupwidth_option");
-      }
-    }
-    WaitMsg.textContent = "Read trace option..";
-    if ((value = res.traceEnabled_option) != undefined) {
-      traceEnabled_option = value;
-      // Cleaning of local store old version .. delete on long term (2.0.30+)
-      if (traceEnabled_option == "true") {
-        traceEnabled_option = true;
-        browser.storage.local.set({traceEnabled_option: true});
-      }
-      if (traceEnabled_option) {
-        TracePlace.hidden = false;
-      }
-    }
-
-    WaitMsg.textContent = "Read saved tree info..";
-    if ((value = res.fIndex) != undefined) {
-      savedfIndex = value;
-    }
-    if ((value = res.fTime) != undefined) {
-      savedfTime = value;
-    }
-    if ((value = res.fTimeBak) != undefined) {
-      savedfTimeBak = value;
-    }
-
-    // Get saved tree / favicons
-    let savedBNListBak = undefined;
-    WaitMsg.textContent = "Read saved tree..";
-    if (savedfTimeBak != undefined) {
-      if ((savedfTime != undefined) && (savedfTime > savedfTimeBak)) {
-    	// Both exist and primary is fresher than backup
-    	if ((value = res.savedBNList) != undefined) {
-    	  savedBNList = value;
-    	  if ((value = res.savedBNListBak) != undefined) {
-            savedBNListBak = value;
-          }
-    	}
-    	else if ((value = res.savedBNListBak) != undefined) {
-    	  // If primary was empty, take backup
-          savedBNList = value;
-        }
-      }
-      else { // Backup fresher than primary, or no primary
-      	if ((value = res.savedBNListBak) != undefined) {
-      	  savedBNList = value;
-    	  if ((value = res.savedBNList) != undefined) {
-            savedBNListBak = value;
-          }
-      	}
-      	else if ((value = res.savedBNList) != undefined) {
-      	  // If backup was empty, attempt primary .. we never know
-          savedBNList = value;
-        }
-      }
-    }
-    else { // No secondary
-   	  if ((value = res.savedBNList) != undefined) {
-    	savedBNList = value;
-      }
-  	  else if ((value = res.savedBNListBak) != undefined) {
-  	    // If primary was empty, attempt backup .. we never know
-        savedBNList = value;
-      }
-    }
-    if (savedBNList != undefined) { // We got something
-      let proto = Object.prototype.toString.call(savedBNList).slice(8, -1);
-//      console.log("proto "+proto);
-      if (proto == "String") { // New jsonified method
-   		trace("New jsonified save method", true);
-   		let json = savedBNList;
-   		if (json.length < 20) { // Bad save last time .. look at the other one
-   		  json = savedBNListBak;
-     	  if ((json != undefined) && (json.length < 20)) { // Not here or bad save again :-(
-     		json = undefined;
-     	  }
-   		}
-   		if (json == undefined) { // We got nothing ... all was corrupted
-   		  savedBNList = undefined;
-   		}
-   		else { // Rebuild the full savedBNList object
-          let BN = BN_deserialize(json);
-          savedBNList = {};
-          rebuildBNList(savedBNList, BN);
-          savedBNList[0] = BN;
-          BN = undefined;
-   		}
-      }
-    }
-    if ((value = res.savedBkmkUriList) != undefined) {
-//    if ((value = res.savedBkmkUriList2) != undefined) {
-//    if ((value = res.savedBkmkUriList3) != undefined) {
-      if (disablefavicons_option) {
-    	browser.storage.local.remove("savedBkmkUriList");
-      }
-      else {
-        savedBkmkUriList = value;
-      }
-    }
-    WaitMsg.textContent = "Read folders state..";
-    if ((value = res.savedFldrOpenList) != undefined) {
-      savedFldrOpenList = value;
-    }
-
-    WaitMsg.textContent = "Read migration state..";
-    // Get migrations state / current state
-    if ((value = res.structureVersion) != undefined) {
-   	  structureVersion = value;
-    }
-    else { // Doesn't exist yet
-      // If savedBkmkUriList is undefined, nothing to convert nor migrate to BNList,
-      // so consider the img16 and BNList states ok
-      if (savedBkmkUriList == undefined) {
-        structureVersion += VersionImg16 + VersionBNList;
-      }
-      browser.storage.local.set({
-    	structureVersion: structureVersion
-      });
-    }
-    res = undefined; // Free memory
-
-    trace("structureVersion: "+structureVersion, true);
-    trace("disablefavicons_option: "+disablefavicons_option, true);
-    if (!structureVersion.includes(VersionImg16)) {
-      // Remember to trigger img16 migration later
-      migration_img16 = true;
-    }
-    if (!structureVersion.includes(VersionBNList)) {
-      // Signal to migrate from savedBkmkUriList
-      migration_bnlist = true;
-    }
-
-    // Get Id of the window the sidebar is running in
-    // Note: there is an instance of sidebar run in each window as it seems
-    browser.windows.getCurrent(
-//      {populate: true	
-//      }
-    )
-    .then(
-      (windowInfo) => {
-        myWindowId = windowInfo.id;
-      }
-    );
-
-    // Catch changes to storage, to catch options changes "real time"
-    browser.storage.onChanged.addListener(storageChanged);
-
-    // Catch changes to the search box contents
-    // (including when we clear its contents programmatically ..)
-    SearchTextInput.addEventListener("input", manageSearchTextHandler);
-
-    // Catch clicks on the Cancel search button
-    CancelSearchInput.addEventListener("click", clearSearchTextHandler);
-//    CancelSearchInput.addEventListener("contextmenu", contextSearchTextHandler);
-
-    // Start the favicon worker, with a delay if there are fetches triggered by the tree load
-    faviconWorker = new Worker("favicon.js");
-    faviconWorker.onmessage = asyncFavicon;
-    faviconWorker.onerror = errorFavicon;
-    faviconWorker.onmessageerror = msgerrorFavicon;
-    faviconWorker.postMessage(["hysteresis"]);
-
-    // Get the boorkmarks tree and display it
-    WaitMsg.textContent = "FF API load bookmarks..";
-    endLoadTime = new Date();
-	trace("Load local store duration: "+(endLoadTime.getTime() - startTime.getTime())+" ms", true);
-    if (delayLoad_option) {
-//      browser.bookmarks.getChildren(Root).then(delayLoadTree, onRejected);
-      delayLoad_option = false;
-      browser.bookmarks.getTree().then(storeAndDisplayTree, onRejected);
-    }
-    else {
-      browser.bookmarks.getTree().then(storeAndDisplayTree, onRejected);
-    }
-
-    // Display our version number
-    browser.management.getSelf()
-    .then(
-      function (extensionInfo) {
-    	let name = extensionInfo.name;
-    	let version = extensionInfo.version;
-    	trace("BSP2 version: "+version, true);
-    	let title1 = name + " v" +version;
-    	let title2 = name + "\nv" +version;
-    	browser.sidebarAction.setTitle(
-    	  {title: title1
-    	  }
-    	);
-    	MGlassImg.title = title2;
-      }
-    );
-
-    // Watch for tabs loading new URL's .. if one matches one of our bookmarks,
-    // then get the favicon from that tab and refresh our bookmarks table and saved storage
-    // with it.
-    browser.tabs.onUpdated.addListener(tabModified);
-
-    // Make sure sidebar.popup.html does not polute history
-    browser.history.onVisited.addListener(onVisited);
-  })
-  .catch( // Asynchronous, like .then
-    function (err) {
-      let msg = "Error on loading from local storage : "+err;
-      trace(msg, true);
-      console.log(msg);
-    }
-  );
-
   // Watch for background script messages
   browser.runtime.onMessage.addListener(handleAddonMessage);
+
+  startTime = new Date();
+  if (backgroundPage == undefined) { // Private window, load by ourselves, except SavedBNList
+	waitMsg("Load saved state..");
+	let p = readFullLStore(true, waitMsg);
+	Promise.all([p_GetWindowId, p]) // Make sure we get myWindowId as we can directly call a function using it
+	.then(
+	  function (a_values) { // An array of one value per Promise is returned
+		// Handle myWindowId
+		let windowInfo = a_values[0];
+		myWindowId = windowInfo.id;
+
+		// Process read values from Store (they are already in Global variables from libstore.js)
+		endLoadTime = new Date();
+		trace("Load local store duration: "+(loadDuration = (endLoadTime.getTime() - startTime.getTime()))+" ms", true);
+		TracePlace.hidden = !traceEnabled_option;
+
+		if (backgroundReady) {
+//		  console.log("Background is Ready 2");
+		  initializePriv();
+		  WaitMsg.textContent = "Load from background..";
+		}
+		else {
+//		  console.log("Waiting on Background 2");
+		  f_initializeNext = initializePriv;
+		  waitingInitBckgnd = true;
+		  WaitMsg.textContent = "Wait background load..";
+		  // In case Background is already ready, but we missed the signalling message because
+		  // we started after it was sent, provoke its resend ..
+		  sendAddonMessage("getBackground");
+		}
+	  }
+	)
+	.catch( // Asynchronous, like .then
+	  function (err) {
+		let msg = "Error on loading from local storage 1 : "+err;
+		trace(msg, true);
+	  }
+	);
+  }
+  else { // Bacground page is accessible, all is loaded inside it, so we will get from there
+	// Only load folders state
+	WaitMsg.textContent = "Load saved state..";
+	let p = readFoldersLStore(waitMsg);
+	Promise.all([p_GetWindowId, p]) // Make sure we get myWindowId as we can directly call a function using it
+	.then(
+	  function (a_values) { // An array of one value per Promise is returned
+		// Handle myWindowId
+		let windowInfo = a_values[0];
+		myWindowId = windowInfo.id;
+
+		// Process read values from Store (they are already in Global variables from libstore.js)
+		endLoadTime = new Date();
+		trace("Load local store duration: "+(loadDuration = (endLoadTime.getTime() - startTime.getTime()))+" ms", true);
+		if (backgroundPage.ready) {
+//		  console.log("Background is Ready 1");
+		  initialize2();
+		}
+		else { // Wait for Background to complete initialization
+//		  console.log("Waiting on Background 1");
+		  f_initializeNext = initialize2;
+		  waitingInitBckgnd = true;
+		  WaitMsg.textContent = "Wait background load..";
+		}
+	  }
+	)
+	.catch( // Asynchronous, like .then
+	  function (err) {
+		let msg = "Error on loading from local storage 2 : "+err;
+		trace(msg, true);
+	  }
+	);
+  }
 
   let bSettings = browser.browserSettings;
   if (bSettings != undefined) {
@@ -6520,4 +4709,51 @@ browser.runtime.getPlatformInfo().then(function(info){
       .then(openSearchResultsInNewTabs_change);
 	}
   }
-});
+}
+
+
+/*
+ * Main code:
+ * ----------
+*/
+//Get background page asap
+browser.runtime.getBackgroundPage()
+.then(
+  function (page) {
+	// In a private browsing window (incognito), this will be null
+	if (page != null) { // Not in a private browsing window
+	  backgroundPage = page;
+
+	  // Retrieve main infos and options already gathered by Background page
+	  platformOs = backgroundPage.platformOs;
+	  initialize();
+	}
+	else { // In a private browsing window
+	  trace("In private browsing window", true);
+
+	  //Retrieve Platform
+	  browser.runtime.getPlatformInfo().then(function(info){
+		platformOs = info.os;
+		initialize();
+	  });
+	}
+  },
+  function (error) {
+	msg = "Can't access background page: "+error;
+	console.log(msg);
+	trace(msg, true);
+
+	//Retrieve Platform
+	browser.runtime.getPlatformInfo().then(function(info){
+	  platformOs = info.os;
+	  initialize();
+	});
+  }
+);
+
+// Get Id of the window the sidebar is running in
+// Note: there is an instance of sidebar run in each window as it seems
+p_GetWindowId = browser.windows.getCurrent(
+//  {populate: true	
+//  }
+);
