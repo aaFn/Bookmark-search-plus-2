@@ -9,12 +9,16 @@ const PersonalToobar = "toolbar_____";
 const BookmarksMenu =  "menu________";
 const OtherBookmarks = "unfiled_____";
 const MobileBookmarks = "mobile______";
+const MostVisitedSort = "sort=8";
+const RecentTagSort = "sort=14"; 
+const RecentBkmkSort = "sort=12";
 
 
 /*
  * Global variables, seen by other instances (var)
  */
-var countBookmarks = 0, countFolders = 0, countSeparators = 0, countOddities = 0;
+var countBookmarks = 0, countFolders = 0, countSeparators = 0, countOddities = 0, countFetchFav = 0;
+var mostVisitedBNId, mostVisitedBN, recentTagBNId, recentTagBN, recentBkmkBNId, recentBkmkBN;
 
 
 /*
@@ -120,6 +124,26 @@ function BN_deserialize (jsonstr) {
   return(JSON.parse(jsonstr));
 }
 
+// Get path to BookmarkNode id, including bnId itself, using curBNList
+// Returns a String, with '>' between each item on the path (or empty string if not parent).
+function BN_path (bnId) {
+  if (bnId != Root) {
+	let BN = curBNList[bnId];
+	let parentId = BN.parentId;
+	let path;
+	if (parentId != Root) {
+	  path = BN_path(parentId) + " > "; // Separator on the path ... 
+	}
+	else {
+	  path = "";
+	}	  
+	return(path + BN.title);
+  }
+  else {
+	return("");
+  }
+}
+
 // Get parent of BookmarkNode, from list bnList (curBNList by default)
 // Returns a BookmarkNode (or undefined if root node = no parent, or parent does not exist).
 function BN_getParentBN (BN, bnList = curBNList) {
@@ -176,27 +200,63 @@ function BN_copy (BN) {
   return(node);
 }
 
-// Delete a BookmarkNode from its parent and from list bnList (curBNList by default) if real.
+// Decrement appropriate counters when deleting a node
+function decrCounters (BN, type) {
+  if (type == "folder") { // Root cannot be deleted, so do not verify
+	if (countFolders > 0)   countFolders--;
+  }
+  else if (type == "separator") {
+	if (countSeparators > 0)   countSeparators--;
+  }
+  else {
+	if (type == "bookmark") {
+	  if ((countBookmarks > 0)
+		  && (!BN.id.startsWith("place:")) // Do not count special bookmarks under special place: folders
+		                                   // tagged with "place:" before their id when inserted
+		 ) {
+		countBookmarks--;
+	  }
+	}
+	else {
+	  if (countOddities > 0)   countOddities--;
+	}
+	if ((BN.faviconUri == "/icons/nofavicontmp.png") && (countFetchFav > 0))
+	  countFetchFav--;  
+  }
+}
+
+// Recursively delete a BookmarkNode from its parent and from list bnList (curBNList by default) if real.
 // Note: for a move, set real to false for both delete and insert.
-function BN_delete (BN, parentId = undefined, real = true, bnList = curBNList) {
+function BN_delete (BN, parentId = undefined, real = true, bnList = curBNList, removeFromParent = true) {
   if (parentId == undefined) {
 	if ((parentId = BN.parentId) == undefined) {
 	  return; // Cannot delete root
 	}
   }
+  // Remove from parent node children 
   let parentBN;
-  if ((parentBN = bnList[parentId]) == undefined) { // No parent .. error case, for robustness..
-	if (real) {
-	  delete bnList[BN.id];
+  if (removeFromParent                                // Do not remove from parent if not told to
+	  && ((parentBN = bnList[parentId]) != undefined) // Plan for no parent error case, for robustness..
+     ) {
+	let index = parentBN.children.indexOf(BN);
+	if (index != -1) {
+	  parentBN.children.splice(index, 1);
 	}
-	return;
   }
-  let index = parentBN.children.indexOf(BN);
-  if (index != -1) {
-	parentBN.children.splice(index, 1);
-	if (real) {
-	  delete bnList[BN.id];
+  // Recursively remove from bnList if real 
+  if (real) {
+	let type = BN.type;
+	if (type == "folder") {
+	  let children = BN.children;
+	  if (children != undefined) {
+		for (let i of children) {
+		  BN_delete(i, BN.id, true, bnList, false); // Do not remove from parent since we are taking care
+		                                            // of things here .. else that would perturb the loop
+		}
+	  }
 	}
+	decrCounters(BN, type); // Keep counters up to date
+	delete bnList[BN.id];
   }
 }
 
@@ -205,7 +265,7 @@ function BN_updateLevel (BN, level) {
   BN.level = level;
   let children = BN.children;
   if (children != undefined) {
-	for (let i of BN.children) {
+	for (let i of children) {
 	  BN_updateLevel(i, level+1);
 	}
   }
@@ -228,7 +288,7 @@ function BN_insert (BN, parentBN, index = -1, real = true, bnList = curBNList) {
 	parentBN.children.push(BN);
   }
   else {
-	if (BeforeFF57) {
+	if (beforeFF57) {
 	  let children = parentBN.children;
 	  if (children == undefined) {
 		children = parentBN.children = new Array (0);
@@ -313,7 +373,7 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
   let index = BTN.index;
   let type = getType(BTN);
   let protect;
-  if (type == "folder") {
+  if (type == "folder") { // Root cannot be created, so do not verify
 	countFolders++;
 
 	let uri, fetchedUri;
@@ -357,7 +417,7 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 	);
   }
   else if (type == "separator") {
-	if ((countSeparators++ == 0) || BeforeFF57) { // First separator is not draggable,
+	if ((countSeparators++ == 0) || beforeFF57) { // First separator is not draggable,
 	  	                                          // or all separators when FF < 57
 	  protect = true;
 	}
@@ -369,8 +429,12 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 	);
   }
   else { // Presumably "bookmark" type
-	if (type == "bookmark")
-	  countBookmarks++;
+	if (type == "bookmark") {
+	  if (!BTN_id.startsWith("place:")) { // Do not count special bookmarks under special place: folders
+                                          // tagged with "place:" before their id when inserted
+		countBookmarks++;
+	  }
+	}
 	else {
 	  trace("Odd bookmark type: "+type);
 	  countOddities++;
@@ -388,9 +452,19 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 	  protect = false;
 	}
 	else if (url.startsWith("place:")) {
+	  type = "folder"; // Convert to folder
 	  uri = "/icons/specfavicon.png";
-	  fetchedUri = false;
+	  fetchedUri = true;
 	  protect = true;
+	  if (url.includes(MostVisitedSort)) {
+		mostVisitedBNId = BTN_id;
+	  }
+	  else if (url.includes(RecentTagSort)) {
+		recentTagBNId = BTN_id; 
+	  }
+	  else if (url.includes(RecentBkmkSort)) {
+		recentBkmkBNId = BTN_id;
+	  }
 	}
 	else if (url.startsWith("about:")) { // about: is protected - security error ..
 	  uri = "/icons/nofavicon.png";
@@ -435,6 +509,10 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 		uri = "/icons/nofavicontmp.png";
 		fetchedUri = false;
 		triggerFetch = true;
+		if (faviconWorker != undefined) {
+		  countFetchFav++;
+//		  console.log("countFetchFav 1: "+countFetchFav+" BTN_id: "+BTN_id);
+		}
 	  }
 	  else {
 		fetchedUri = true;
@@ -446,16 +524,20 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 	  BTN.title, uri, fetchedUri, url
 	);
 
-	if (triggerFetch) {
+	if (triggerFetch && !pauseFavicons_option) { // Trigger favicon fetch, except if paused
 	  if (uglyHackTabFavIconUrl == undefined) {
 		// This is a bookmark, so here no need for cloneBN(), there is no tree below
 //		faviconWorker.postMessage(["get", BTN_id, url, enableCookies_option]);
-		faviconWorker({data: ["get", BTN_id, url, enableCookies_option]});
+		if (faviconWorker != undefined) {
+		  faviconWorker({data: ["get", BTN_id, url, enableCookies_option]});
+		}
 	  }
 	  else {
 		// This is a bookmark, so here no need for cloneBN(), there is no tree below
 //		faviconWorker.postMessage(["icon", BTN_id, uglyHackTabFavIconUrl, enableCookies_option]);
+		// If uglyHackTabFavIconUrl is set, faviconWorker is not undefined
 		faviconWorker({data: ["icon", BTN_id, uglyHackTabFavIconUrl, enableCookies_option]});
+		
 //        trace("Retrieval demand 1 sent for icon:"+uglyHackTabFavIconUrl);
 		uglyHackTabFavIconUrl = undefined; // One shot ..
 	  } 
@@ -529,52 +611,115 @@ function BN_trace (BN) {
 /*
  * Rebuild the full BNList from a BN tree
  * 
- * Returns: nothing, just completes the BNList
+ * Returns: true if no null encountered while completing the BNList (= no error)
  */
 function rebuildBNList (BNList, BN) {
-  BNList[BN.id] = BN;
-  if (BN.type == "folder") {
- 	let children = BN.children;
- 	if (children != undefined) {
- 	  for (let i of children) {
- 	    rebuildBNList(BNList, i);
- 	  }
-    }
+  let rc;
+  if (BN == null) { // Error case, corruption from last jsonified save
+	rc = false;
   }
+  else {
+	rc = true;
+	BNList[BN.id] = BN;
+	if (BN.type == "folder") {
+	  let children = BN.children;
+	  if (children != undefined) {
+		for (let i of children) {
+		  if (!rebuildBNList(BNList, i)) {
+			rc = false;
+		  }
+		}
+	  }
+	}
+  }
+  return(rc);
 }
 
 /*
- * Scan the full BN tree for stats and for favicons to fetch, and updates as needed
- * funciton of disableFavicons_option.
+ * Scan a BN tree for stats and for favicons to fetch, and updates as needed
+ * function of disableFavicons_option.
  * 
+ * BN = BN tree to scan
+ * faviconWorker = function to post favicons fetching to
+ * doStats = if false, do not update counters
+ *  
  * Returns: maintains global countxx variable, and triggers favicon fetching if needed
  */
-function scanBNTree (BN, faviconWorker) {
+function scanBNTree (BN, faviconWorker, doStats = true) {
   let type = BN.type;
   if (type == "folder") {
-	countFolders++;
+	let bnId = BN.id;
+	if (bnId != Root) { // Do not count Root (not visible)
+	  let url = BN.url;
+	  if (url == undefined) { // Do not count folders with url ("place:" special folders),
+		                      // they are to be counted as bookmarks
+		if (doStats)
+	      countFolders++;
+	  }
+	  else if (url.startsWith("place:")) { // Remember special folders ..
+//BN.type = "bookmark";
+		if (doStats)
+		  countBookmarks++;
+		if (url.includes(MostVisitedSort)) {
+		  mostVisitedBNId = bnId;
+		  mostVisitedBN = BN;
+		}
+		else if (url.includes(RecentTagSort)) {
+		  recentTagBNId = bnId;
+		  recentTagBN = BN;
+		}
+		else if (url.includes(RecentBkmkSort)) {
+		  recentBkmkBNId = bnId;
+		  recentBkmkBN = BN;
+		}
+	  }
+	}
 	let children = BN.children;
  	if (children != undefined) {
  	  for (let i of children) {
- 		scanBNTree(i, faviconWorker);
+ 		scanBNTree(i, faviconWorker, doStats);
  	  }
     }
   }
   else if (type == "separator") {
-	countSeparators++;
+	if (doStats)
+	  countSeparators++;
   }
   else {
-	if (type == "bookmark")
-	  countBookmarks++;
+	let bnId = BN.id;
+	if (type == "bookmark") {
+	  if (!bnId.startsWith("place:")) { // Do not count special bookmarks under special place: folders
+		                                // tagged with "place:" before their id when inserted
+		if (doStats)
+		  countBookmarks++;
+	  }
+	}
 	else {
 	  trace("Odd bookmark type: "+type);
-	  countOddities++;
+	  if (doStats)
+		countOddities++;
 	}
 	let url = BN.url;
 	if ((url == undefined)
-		|| (url.startsWith("place:"))
 		|| (url.startsWith("about:"))
-	   ) { // In those 3 cases, change nothing
+	   ) { // In those 2 cases, change nothing
+	}
+	else if (migration_spfldr && url.startsWith("place:")) { // Change nothing also, but transform (and remember) ..
+	  // These are now special folders, still ocounted as bookmarks
+	  BN.type = "folder";
+	  BN.fetchedUri = true; // Tell to use special favicon instead of standard folder favicon
+	  if (url.includes(MostVisitedSort)) {
+		mostVisitedBNId = bnId;
+		mostVisitedBN = BN;
+	  }
+	  else if (url.includes(RecentTagSort)) {
+		recentTagBNId = bnId;
+		recentTagBN = BN;
+	  }
+	  else if (url.includes(RecentBkmkSort)) {
+		recentBkmkBNId = bnId;
+		recentBkmkBN = BN;
+	  }
 	}
 	else if (disableFavicons_option) {
 	  BN.faviconUri = undefined;
@@ -587,16 +732,24 @@ function scanBNTree (BN, faviconWorker) {
 		BN.faviconUri = "/icons/nofavicontmp.png";
 		BN.fetchedUri = false;
 		triggerFetch = true;
+		if (doStats) {
+		  countFetchFav++;
+//		  console.log("countFetchFav 2: "+countFetchFav+" bnId: "+bnId);
+		}
 	  }
 	  else if (uri == "/icons/nofavicontmp.png") {
 		BN.fetchedUri = false;
 		triggerFetch = true;
+		if (doStats) {
+		  countFetchFav++;
+//		  console.log("countFetchFav 3: "+countFetchFav+" bnId: "+bnId);
+		}
 	  }
 	  else {
 		triggerFetch = false;
 	  }
 
-	  if (triggerFetch) {
+	  if (triggerFetch && !pauseFavicons_option) { // Trigger favicon fetch, except if paused
 		// This is a bookmark, so here no need for cloneBN(), there is no tree below
 //		faviconWorker.postMessage(["get", BN.id, BN.url, enableCookies_option]);
 		faviconWorker({data: ["get", BN.id, BN.url, enableCookies_option]});

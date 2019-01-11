@@ -6,7 +6,7 @@
 // Cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1408446
 // imposing to resize in order to draw contents - Apparently corrected FF in 59.x -
 const PopupWidth  = 375;
-const PopupHeight = 150;
+const PopupHeight = 190;
 
 let remembersizes_option;
 let gettingItem = browser.storage.local.get(
@@ -50,6 +50,7 @@ gettingItem.then((res) => {
  * Constants
  */
 const Body = document.querySelector("#body"); // Assuming it is an HTMLBodyElement
+const PathLabel = document.querySelector("#path"); // Assuming it is an HTMLLabelElement
 const TitleInput = document.querySelector("#title"); // Assuming it is an HTMLInputElement
 const AddressLabel = document.querySelector("#addrlabel"); // Assuming it is an HTMLLabelElement
 const AddressInput = document.querySelector("#address"); // Assuming it is an HTMLInputElement
@@ -71,6 +72,7 @@ let myType; //String = type of window being open. This conditions button names a
 let isPropPopup; // To signal if we are a properties popup, or a creation one
 let isFolder; // To signal if we are on folder or a bookmark item
 let btnId;
+let btnPath;
 let btnTitle;
 let btnUrl1;
 let btnUrl2;
@@ -332,11 +334,14 @@ function paramParse (paramStr) {
   else if (param == "id") {
 	btnId = value;
   }
+  else if (param == "path") {
+	btnPath = decodeURIComponent(value);
+  }
   else if (param == "title") {
-	btnTitle = value;
+	btnTitle = decodeURIComponent(value);
   }
   else if (param == "url") {
-	btnUrl = value;
+	btnUrl = decodeURIComponent(value);
   }
 }
 
@@ -393,10 +398,10 @@ browser.runtime.getPlatformInfo().then(function(info){
       // Parse the url, it will give us our type of window, the BTN.id, BTN.title and BTN.url
       let paramsPos = myUrl.indexOf("?");
 
-      // There should be 3 or 4 arguments, url should be the last and can itself contain "&"
+      // There should be 5 arguments, url should be the last and can itself contain "&"
       let paramStr;
       let endPos;
-      for (let i=0 ; i<3 ; i++) {
+      for (let i=0 ; i<4 ; i++) {
         endPos = myUrl.indexOf("&", paramsPos+1);
         if (endPos == -1) { // Reached last param
           break;
@@ -419,6 +424,7 @@ browser.runtime.getPlatformInfo().then(function(info){
       else {
         isPropPopup = false;
       }
+      PathLabel.textContent = btnPath;
       TitleInput.value = btnTitle;
       TitleInput.select();
       if (myType.endsWith("fldr")) { // No URL for folders

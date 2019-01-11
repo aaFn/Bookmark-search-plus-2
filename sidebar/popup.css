@@ -10,6 +10,8 @@ html, body {
 body {
   background-color: #F0F0F0;
   padding: 8px 12px 8px 12px;
+  display: flex;
+  flex-direction: column;
 }
 
 .fontdflt {
@@ -29,10 +31,12 @@ body {
 }
 
 .buttons {
+  flex: auto;
   box-sizing: border-box;
   display: flex;
   flex-direction: row;
   justify-content: flex-end;
+  align-items: flex-end;
   margin-top: 15px;
   margin-bottom: 4px;
 }
@@ -46,6 +50,12 @@ label {
   flex: auto;
 }
 
+.textwrap {
+  flex: auto;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
 .button {
   flex: none;
   height: 28px;
@@ -54,8 +64,4 @@ label {
   flex-direction: column;
   justify-content: center;
   margin-left: 10px;
-}
-
-p {
-  margin: 1em 2em;
 }

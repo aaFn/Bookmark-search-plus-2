@@ -127,6 +127,7 @@ tbody {
 }
 
 .brow:focus, .selbrow:focus {
+  outline: none;
   background-color: #CDE8FF;
   border-color: #7BC3FF;
 }
@@ -143,6 +144,7 @@ tbody {
   width: 16px;
   flex: none;
   background-image: url("/icons/twistieac.png");
+  cursor: pointer;
 }
 
 .brow:hover .twistieac, .selbrow:hover .twistieac {
@@ -154,6 +156,7 @@ tbody {
   width: 16px;
   flex: none;
   background-image: url("/icons/twistieao.png");
+  cursor: pointer;
 }
 
 .brow:hover .twistieao, .selbrow:hover .twistieao {
@@ -162,12 +165,20 @@ tbody {
 
 .bkmkitem_b {
   flex: none;
-  border: 0;
   cursor: pointer;
+  border-top: solid 2px transparent;
+  border-bottom: solid 2px transparent;
+  margin-top: -2px;
+  margin-bottom: -2px;
 }
 
 .bkmkitem_f {
-  flex: auto;
+  flex: none;
+  cursor: pointer;
+  border-top: solid 2px transparent;
+  border-bottom: solid 2px transparent;
+  margin-top: -2px;
+  margin-bottom: -2px;
 }
 
 .bkmkitem_s {
@@ -175,6 +186,10 @@ tbody {
   display: flex;
   flex-direction: row;
   align-items: center;
+  border-top: solid 2px transparent;
+  border-bottom: solid 2px transparent;
+  margin-top: -2px;
+  margin-bottom: -2px;
 }
 
 .favseparator {
@@ -185,7 +200,7 @@ tbody {
 .favseparatorend {
   flex: none;
   width: 1px;
-  height: 17px;
+  height: 16px;
 }
 
 .ffavicon {
