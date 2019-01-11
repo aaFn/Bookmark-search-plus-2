@@ -6,11 +6,22 @@
   font: 12px "Segoe UI";
 }
 
-#group {
+.group {
   border: 1px solid #D7D7D7;
   padding: 10px 10px;
 }
 
 img {
   border: 1px solid black;
+}
+
+textarea {
+  resize: none;
+  font-size: 11px;
+  height: 80px;
+  width: 300px;
+}
+
+#fontsize {
+  width: 3em;
 }

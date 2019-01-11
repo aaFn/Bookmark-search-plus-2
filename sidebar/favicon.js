@@ -44,7 +44,16 @@ let fetchTimerID = null;
 function answerBack (bnId, uri) {
 //  console.log("Answering [BN.id="+BN.id+",uri=<<"+uri.substr(0,40)+">>]");
 //  postMessage([bnId, uri]);
-  asyncFavicon({data: [bnId, uri]});
+  try { // Ensure we always come back here even if there is a problem in called code
+	    // in order to restart timer and continue dequeueing, or clear timer as needed.
+	asyncFavicon({data: [bnId, uri]});
+  }
+  catch (err) {
+	let msg = "Error in favicon call to asyncFavicon() : "+err;
+	console.log(msg);
+	console.log("lineNumber: "+err.lineNumber);
+	console.log("fileName:   "+err.fileName);
+  }
 
   if (uri != "starting:") {
 	reqQueue.shift(); // Remove the element in queue we just processed (= first one)
@@ -129,13 +138,23 @@ function getUri (bnId, url, enableCookies) {
       fetchTimerID = null;
 //      console.log("Status: "+response.status+"'for url: "+url);
       if (response.status == 200) { // If ok, get contents as blob
-        response.blob().then(
+        response.blob()
+        .then(
           function (blob) { // blob is a Blob ..
 //            console.log("Contents: "+blob);
             readerBNId = bnId;
    	        FReader.readAsDataURL(blob);
           }
    	    )
+   	    .catch( // Asynchronous also, like .then
+   	      function (err) {
+   	    	let msg = "Response.blob Error :-S "+err;
+   	    	console.log(msg, url);
+   	    	console.log("lineNumber: "+err.lineNumber);
+   	    	console.log("fileName:   "+err.fileName);
+   	    	answerBack(bnId, "error: "+msg);
+   	      }
+   	    );
       }
       else {
     	let msg = "error: Looks like there was a URL fetch problem. Status Code: "+response.status;
@@ -148,8 +167,10 @@ function getUri (bnId, url, enableCookies) {
   .catch( // Asynchronous also, like .then
     function (err) {
       // Remove fetch timeout
-      clearTimeout(fetchTimerID);
-      fetchTimerID = null;
+      if (fetchTimerID != null) {
+    	clearTimeout(fetchTimerID);
+    	fetchTimerID = null;
+      }
       let msg = "Favicon fetch Error :-S "+err;
       console.log(msg, url);
       answerBack(bnId, "error: "+msg);
@@ -179,7 +200,7 @@ let glob_lctext;
 function retrieveHref (text, pos, searchLinkToken = false) {
   let faviconUrl;
 
-  // Find enclosing brakets
+  // Find enclosing brackets
   let posStart = glob_lctext.lastIndexOf("<", pos); // Search left starting from pos included
   let posEnd = glob_lctext.indexOf(">", pos);
   if ((posStart < 0) || (posEnd < 0))
@@ -322,7 +343,26 @@ function retrieveFaviconUrl (text) {
  * myInit = fetch parameters
  * enableCookies = a Boolean to "omit" (false) or "include" (true)
  */
-function fetchFavicon (bnId, bnUrl, myInit, enableCookies) {
+function fetchFavicon (bnId, bnUrl, enableCookies) {
+  // Need to recreate the AbortController each time, or else all requests after
+  // an abort will abort .. and there appears to be no way to remove / clear the abort signal
+  // from the AbortController.
+  try { // Only supported as of FF 57
+    fetchController = new AbortController();
+  }
+  catch (error) {
+    console.log("handleRequest error: "+error);
+  }
+  let myInit;
+  if (fetchController == null) { // we are below FF 57
+    myInit = MyInitFF56;
+  }
+  else {
+    myInit = MyInitFF57;
+    let fetchSignal = fetchController.signal;
+    myInit.signal = fetchSignal;
+  }
+  myInit.credentials = (enableCookies ? "include" : "omit");
   fetch(bnUrl, myInit)
   .then(
 	function (response) { // response is a Response object
@@ -378,7 +418,8 @@ function fetchFavicon (bnId, bnUrl, myInit, enableCookies) {
 			    if (baseUrl != null) {
 			      if (baseUrl.includes("://"))
 			        faviconUrl = baseUrl + faviconUrl;
-			      else   faviconUrl = urlObj.origin + baseUrl + faviconUrl;
+			      else
+			    	faviconUrl = urlObj.origin + baseUrl + faviconUrl;
 			    }
 			    else {
 			      // Need to get back to closest '/' from end of path, removing all
@@ -393,12 +434,21 @@ function fetchFavicon (bnId, bnUrl, myInit, enableCookies) {
 //				console.log("faviconUrl 3: <<"+faviconUrl+">>");
 			  getUri(bnId, faviconUrl, enableCookies);
 			}
-			else {
+			else { // Absolute URL
 //				console.log("faviconUrl 4: <<"+faviconUrl+">>");
 			  getUri(bnId, faviconUrl, enableCookies);
 			}
 		  }
 		)
+		.catch( // Asynchronous, like .then
+		  function (err) {
+			let msg = "Error on loading from local storage : "+err;
+			console.log(msg);
+			console.log("lineNumber: "+err.lineNumber);
+			console.log("fileName:   "+err.fileName);
+			answerBack(bnId, "error: "+msg);
+		  }
+		);
 /*      }
 	  else {
     	let msg = "error: Looks like there was a page fetch problem. Status Code: "+response.status;
@@ -413,13 +463,20 @@ function fetchFavicon (bnId, bnUrl, myInit, enableCookies) {
   .catch( // Asynchronous, like .then
 	function pageFetchError (err) {
 	  // Remove fetch timeout
-	  clearTimeout(fetchTimerID);
-	  fetchTimerID = null;
+      if (fetchTimerID != null) {
+    	clearTimeout(fetchTimerID);
+    	fetchTimerID = null;
+      }
 	  let msg = "Page fetch Error :-S "+err;
 	  console.log(msg, bnUrl);
+	  console.log("lineNumber: "+err.lineNumber);
+	  console.log("fileName:   "+err.fileName);
 	  answerBack(bnId, "error: "+msg);
 	}
   );
+
+  // Set timeout on fetch
+  fetchTimerID = setTimeout(fetchTimeoutHandler, FetchTimeout);
 }
 
 /*
@@ -450,7 +507,10 @@ function handleRequest () {
 	else if (action == "icon") { // We already got the favicon URL (e.g. tab refresh)
 		                         // so simply get it.
 //      console.log("faviconUrl: <<"+action.slice(5)+">> 2");
-	  answerBack(bnId, "starting:"); // Signal we are starting to retrieve favicon for that BN
+	  // In case we get the icon directly, this is on updated tab .. let's not remove the previous favicon
+	  // to leave a chance to detect this is the same and to not do massive favicon saves when doing
+	  // History -> Restore previous session
+	  //answerBack(bnId, "starting:"); // Signal we are starting to retrieve favicon for that BN
 	  getUri(bnId, bnUrl, enableCookies);
 	}
 	else { // Normal get process
@@ -459,30 +519,9 @@ function handleRequest () {
       // Get the page at bookmarked URL, following redirections,
 	  // and attempt to retrieve the favicon URL
 
-	  // Need to recreate the AbortController each time, or else all requests after
-	  // an abort will abort .. and there appears to be no way to remove / clear the abort signal
-	  // from the AbortController.
-	  try { // Only supported as of FF 57
-	    fetchController = new AbortController();
-	  }
-	  catch (error) {
-	    console.log("handleRequest error: "+error);
-	  }
-	  let myInit;
-	  if (fetchController == null) { // we are below FF 57
-	    myInit = MyInitFF56;
-	  }
-	  else {
-	    myInit = MyInitFF57;
-	    let fetchSignal = fetchController.signal;
-	    myInit.signal = fetchSignal;
-	  }
-	  myInit.credentials = (enableCookies ? "include" : "omit");
 //      console.log("Fetching: "+bnUrl);
-	  fetchFavicon(bnId, bnUrl, myInit, enableCookies);
+	  fetchFavicon(bnId, bnUrl, enableCookies);
 
-      // Set timeout on fetch
-      fetchTimerID = setTimeout(fetchTimeoutHandler, FetchTimeout);
 //      console.log("Finished sending request "+fetchTimerID);
     }
   }
@@ -518,6 +557,13 @@ function faviconWorkerPostMessage (e) { // e is of type MessageEvent,
 	if (requestTimerID == undefined) {
 	  hysteresis = Cadence;
 	}
+  }
+  else if (action == "stopfetching") { // Stop all process and empty the queue
+	if (requestTimerID != undefined) { // A request is scheduled with Hysteresis
+	  clearTimeout(requestTimerID);
+	  requestTimerID = undefined; // It will get rescheduled on next request submitted
+	}
+	reqQueue.length = 0; // No more request
   }
   else {
 	if (action == "get2") { // If this is a manual refresh favicon request, or an existing bookmark,

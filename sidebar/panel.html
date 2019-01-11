@@ -93,6 +93,8 @@
     <div class="menuopenwin">Open in new window</div>
     <div class="menuopenpriv">Open in private window</div>
     <hr>
+    <div class="menugoparent">Go parent folder</div>
+    <hr>
     <div class="menunewb">New bookmark..</div>
     <div class="menunewf">New folder..</div>
     <div class="menunews">New separator</div>
@@ -113,6 +115,7 @@
     <div class="menuopenpriv">Open in private window</div>
     <hr>
     <div class="menuopentree">Open parent folder(s)</div>
+    <div class="menugoparent">Go parent folder</div>
     <hr>
     <div class="menunewb">New bookmark..</div>
     <div class="menunewf">New folder..</div>
@@ -132,12 +135,16 @@
     <div class="menunewf">New folder..</div>
     <div class="menunews">New separator</div>
     <hr>
+    <div class="menugoparent">Go parent folder</div>
+    <hr>
     <div class="menucut">Cut</div>
     <div class="menucopy">Copy</div>
     <div class="menudisabled" id="mybfldrmenupaste">Paste before</div>
     <div class="menudisabled" id="mybfldrmenupasteinto">Paste into</div>
     <hr>
     <div class="menudel">Delete</div>
+    <hr>
+    <div class="menusort">Sort by Name</div>
     <hr>
     <div class="menuprop">Properties..</div>
   </div>
@@ -147,6 +154,7 @@
     <div class="menunews">New separator</div>
     <hr>
     <div class="menuopentree">Open parent folder(s)</div>
+    <div class="menugoparent">Go parent folder</div>
     <hr>
     <div class="menucut">Cut</div>
     <div class="menucopy">Copy</div>
@@ -155,12 +163,16 @@
     <hr>
     <div class="menudel">Delete</div>
     <hr>
+    <div class="menusort">Sort by Name</div>
+    <hr>
     <div class="menuprop">Properties..</div>
   </div>
   <div id="mybsepmenu" class="mymenu" data-type="separator">
     <div class="menunewb">New bookmark..</div>
     <div class="menunewf">New folder..</div>
     <div class="menunews">New separator</div>
+    <hr>
+    <div class="menugoparent">Go parent folder</div>
     <hr>
     <div class="menucut">Cut</div>
     <div class="menucopy">Copy</div>
@@ -173,6 +185,8 @@
     <div class="menuopentab">Open in new tab</div>
     <div class="menuopenwin">Open in new window</div>
     <div class="menuopenpriv">Open in private window</div>
+    <hr>
+    <div class="menugoparent">Go parent folder</div>
   </div>
   <div id="mybprotfmenu" class="mymenu" data-type="fprotected">
     <div class="menunewb">New bookmark..</div>
@@ -188,17 +202,29 @@
     <div class="menuopenpriv">Open in private window</div>
     <hr>
     <div class="menushow">Show bookmark</div>
+    <div class="menugoparent">Go parent folder</div>
+    <hr>
+    <div class="menucut">Cut</div>
+    <div class="menucopy">Copy</div>
   </div>
   <div id="myrshowbkmkmenu" class="mymenu" data-type="bookmark">
     <div class="menushow menudefault">Show bookmark</div>
+    <div class="menugoparent">Go parent folder</div>
     <hr>
     <div class="menuopen">Open</div>
     <div class="menuopentab">Open in new tab</div>
     <div class="menuopenwin">Open in new window</div>
     <div class="menuopenpriv">Open in private window</div>
+    <hr>
+    <div class="menucut">Cut</div>
+    <div class="menucopy">Copy</div>
   </div>
   <div id="myrfldrmenu" class="mymenu" data-type="folder">
     <div class="menushow menudefault">Show folder</div>
+    <div class="menugoparent" id="myrfldrmenugoparent">Go parent folder</div>
+    <hr>
+    <div class="menucut">Cut</div>
+    <div class="menucopy">Copy</div>
   </div>
   <script src="libstore.js"></script>
   <script src="BookmarkNode.js"></script>

@@ -30,7 +30,7 @@ const XIconSignature2 = String.fromCharCode(0, 0, 2, 0);
  * 
  * uri = a data:image/x-icon base64 string describing the image
  * 
- * Returns null if no choice to make (or wrong format),
+ * Returns null if no choice to make, e.g. only 1 image or wrong format,
  * or an uri with a data:image/x-icon base64 string containing only the selected image
  */
 function selectXIconImg (uri) {
@@ -41,7 +41,7 @@ function selectXIconImg (uri) {
   }
   let str = atob(uri.slice(pos+7)); // Get the binary part
 
-  // Explore structure, as docupmented here: https://en.wikipedia.org/wiki/ICO_(file_format)
+  // Explore structure, as documented here: https://en.wikipedia.org/wiki/ICO_(file_format)
 //  console.log("str.length: "+str.length);
   // Do a bit of verifications on structure as sometimes the mime type doesn't correspond
   // to contents !!
@@ -52,7 +52,7 @@ function selectXIconImg (uri) {
   }
 //  console.log("x-icon: "+uri);
 
-  // First get the npmber of images
+  // First get the number of images
   let nbImg = str.charCodeAt(4) + str.charCodeAt(5) * 256;
 //  console.log("  nbImg: "+nbImg);
   if (nbImg == 1) {

@@ -7,58 +7,144 @@
   </head>
 
 <body id="body" class="fontdflt">
-  <p> Changing an option will be effective at next restart / plugin refresh / sidebar switch</p>
+  <p> Changing an option will be applied immediately most of the time</p>
   <p>
-    <b>Favicon fetching (retrieved only once and then cached):</b><br>
+    <b>Statistics:</b><i> Refresh this page to get latest values</i>
+    <br/>
+	<textarea readonly id="stats"></textarea>
+  </p>
+  <p>
+    <b>Favicon fetching:</b><i> Retrieved only once and then cached</i>
+  </p>
+  <div class="group">
+    <input type="radio" name="faviconfetchmode" id="activeff" checked>
+    <label for="activeff">Active</label>
+    <br/>
+    <input type="radio" name="faviconfetchmode" id="pauseff">
+    <label for="pauseff">Pause. <i>Keeps already fetched favicons in the cache</i></label>
+  </div>
+  <p>
     <input type="checkbox" id="disablefavicons">
-    <label for="disablefavicons">Disable favicon fetching</label>
-    <br>
+    <label for="disablefavicons">Disable favicon fetching. <i>Warning: this deletes all cached favicons !</i></label>
+    <br/>
     <input type="checkbox" id="enablecookies">
     <label for="enablecookies">Include cookies to increase background favicon retrieval success rate. <i>Drawback: prompts for user/pwd on some URLs</i></label>
-    <br>
+    <br/>
     <input type="checkbox" id="enableflipflop">
-    <label for="enableflipflop">Dual save to protect from local store corruption (activate only when you experience favicons loss when stopping/restarting BSP2 or Firefox)</label>
+    <label for="enableflipflop">Dual save to protect from local store corruption. <i>Activate only when you experience favicons loss when stopping/restarting BSP2 or Firefox</i></label>
   </p>
   <p>
     <b>Search results bookmark behaviour:</b>
   </p>
-    <div id="group">
-      <input type="radio" name="clickoption" id="simple" checked>
-      <label for="simple">Simple click = always "Show bookmark"</label>
-      <br>
-      <input type="radio" name="clickoption" id="advanced">
-      <label for="advanced">Advanced click = <img src="/icons/clickshow.png"> "Show bookmark", or <img src="/icons/clickopen.png"> "Show bookmark" and "Open" bookmark in active tab</label>
-    </div>
+  <div class="group">
+ 	<input type="radio" name="clickoption" id="simple" checked>
+    <label for="simple">Simple click = always "Show bookmark"</label>
+    <br/>
+    <input type="radio" name="clickoption" id="advanced">
+    <label for="advanced">Advanced click = <img src="/icons/clickshow.png"> "Show bookmark", or <img src="/icons/clickopen.png"> "Show bookmark" and "Open" bookmark in active tab</label>
+  </div>
   <p>
     <input type="checkbox" id="closesearch">
-    <label for="closesearch">After "Show bookmark", close search pane (implies leave bookmark tree open)</label>
-    <br>
+    <label for="closesearch">After "Show bookmark", close search pane. <i>Implies leave bookmark tree open</i></label>
+    <br/>
     <input type="checkbox" id="opentree">
     <label for="opentree">After "Show Bookmark", leave bookmark tree open by default when closing search pane</label>
   </p>
   <p>
-    <b>Performances:</b><br>
+    <b>Performances:</b><br/>
     <input type="checkbox" id="immediatefavdisplay">
-    <label for="immediatefavdisplay">Revert to old behavior of immediate favicon display (slows down bookmark tree availability)</label>
-    <br>
+    <label for="immediatefavdisplay">Revert to old behavior of immediate favicon display. <i>Slows down bookmark tree availability</i></label>
+    <br/>
     <input type="checkbox" id="loadffapi">
-    <label for="loadffapi">Revert to old behavior of loading full bookmark tree from FF API at each FF restart (slows down bookmark tree availability)</label>
+    <label for="loadffapi">Revert to old behavior of loading full bookmark tree from FF API at each FF restart. <i>Slows down bookmark tree availability</i></label>
     <button type="button" id="reloadffapi">Reload from FF API now</button>
-    <br>
+    <br/>
     <input type="checkbox" id="delayLoad" disabled>
-    <label for="delayLoad"> (not yet effective) Load bookmarks only when required to (show result or open folder), do not load all at start - for large volumes</label>
+    <label for="delayLoad"> (not yet effective) Load bookmarks only when required to (show result or open folder), do not load all at start. <i>For large volumes</i></label>
   </p>
   <p>
-    <b>User Interface:</b><br>
+    <b>User Interface:</b><br/>
     <input type="checkbox" id="remembersizes">
     <label for="remembersizes">Remember size of resizeable objects - search pane, edit bookmark property, ..</label>
     <button type="button" id="resetsizes" disabled>Reset defaults</button>
+    <br/>
+    <input type="checkbox" id="setfontsize">
+    <label for="setfontsize">Override default font size to </label>
+    <input type="number" id="fontsize" step="1" min="10" max="16" required disabled>
+    <span> px</span>
+    <br/>
+    <input type="checkbox" id="setspacesize">
+    <label for="setspacesize">Override default bookmark item spacing to </label>
+    <input type="number" id="spacesize" step="2" min="0" max="10" required disabled>
+    <span> px</span>
+    <br/>
+    <label for="command1">Sidebar shortcut (FF >= 60):</label>
+	<select id="command1">
+      <option value="Ctrl">Ctrl</option>
+      <option value="Alt">Alt</option>
+	</select>
+	<select id="command2">
+      <option value="none">--none--</option>
+      <option value="Shift">Shift</option>
+	</select>
+	<select id="command3">
+      <option value="A">A</option>
+      <option value="B">B</option>
+      <option value="C">C</option>
+      <option value="D">D</option>
+      <option value="E">E</option>
+      <option value="F">F</option>
+      <option value="G">G</option>
+      <option value="H">H</option>
+      <option value="I">I</option>
+      <option value="J">J</option>
+      <option value="K">K</option>
+      <option value="L">L</option>
+      <option value="M">M</option>
+      <option value="N">N</option>
+      <option value="O">O</option>
+      <option value="P">P</option>
+      <option value="Q">Q</option>
+      <option value="R">R</option>
+      <option value="S">S</option>
+      <option value="T">T</option>
+      <option value="U">U</option>
+      <option value="V">V</option>
+      <option value="W">W</option>
+      <option value="X">X</option>
+      <option value="Y">Y</option>
+      <option value="Z">Z</option>
+      <option value="0">0</option>
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+      <option value="7">7</option>
+      <option value="8">8</option>
+      <option value="9">9</option>
+      <option value="F1">F1</option>
+      <option value="F2">F1</option>
+      <option value="F3">F1</option>
+      <option value="F4">F1</option>
+      <option value="F5">F1</option>
+      <option value="F6">F1</option>
+      <option value="F7">F1</option>
+      <option value="F8">F1</option>
+      <option value="F9">F1</option>
+      <option value="F10">F1</option>
+      <option value="F11">F1</option>
+      <option value="F12">F1</option>
+	</select>
+	<span>Reset to default: </span>
+    <button type="button" id="resetcommand">Reset</button>
   </p>
   <p>
-    <b>Traces / debug:</b><br>
+    <b>Traces / debug:</b><br/>
     <input type="checkbox" id="traceEnabled">
     <label for="traceEnabled">Activate traces</label>
-    <br>
+    <br/>
     <button type="button" id="resetmigr16x16" disabled>Re-trigger 16x16 favicon migration</button>
   </p>
   <script src="libstore.js"></script>
