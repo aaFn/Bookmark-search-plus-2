@@ -4,7 +4,7 @@
 // Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
 //This is also used as workaround for bug 1408446 in Linux (window contents is not painted ..)
 // Cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1408446
-// imposing to resize in order to draw contents - Apparently corrected FF in 59.x -
+// imposing to resize in order to draw contents - Apparently corrected in FF 59.x -
 const PopupWidth  = 375;
 const PopupHeight = 190;
 

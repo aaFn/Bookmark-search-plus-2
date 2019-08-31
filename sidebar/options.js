@@ -25,6 +25,7 @@ const ImmediateFavDisplayInput = document.querySelector("#immediatefavdisplay");
 const LoadFFAPIInput = document.querySelector("#loadffapi");
 const ReloadFFAPIButton = document.querySelector("#reloadffapi");
 const DelayLoadInput = document.querySelector("#delayLoad");
+const ReversePathInput = document.querySelector("#reversepath");
 const RememberSizesInput = document.querySelector("#remembersizes");
 const ResetSizesButton = document.querySelector("#resetsizes");
 const SetFontSizeInput = document.querySelector("#setfontsize");
@@ -197,6 +198,7 @@ function saveOptions (e) {
 	,immediatefavdisplay_option: ImmediateFavDisplayInput.checked
 	,loadffapi_option: LoadFFAPIInput.checked
 	,delayLoad_option: DelayLoadInput.checked
+	,reversepath_option: ReversePathInput.checked
 	,remembersizes_option: RememberSizesInput.checked
 	,setfontsize_option: setfontsize
 	,fontsize_option: fontSize
@@ -262,6 +264,10 @@ function restoreOptions () {
 
   if (delayLoad_option_file) {
 	DelayLoadInput.checked = true;
+  }
+
+  if (reversePath_option_file) {
+	ReversePathInput.checked = true;
   }
 
   if (rememberSizes_option_file) {
@@ -613,6 +619,7 @@ function initialize2 () {
   LoadFFAPIInput.addEventListener("click", saveOptions);
   ReloadFFAPIButton.addEventListener("click", reloadFFAPI);
   DelayLoadInput.addEventListener("click", saveOptions);
+  ReversePathInput.addEventListener("click", saveOptions);
   RememberSizesInput.addEventListener("click", saveOptions);
   ResetSizesButton.addEventListener("click", resetSizes);
   SetFontSizeInput.addEventListener("click", saveOptions);

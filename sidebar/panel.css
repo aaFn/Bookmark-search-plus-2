@@ -41,9 +41,77 @@ p {
   border: 1px solid #0078D7;	
 }
 
+#sbutton {
+  box-shadow: inset 2px 2px 3px rgba(255, 255, 255, .6),
+              inset -2px -2px 3px rgba(0, 0, 0, .6);
+  border: 0;
+  line-height: 0;
+  padding: 0;
+}
+
+#sbutton:active {
+  box-shadow: inset -2px -2px 3px rgba(255, 255, 255, .6),
+              inset 2px 2px 3px rgba(0, 0, 0, .6);
+}
+
+.swboth {
+  background-color: #DC0000;
+}
+
+.swboth:hover {
+  background-color: #FF0000;
+}
+
+.swtitle {
+  background-image: linear-gradient(to bottom right, #DC0000 0%, #DC0000 50%, white 51%, white 100%);
+}
+
+.swtitle:hover {
+  background-image: linear-gradient(to bottom right, #FF0000 0%, #FF0000 50%, white 51%, white 100%);
+}
+
+.swurl {
+  background-image: linear-gradient(to bottom right, white 0%, white 50%, #DC0000 51%, #DC0000 100%);
+}
+
+.swurl:hover {
+  background-image: linear-gradient(to bottom right, white 0%, white 50%, #FF0000 51%, #FF0000 100%);
+}
+
+.srboth {
+  background-color: #3B679E;
+}
+
+.srboth:hover {
+  background-color: #2B88D9;
+}
+
+.srtitle {
+  background-image: linear-gradient(to bottom right, #3B679E 0%, #3B679E 50%, white 51%, white 100%);
+}
+
+.srtitle:hover {
+  background-image: linear-gradient(to bottom right, #2B88D9 0%, #2B88D9 50%, white 51%, white 100%);
+}
+
+.srurl {
+  background-image: linear-gradient(to bottom right, white 0%, white 50%, #3B679E 51%, #3B679E 100%);
+}
+
+.srurl:hover {
+  background-image: linear-gradient(to bottom right, white 0%, white 50%, #2B88D9 51%, #2B88D9 100%);
+}
+
+#mglass {
+  height: 20px;
+  width: 21px;
+  background-image: url("/icons/search.png");
+}
+
 #searchtext {
   flex: 1;
   background-color: white;
+  color: black;
   border: 0;
 }
 
@@ -57,11 +125,19 @@ p {
   min-height: 10%;
   min-width: 100%;
   margin: 0 0 0 0;
+  border-top: 1px solid white;
   overflow-x: hidden;
-  overflow-y: auto;
   resize: vertical;
   border-bottom: thin solid black;
   flex: none;
+}
+
+.rscrollok {
+  overflow-y: auto;
+}
+
+.rscrollko {
+  overflow-y: hidden;
 }
 
 #waiting, #waitingsearch {
@@ -80,8 +156,16 @@ p {
 
 #bookmarks {
   margin: 0 0 0 0;
-  overflow: auto;
+  border-top: 1px solid white;
   flex: auto;
+}
+
+.bscrollok {
+  overflow: auto;
+}
+
+.bscrollko {
+  overflow: hidden;
 }
 
 table {
@@ -122,8 +206,8 @@ tbody {
 }
 
 .brow:hover, .selbrow:hover {
-  background-color: #E5F3FF;
-  border-color: #E5F3FF;
+  background-color: #D7EDFF;
+  border-color: #D7EDFF;
 }
 
 .brow:focus, .selbrow:focus {
@@ -228,6 +312,7 @@ tbody {
 
 .favtext {
   margin-left: 3px;
+  white-space: pre;
 }
 
 .mymenu {
@@ -241,6 +326,7 @@ tbody {
   color: #000000;
   border: 1px solid #CCCCCC;
   box-shadow: 4px 4px 3px -2px #808080FF;
+  cursor: default;
 }
 
 .mymenu div {
@@ -258,6 +344,10 @@ tbody {
   border: 1px solid #D0D0D0;
   border-bottom: 0;
   margin: 2px 3px 2px 20px;
+}
+
+.inputradio {
+  margin-left: -15px;
 }
 
 .menudisabled {
