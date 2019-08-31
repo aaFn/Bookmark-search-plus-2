@@ -8,11 +8,11 @@
 
 <body id="body" class="fontdflt">
   <div id="searchbox">
-    <img src="/icons/search.png" id="mglass"/>
+    <button type="button" id="sbutton" class="swboth"><div id="mglass"></div></button>
     <input id="searchtext" type="text" placeholder="Search bookmarks.." class="fontdflt" size=1 autofocus>
     <input id="cancelsearch" type="image" src="/icons/empty.png" disabled>
   </div>
-  <div id = "searchresult" hidden=true>
+  <div id="searchresult" class="rscrollok" hidden=true>
     <img src="/icons/waiting.gif" height="20px" id="waitingsearch">
 <!--
     <table><tbody>
@@ -23,6 +23,7 @@
         </div>
       </td></tr>
       <tr data-id=".."><td class="brow" tabindex="0" draggable="false">
+        <div class="twistieac" draggable="false"></div>
         <div class="bkmkitem_f" draggable="false">
           <img src="/icons/folder.png" class="favicon" draggable="false">
           <span class="favtext" draggable="false">aaaaaa</span>
@@ -32,7 +33,7 @@
 -->
   </div>
   <textarea readonly id="trace" hidden=true></textarea>
-  <div id = "bookmarks">
+  <div id="bookmarks" class="bscrollok">
     <div id="waiting">
       <img src="/icons/waiting.gif" height="20px"/>
       <span id="waitmsg">Load from bkgnd page..</span>
@@ -225,6 +226,40 @@
     <hr>
     <div class="menucut">Cut</div>
     <div class="menucopy">Copy</div>
+  </div>
+  <div id="mymglassmenu" class="mymenu" data-type="default">
+    <div class="menusfboth">
+  	  <input type="radio" class="inputradio" name="searchfields" id="titleurl" checked>
+  	  <label for="titleurl">Title + URL (default)</label>
+	</div>
+    <div class="menusftitle">
+  	  <input type="radio" class="inputradio" name="searchfields" id="titleonly">
+  	  <label for="titleonly">Title only</label>
+	</div>
+    <div class="menusfurl">
+  	  <input type="radio" class="inputradio" name="searchfields" id="urlonly">
+  	  <label for="urlonly">URL only</label>
+	</div>
+    <hr>
+    <div class="menussall">
+  	  <input type="radio" class="inputradio" name="searchscope" id="all" checked>
+  	  <label for="all">Search all (default)</label>
+	</div>
+    <div class="menusssubfolder">
+  	  <input type="radio" class="inputradio" name="searchscope" id="subfolder">
+  	  <label for="subfolder">Inside current folder</label>
+	</div>
+    <hr>
+    <div class="menusmwords">
+  	  <input type="radio" class="inputradio" name="matchmethod" id="words" checked>
+  	  <label for="words">Match words (default)</label>
+	</div>
+    <div class="menusmregexp">
+  	  <input type="radio" class="inputradio" name="matchmethod" id="regexp">
+  	  <label for="regexp">Use regex</label>
+	</div>
+    <hr>
+    <div class="menuopenbsp2">Open BSP2 in a tab</div>
   </div>
   <script src="libstore.js"></script>
   <script src="BookmarkNode.js"></script>

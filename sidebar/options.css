@@ -22,6 +22,6 @@ textarea {
   width: 300px;
 }
 
-#fontsize {
-  width: 3em;
+#fontsize, #spacesize {
+  width: 4em;
 }

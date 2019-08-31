@@ -132,12 +132,22 @@ function BN_path (bnId) {
 	let parentId = BN.parentId;
 	let path;
 	if (parentId != Root) {
-	  path = BN_path(parentId) + " > "; // Separator on the path ... 
+	  if (reversePath_option) {
+		path = " < " + BN_path(parentId); // Separator on the path ...
+	  }
+	  else {
+		path = BN_path(parentId) + " > "; // Separator on the path ...
+	  }
 	}
 	else {
 	  path = "";
-	}	  
-	return(path + BN.title);
+	}
+	if (reversePath_option) {
+	  return(BN.title + path);
+	}
+	else {
+	  return(path + BN.title);
+	}
   }
   else {
 	return("");
@@ -443,6 +453,7 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 	let uri, fetchedUri;
 	let triggerFetch = false;
 	let url = BTN.url;
+	let title = BTN.title;
 	if (url == undefined) {
 	  trace("Bookmark with undefined URL !");
 	  traceBTN(BTN);
@@ -465,12 +476,16 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 	  else if (url.includes(RecentBkmkSort)) {
 		recentBkmkBNId = BTN_id;
 	  }
+	  else { // Unknown or non supported place: case ...
+		title = url;
+	  }
 	}
 	else if (url.startsWith("about:")) { // about: is protected - security error ..
 	  uri = "/icons/nofavicon.png";
 	  fetchedUri = false;
-	  protect = (url != "about:blank"); // about:blank is not protected ...
-                                        // It is draggable, but keep favicon = nofavicon
+	  // about:blank and about:reader are not protected ...
+      // They are draggable, but keep favicon = nofavicon
+	  protect = (url != "about:blank") && !url.startsWith("about:reader?url=");
 	}
 	else if (disableFavicons_option) {
 	  uri = undefined;
@@ -521,7 +536,7 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 
 	node = new BookmarkNode (
 	  BTN_id, type, level, BTN.parentId, BTN.dateAdded, protect,
-	  BTN.title, uri, fetchedUri, url
+	  title, uri, fetchedUri, url
 	);
 
 	if (triggerFetch && !pauseFavicons_option) { // Trigger favicon fetch, except if paused
@@ -566,6 +581,77 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
   }
 
   return(node);
+}
+
+/*
+ * Function to normalize (remove diacritics) a string
+ * Cf. https://stackoverflow.com/questions/990904/remove-accents-diacritics-in-a-string-in-javascript 
+ */
+function strNormalize (str) {
+  return(str.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+}
+
+/*
+ * Function to normalize (remove diacritics) and lowercase a string
+ * Cf. https://stackoverflow.com/questions/990904/remove-accents-diacritics-in-a-string-in-javascript 
+ */
+function strLowerNormalize (str) {
+  return(str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+}
+
+// Verify a BookmarkNode against a match - normalized case insensitive
+// a_matchStr is an array of normalized lower case word strings to match (no space)
+//
+// Returns a Boolean, true or false
+function BN_match (BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch) {
+  if (BN.type == "separator") {
+	return (false);
+  }
+
+  let isMatch;
+  if (isRegExp) {
+	let url;
+	isMatch = (isTitleSearch && matchRegExp.test(strLowerNormalize(BN.title)))
+	          || (isUrlSearch && ((url = BN.url) != undefined) && matchRegExp.test(strLowerNormalize(BN.url)));
+  }
+  else { // Match all words with both or only one as needed (note, if both, we can have
+	     // some of the words matching only title, and some others matching url, the native
+	     // condition is that each word match at least one, and can mix)
+	isMatch = true;
+	let url;
+	for (let str of a_matchStr) {
+	  if ((!isTitleSearch || (strLowerNormalize(BN.title).indexOf(str) == -1))
+    	  && (!isUrlSearch || ((url = BN.url) == undefined) || (strLowerNormalize(url).indexOf(str) == -1))
+    	 ) {
+		isMatch = false; // One word is not matching at least, stop there, result is false
+		break;
+	  };
+	}
+  }
+  return (isMatch);
+}
+
+// Search a BookmarkNode and its children for a match - normalized case insensitive
+// a_matchStr is an array of normalized lowercase word strings to match (no space)
+//
+// Returns list of matches in a_result (supplied at start as an empty array []
+function BN_search (BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch, a_result) {
+  if (BN_match(BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch)) {
+	a_result.push(BN);
+  }
+  if (BN.type == "folder") {
+	let children = BN.children;
+	if (children != undefined) {
+	  let url;
+	  for (let i of children) {
+		if ((i.type != "separator")
+			&& (((url = i.url) == undefined) || !url.startsWith("place:"))  // Ignore special bookmarks
+           ) {
+		  BN_search (i, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch, a_result)
+		}
+	  }
+	}
+  }
 }
 
 
@@ -636,6 +722,63 @@ function rebuildBNList (BNList, BN) {
 }
 
 /*
+ * Search the full BNList for matches - normalized case insensitive
+ * a_matchStr is an array of normalized lower case word strings to match (no space)
+ * 
+ * Returns: an array listing matching BookmarkNodes
+ */
+function searchCurBNList (a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch) {
+  let a_result = [];
+
+  let names = Object.getOwnPropertyNames(curBNList);
+  let BN;
+  let url;
+  for (let i of names) {
+	if ((i != 0) && (i != Root) && !i.startsWith("place:")) { // Do not match with Root, nr with most visited or recent bookmarks
+	  BN = curBNList[i];
+	  if ((BN.type != "separator")
+		  && (((url = BN.url) == undefined) || !url.startsWith("place:"))  // Ignore special bookmarks
+		  && BN_match(BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch)
+		 ) {
+		a_result.push(BN);
+	  }
+	}
+  }
+  return(a_result);
+}
+
+/*
+ * Search from current BN for matches - normalized case insensitive
+ * If current BN is a folder (or Root), ignore it in the search
+ * If it is a bookmark/separator, go to parent folder (and ignore the parent in the search) 
+ * a_matchStr is an array of normalized lower case word strings to match (no space)
+ * 
+ * Returns: an array listing matching BookmarkNodes
+ */
+function searchBNRecur (BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch) {
+  let a_result = [];
+
+  if (BN.type != "folder") { // Parent must be a folder ..
+	BN = curBNList[BN.parentId];
+  }
+  let url;
+  if (((url = BN.url) == undefined) || !url.startsWith("place:")) { // Ignore special bookmarks
+	let children = BN.children;
+	if (children != undefined) {
+	  for (let i of children) {
+		if ((i.type != "separator")
+			&& (((url = i.url) == undefined) || !url.startsWith("place:"))  // Ignore special bookmarks
+		   ) {
+		  BN_search (i, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch, a_result);
+		}
+	  }
+	}
+  }
+
+  return(a_result);
+}
+
+/*
  * Scan a BN tree for stats and for favicons to fetch, and updates as needed
  * function of disableFavicons_option.
  * 
@@ -656,7 +799,7 @@ function scanBNTree (BN, faviconWorker, doStats = true) {
 		if (doStats)
 	      countFolders++;
 	  }
-	  else if (url.startsWith("place:")) { // Remember special folders ..
+	  else if (url.startsWith("place:")) { // Remember pointers at special folders ..
 //BN.type = "bookmark";
 		if (doStats)
 		  countBookmarks++;
@@ -688,8 +831,18 @@ function scanBNTree (BN, faviconWorker, doStats = true) {
   else {
 	let bnId = BN.id;
 	if (type == "bookmark") {
-	  if (!bnId.startsWith("place:")) { // Do not count special bookmarks under special place: folders
-		                                // tagged with "place:" before their id when inserted
+	  if (bnId.startsWith("place:")) { // Do not count special bookmarks under special place: folders
+		                               // tagged with "place:" before their id when inserted
+		if (!bnId.startsWith("place:mostVisited_")) { 
+		  // If one of recently bookmarked, try to avoid any un-needed fetches
+		  // by getting the uri directly from the original bookmark
+		  let origBnId = bnId.substring(6); // Remove "place:"
+		  let origBN = curBNList[origBnId];
+		  if (origBN != undefined) {
+			BN.faviconUri = origBN.faviconUri;
+		  }
+		}
+	  } else {
 		if (doStats)
 		  countBookmarks++;
 	  }
@@ -700,12 +853,15 @@ function scanBNTree (BN, faviconWorker, doStats = true) {
 		countOddities++;
 	}
 	let url = BN.url;
-	if ((url == undefined)
-		|| (url.startsWith("about:"))
-	   ) { // In those 2 cases, change nothing
+	if (url == undefined) { // Change nothing
 	}
-	else if (migration_spfldr && url.startsWith("place:")) { // Change nothing also, but transform (and remember) ..
-	  // These are now special folders, still ocounted as bookmarks
+	else if (url.startsWith("about:")) { // Change nothing, except if protect is set, and this is an "about:reader" URL
+	  if (BN.protect && url.startsWith("about:reader?url=")) {
+		BN.protect = false;
+	  }
+	}
+	else if (migration_spfldr && url.startsWith("place:")) { // Change nothing also, but transform (and remember pointers) ..
+	  // These are now special folders, still counted as bookmarks
 	  BN.type = "folder";
 	  BN.fetchedUri = true; // Tell to use special favicon instead of standard folder favicon
 	  if (url.includes(MostVisitedSort)) {

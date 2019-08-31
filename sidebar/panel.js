@@ -10,6 +10,8 @@ let p_getWindowId = browser.windows.getCurrent(
 //  {populate: true	
 //  }
 );
+let p_getTab = browser.tabs.getCurrent();
+
 
 /* <rant on>
  *       javascript is a crap language .. no easy way to know/specify the type of objects we
@@ -86,7 +88,9 @@ let p_ffversion = browser.runtime.getBrowserInfo();
 
 const Performance = window.performance;
 const Body = document.querySelector("#body"); // Assuming it is an HTMLBodyElement
+const SearchButtonInput = document.querySelector("#sbutton"); // Assuming it is an HTMLButtonElement
 const MGlassImg = document.querySelector("#mglass"); // Assuming it is an HTMLImgElement
+const MGlassImgStyle = MGlassImg.style;
 const SearchTextInput = document.querySelector("#searchtext"); // Assuming it is an HTMLInputElement
 const CancelSearchInput = document.querySelector("#cancelsearch"); // Assuming it is an HTMLInputElement
 const SearchResult = document.querySelector("#searchresult"); // Assuming it is an HTMLDivElement
@@ -129,8 +133,19 @@ const MyBProtMenuStyle = MyBProtMenu.style;
 const MyBProtFMenu = document.querySelector("#mybprotfmenu");
 const MyBProtFMenuStyle = MyBProtFMenu.style;
 const MyBProtFMenuPasteInto = document.querySelector("#mybprotfmenupasteinto");
+const MyMGlassMenu = document.querySelector("#mymglassmenu");
+const MyMGlassMenuStyle = MyMGlassMenu.style;
+const SFieldTitleUrlInput = document.querySelector("#titleurl");
+const SFieldTitleOnlyInput = document.querySelector("#titleonly");
+const SFieldUrlOnlyInput = document.querySelector("#urlonly");
+const SScopeAllInput = document.querySelector("#all");
+const SScopeSubfolderInput = document.querySelector("#subfolder");
+const SMatchWordsInput = document.querySelector("#words");
+const SMatchRegexpInput = document.querySelector("#regexp");
+
 const InputKeyDelay = 500; // Delay in ms from last keystropke to activate / refresh search result
 const PopupURL = browser.extension.getURL("sidebar/popup.html");
+const SelfURL = browser.extension.getURL("sidebar/panel.html");
 const PopupWidth  = 375;
 const PopupHeight = 190;
 const DfltMenuSize = 150;
@@ -139,6 +154,17 @@ const OpenFolderTimeout = 1000; // Wait time in ms for opening a closed folder, 
 
 const Selhighlight = "selbrow"; // selhighlight class name in CSS
 const Reshidden = "reshidden"; // reshidden class name in CSS, to remember a shown row was hidden before show
+const BScrollOk = "bscrollok"; // scrollok class name in CSS, to enable Bookmarks scrolling
+const BScrollKo = "bscrollko"; // scrollko class name in CSS, to disnable Bookmarks scrolling
+const RScrollOk = "rscrollok"; // scrollok class name in CSS, to enable SearchResult scrolling
+const RScrollKo = "rscrollko"; // scrollko class name in CSS, to disnable SearchResult scrolling
+const HystReEnableScroll = 30; // If we're getting that far inside from the point we disabled scroll, re-enable
+const TimeoutReEnableScroll = 600; // Delay in ms from last drag event to re-enable scrolling = bigger than 350 +/- 200
+const TimeoutSimulDragover = 350; // Delay in ms from last drag event to simulate a dragover
+const EnterEvent = 1;
+const OverEvent  = 2;
+const LeaveEvent = 3;
+const ExitEvent  = 4;
 
 const LevelIncrementPx = 12; // Shift right in pixel from level N to level N+1
 //Declared in BookmarkNode.js
@@ -153,7 +179,10 @@ const LevelIncrementPx = 12; // Shift right in pixel from level N to level N+1
 const FolderTempl = document.createElement("div"); // Assuming it is an HTMLDivElement
 FolderTempl.classList.add("bkmkitem_f");
 FolderTempl.draggable = false; // False by default for <div>
-let tmpElem1 = document.createElement("img"); // Assuming it is an HTMLImageElement
+let tmpElem1 = document.createElement("div"); // Assuming it is an HTMLImageElement
+											  // Not using <img> since with FF65 and later, they
+											  // show default box-shadow: inset when the src=
+											  // attribute is not specified.
 tmpElem1.classList.add("ffavicon");
 tmpElem1.draggable = false; // True by default for <img>
 FolderTempl.appendChild(tmpElem1);
@@ -218,7 +247,10 @@ BookmarkTempl.appendChild(tmpElem1);
 const NFBookmarkTempl = document.createElement("div"); // Assuming it is an HTMLDivElement
 NFBookmarkTempl.classList.add("bkmkitem_b");
 NFBookmarkTempl.draggable = false; // False by default for <div> 
-tmpElem1 = document.createElement("img"); // Assuming it is an HTMLImageElement
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLImageElement
+										  // Not using <img> since with FF65 and later, they
+										  // show default box-shadow: inset when the src=
+										  // attribute is not specified.
 tmpElem1.classList.add("nofavicon");
 tmpElem1.draggable = false; // True by defaul for <img>
 NFBookmarkTempl.appendChild(tmpElem1);
@@ -241,7 +273,10 @@ let waitingInitBckgnd = false; // To flag we're waiting for background init
 
 let migrationTimeout = null; // Timer to trigger migration
 let platformOs;
+let isLinux = false; // To indicate we are under Linux, used for workaround on dragover not firing
+                     // continuously under Linux
 let myWindowId;
+let isInSidebar = false; // To detect if we are open in sidebar or in a tab
 let openBookmarksInNewTabs_option = false; // Boolean
 let openSearchResultsInNewTabs_option = false; // Boolean
 // Declared in libstore.js
@@ -271,6 +306,7 @@ let myBResFldrMenu_open = false;
 let myBSepMenu_open = false;
 let myBProtMenu_open = false;
 let myBProtFMenu_open = false;
+let myMGlassMenu_open = false;
 let bkmkClipboard = undefined; // Contains the BookmarkNode(s) being copied or cut
 let rowClipboard = undefined; // Remains undefined in case of copy, else contains the row(s)
                               // being cut.
@@ -281,6 +317,7 @@ let rowClipboard = undefined; // Remains undefined in case of copy, else contain
 
 let startTime, endLoadTime, endGetTreetime, endDisplayTime;
 let loadDuration, treeLoadDuration, treeBuildDuration, saveDuration;
+let isSlowSave;
 
 
 /*
@@ -360,7 +397,7 @@ function suggestDisplayTitle(url) {
 /*
  * Append a bookmark inside the search result sidebar table
  *
- * BTN = BookmarkTreeNode
+ * BTN = BookmarkTreeNode or BookmarkNode (a poor man's kind of "polymorphism" in Javascript ..)
  */
 function appendResult (BTN) {
 //  trace("Displaying <<"+BTN.id+">><<"+BTN.title+">><<"+BTN.type+">><<"+BTN.url+">>");
@@ -394,6 +431,10 @@ function appendResult (BTN) {
     row.dataset.type = "folder";
 
     // Create elements
+    let div2 = document.createElement("div"); // Assuming it is an HTMLDivElement
+    div2.classList.add("twistieac");
+    div2.draggable = false; // False by default for <div>
+    cell.appendChild(div2);
     let fetchedUri;
     let div3;
     if (BTN_id == PersonalToobar) {
@@ -436,7 +477,9 @@ function appendResult (BTN) {
 
 //    let span = document.createElement("span"); // Assuming it is an HTMLSpanElement
 //    span.classList.add("favtext");
-    span.textContent = BTN.title;
+    let title = BTN.title;
+    div3.title = title;
+    span.textContent = title;
 //    span.draggable = false;
 //    div3.appendChild(span);
     cell.appendChild(div3);
@@ -526,7 +569,7 @@ function clearCellHighlight () {
 }
 
 /*
- * Set cell highlight
+ * Set cell highlight, remember current selected bnId for next FF or sidebar reopen
  * 
  * cell = .brow cell to set. Preserve the Reshidden flag if this is not changing cellHighlight.
  */
@@ -535,6 +578,14 @@ function setCellHighlight (cell) {
     clearCellHighlight();
     cellHighlight = cell;
     cellHighlight.classList.replace("brow", Selhighlight);
+  }
+
+  let bnId = cell.parentElement.dataset.id;
+  if (backgroundPage == undefined) {
+	sendAddonMsgCurBnId(bnId);
+  }
+  else {
+	backgroundPage.saveCurBnId(myWindowId, bnId);
   }
 }
 
@@ -590,7 +641,7 @@ function updateSearch () {
   // Do not trigger any search if the input box is empty
   // Can happen in rare cases where we would hit the cancel button, and updateSearch() is dispatched
   // before the event dispatch to manageSearchTextHandler() and so before it could clear the timeout.
-  if (SearchTextInput.value.length > 0) { // Launch search only if there is something to search for
+  if (value.length > 0) { // Launch search only if there is something to search for
 	// Activate search mode and Cancel search button if not already on
 	if (CancelSearchInput.disabled) {
 	  CancelSearchInput.src = "/icons/cancel.png";
@@ -611,9 +662,67 @@ function updateSearch () {
 	WaitingSearch.hidden = false;
 
 	// Look for bookmarks matching the search text in their contents (title, url .. etc ..)
-	let searching = browser.bookmarks.search(value)
-	.then(
-      function (a_BTN) { // An array of BookmarkTreeNode
+	let searching;
+	if ((searchField_option == "both") && (searchScope_option == "all") && (searchMatch_option == "words")) {
+	  searching = browser.bookmarks.search(value);
+	}
+	else {
+	  searching = new Promise ( // Do it asynchronously as that can take time ...
+		(resolve, reject) => {
+		  let a_matchStr;
+		  let matchRegExp;
+		  let isRegExp, isTitleSearch, isUrlSearch;
+		  let a_BN;
+
+		  if (searchField_option == "both") {
+			isTitleSearch = isUrlSearch = true;
+		  }
+		  else if (searchField_option == "title") {
+			isTitleSearch = true;
+			isUrlSearch = false;
+		  }
+		  else {
+			isTitleSearch = false; 
+			isUrlSearch = true;
+		  }
+		  if (searchMatch_option == "words") { // Build array of words to match
+			isRegExp = false;
+			a_matchStr = strLowerNormalize(value).split(" ");
+		  }
+		  else {
+			isRegExp = true;
+			try {
+			  matchRegExp = new RegExp (strNormalize(value), "i"); // Do normalized insensitive case matching
+			}
+			catch (e) { // If malformed regexp, do not continue, match nothing
+			  resolve([]);
+			}
+		  }
+		  if (searchScope_option == "all") { // Use the List form
+			a_BN = searchCurBNList(a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch);
+		  }
+		  else { // Use the recursive form
+			let BN;
+			if ((cellHighlight == undefined) || (cellHighlight == null)) { // Start from Root
+			  BN = rootBN;
+			}
+			else { // Retrieve BN of highlighted cell
+			  let bnId = cellHighlight.parentElement.dataset.id;
+			  BN = curBNList[bnId];
+			  // Protection
+			  if (BN == undefined) {
+				BN = rootBN;
+			  }
+			}
+			a_BN = searchBNRecur(BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch);
+		  }
+
+		  resolve(a_BN);
+		}
+	  );
+	}
+	searching.then(
+      function (a_BTN) { // An array of BookmarkTreeNode or of BookmarkNode (a poor man's kind of "polymorphism" in Javascript ..)
     	// Create the search results table only if a search is still active.
     	// Can happen when browser.bookmarks.search() is very long, like higher than InputKeyDelay,
     	// and we have cleared the input box / cancelled the search in between.
@@ -642,12 +751,14 @@ function updateSearch () {
     		for (let i of a_BTN) {
     		  let url = i.url;
 //              trace("Matching BTN.id: "+i.id+" "+i.title+" "+url);
-    		  if ((url == undefined)           // folder
+    		  if ((url == undefined)           // folder (or separator ...)
     			  || !url.startsWith("place:") // "place:" results behave strangely ..
                                            	   // (they have no title !!)
                	 ) {
     			// Append to the search result table
-    			appendResult(i);
+    			if (i.type != "separator") { // Do not display separators in search results
+    			  appendResult(i);
+    			}
     		  }
     		}
     	  }
@@ -766,6 +877,7 @@ function manageSearchTextHandler () {
  */
 function clearSearchTextHandler () {
 //  trace("manageSearchTextHandler");
+  clearMenu(); // Clear any open menu  
   SearchTextInput.value = ""; // Empty the imnput box
 
   // Fire event on searchText to handle things properly
@@ -781,6 +893,95 @@ function clearSearchTextHandler () {
   trace("contextSearchTextHandler");
 }
 */
+
+/*
+ * Handle search options
+ */
+function setSearchOptions () {
+  let cn;
+  if (searchMatch_option == "regexp") {
+	cn = "sr" + searchField_option;
+	SMatchRegexpInput.checked = true;
+  }
+  else {
+	cn = "sw" + searchField_option;
+	SMatchWordsInput.checked = true;
+  }
+  SearchButtonInput.className = cn;
+  if (searchScope_option == "all") {
+	MGlassImgStyle.backgroundImage = 'url("/icons/search.png"';
+	SScopeAllInput.checked = true;
+  }
+  else {
+	MGlassImgStyle.backgroundImage = 'url("/icons/searchsub.png"';
+	SScopeSubfolderInput.checked = true;
+  }
+
+  if (searchField_option == "both") {
+	SFieldTitleUrlInput.checked = true;
+  }
+  else if (searchField_option == "title") {
+	SFieldTitleOnlyInput.checked = true;
+  }
+  else {
+	SFieldUrlOnlyInput.checked = true;
+  }
+
+  // Clear any ongoing search
+  clearSearchTextHandler();
+}
+
+function saveSearchOptions () {
+  searchField_option_file = searchField_option;
+  searchScope_option_file = searchScope_option;
+  searchMatch_option_file = searchMatch_option;
+  browser.storage.local.set({
+	 searchfield_option: searchField_option,
+   	 searchscope_option: searchScope_option,
+   	 searchmatch_option: searchMatch_option
+  })
+  .then(
+	function () {
+	  // Signal change to search options to all
+	  sendAddonMessage("savedSearchOptions");
+	}
+  );
+}
+
+function setSFieldTitleUrlHandler () {
+  searchField_option = "both";
+  saveSearchOptions();
+}
+
+function setSFieldTitleOnlyHandler () {
+  searchField_option = "title";
+  saveSearchOptions();
+}
+
+function setSFieldUrlOnlyHandler () {
+  searchField_option = "url";
+  saveSearchOptions();
+}
+
+function setSScopeAllHandler () {
+  searchScope_option = "all";
+  saveSearchOptions();
+}
+
+function setSScopeSubfolderHandler () {
+  searchScope_option = "subfolder";
+  saveSearchOptions();
+}
+
+function setSMatchWordsHandler () {
+  searchMatch_option = "words";
+  saveSearchOptions();
+}
+
+function setSMatchRegexpHandler () {
+  searchMatch_option = "regexp";
+  saveSearchOptions();
+}
 
 /*
  * Trigger 16x16 migration in background
@@ -1160,7 +1361,9 @@ function bkmkCreated (BN, index) {
   // getSubtree() which is very very long ...
   let row;
   let parentRow = curRowList[parentId];
-  if (index == 0) { // Insert just after parent row
+  // Introduce robustness in case the BN tree is empty and index is not 0, as that seems to occur some times
+  let children = parentBN.children;
+  if ((index == 0) || (children == undefined)) { // Insert just after parent row
 	// Note that this also takes care of the case where parent had so far no child
 	insertRowIndex = parentRow.rowIndex + 1; // Can be at end of bookmarks table
   }
@@ -1168,9 +1371,8 @@ function bkmkCreated (BN, index) {
 		 // ASSUMPTION (true so far): when multiple moves / creates to same parent, like in multi-select move
 	 	 //            or reorder or ..., items are sent to us in increasing row/index order, so previous
     	 //            rows to current item under process are always already at the right place.
-		 // Note that in such multi operations, things have been all processed in background first or the copy,
-		 //       so the BN tree is not any more in sync with display.
-	let children = parentBN.children;
+		 // Note that in such multi operations, things have been all processed in background first for the copy,
+		 //       so the BN tree is not anymore in sync with display.
 	let previousBN = BN_lastDescendant(children[index-1]);
 	row = curRowList[previousBN.id];
 	insertRowIndex = row.rowIndex + 1; // Can be at end of bookmarks table
@@ -1322,9 +1524,9 @@ function bkmkRemoved (bnId) {
  *
  * bnId = string. ID of the item that was changed.
  * isBookmark = boolean, true if the changed item is a bookmark, else false
- * title = string. Latest title value (chnaged or not)
- * url = string. Latest url value (chnaged or not)
- * uri = string. Latest faviconUri value (chnaged or not)
+ * title = string. Latest title value (changed or not)
+ * url = string. Latest url value (changed or not)
+ * uri = string. Latest faviconUri value (changed or not)
  */
 function bkmkChanged (bnId, isBookmark, title, url, uri) {
 //  trace("Change event on: "+id+" title: <<"+changeInfo.title+">> url: "+changeInfo.url);
@@ -1417,7 +1619,9 @@ function bkmkMoved (bnId, curParentId, targetParentId, targetIndex) {
   // Find insertion point, in current (= old) reference
   let targetCurRowIndex;
   let targetRow;
-  if (targetCurIndex == 0) { // Insert just after parent row
+  // Introduce robustness in case the BN tree is empty and index is not 0, as that seems to occur some times
+  let children = targetParentBN.children;
+  if ((targetCurIndex == 0) || (children == undefined)) { // Insert just after parent row
 	// Note that this also takes care of the case where parent had so far no child
 	targetCurRowIndex = targetParentRow.rowIndex + 1;
 	targetRow = targetParentRow.nextElementSibling; // Can be null if we move at end
@@ -1428,7 +1632,6 @@ function bkmkMoved (bnId, curParentId, targetParentId, targetIndex) {
 	     //            rows to current item under process are always already at the right place.
 		 // Note that in such multi operations, things have been all processed in background first or the copy,
 		 //       so the BN tree is not any more in sync with display.
-	let children = targetParentBN.children;
 	let previousBN = BN_lastDescendant(children[targetCurIndex-1]);
 	targetRow = curRowList[previousBN.id];
 	targetCurRowIndex = targetRow.rowIndex + 1; // Can be at end of bookmarks table
@@ -1603,6 +1806,26 @@ function showRow (srcRow) {
   else {
     srcRow.scrollIntoView({behavior: "smooth", block: "center", inline: "nearest"});
   }
+}
+
+/*
+ * Go to a specific bookmark Id and highlight it.
+ * If undefined or hidden, or doesn't exist anymore, go at top row, which cannot be hidden.
+ * 
+ * bnId is a String. If undefined or "undefined", does nothing
+ */
+function goBkmkItem (bnId) {
+  let row;
+  if ((bnId != undefined) && (bnId != "undefined")) {
+	row = curRowList[bnId];
+	if ((row == undefined) || row.hidden) {
+	  row = bookmarksTable.rows[0];
+	}
+  }
+  else {
+	row = bookmarksTable.rows[0];
+  }
+  showRow(row);
 }
 
 /*
@@ -1869,7 +2092,7 @@ function resultsMouseHandler (e) {
 	  // Now go to row
       target = target.parentElement.parentElement;
     }
-    else if (className == "bkmkitem_f") {
+    else if ((className == "bkmkitem_f") || (className == "twistieac")) {
   	  // Go to row
 	  target = target.parentElement.parentElement;
 	}
@@ -1898,7 +2121,7 @@ function resultsMouseHandler (e) {
 function bkmkMouseHandler (e) {
   let target = e.target; // Type depends ..
   let className = target.className;
-//trace("Bookmark click event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" target: "+target+" class: "+className);
+//console.log("Bookmark click event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" target: "+target+" class: "+className);
 
   // The click target is one of .brow cell, .twistiexx img (if folder),
   // .bkmkitem_x div, .favseparator div, .favicon or .favttext
@@ -1950,10 +2173,10 @@ function bkmkMouseHandler (e) {
 	if (traceEnabled_option && e.altKey) {
 	  let bnId = target.parentElement.parentElement.dataset.id;
 	  if ((bnId == mostVisitedBNId) || (bnId == recentTagBNId) || (bnId == recentBkmkBNId)) {
-		// Special trick .. if traces are enabled, authorize this .. with href == "", it will
-        // load the add-on itself in the window !
+		// Special trick .. if traces are enabled, authorize this .. with href = "" or SelfURL, it will
+        // load the add-on itself in the window tab.
         // Very useful to use the inpector on it, as we cannot inspect inside the add-on sidebar ..
-        let href="";
+        let href = SelfURL;
         // Open in new tab, referred by this tab to come back to it when closing
         // Get current active tab as opener id to come back to it when closing the new tab
         browser.tabs.query({windowId: myWindowId, active: true})
@@ -2061,7 +2284,7 @@ function resultsAuxHandler (e) {
 function bkmkAuxHandler (e) {
   let target = e.target; // Type depends ..
   let className = target.className;
-//trace("Bookmark aux event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" phase: "+e.eventPhase+" target: "+target+" class: "+className);
+//console.log("Bookmark aux event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" phase: "+e.eventPhase+" target: "+target+" class: "+className);
 
   // Be careful, button 2 (contextmenu) also ends up here :-(
   if (e.button == 1) {
@@ -2211,6 +2434,12 @@ function clearMenu () {
     myBProtFMenu_open = false;
   }
 
+  if (myMGlassMenu_open) {
+	menuClosed = true;
+	MyMGlassMenuStyle.visibility = "hidden";
+    myMGlassMenu_open = false;
+  }
+
   myMenu_open = false;
   return(menuClosed);
 }
@@ -2237,7 +2466,7 @@ function resultsContextHandler (e) {
     if(className.includes("fav")) {
 	  row = (cell = target.parentElement.parentElement).parentElement;
     }
-    else if (className.startsWith("bkmkitem_")) {
+    else if (className.startsWith("bkmkitem_") || (className == "twistieac")) {
 	  row = (cell = target.parentElement).parentElement;
     }
     else { // .brow
@@ -2302,7 +2531,7 @@ let noPasteMinRowIndex = -1;
 let noPasteMaxRowIndex = -1;
 function bkmkContextHandler (e) {
   let target = e.target; // Type depends ..
-//trace("Bookmark context event: "+e.type+" target: "+target+" class: "+target.classList);
+//console.log("Bookmark context event: "+e.type+" target: "+target+" class: "+target.classList);
 
   // Go up to the row level
   let className = target.className;
@@ -2457,6 +2686,307 @@ function bkmkContextHandler (e) {
 }
 
 /*
+ * Receive event from scrolls on bookmarks table
+ *
+ * e is of type MouseEvent (click)
+ */
+let isBkmkItemDragged = false;
+let isBkmkScrollInhibited = false;
+let isBkmkScrollReactivated = false;
+let isBkmkDragActive = false;
+let refBkmkScrollLeft = -1;
+let refBkmkScrollTop = -1;
+let refBkmkClientX = -1;
+let refBkmkClientY = -1;
+let curBkmkScreenX;
+let curBkmkScreenY;
+let curBkmkClientX;
+let curBkmkClientY;
+let bkmkDragTimerID;
+/*
+ * Enable scrolling 
+ */
+function enableBkmkScroll () {
+  Bookmarks.classList.replace(BScrollKo, BScrollOk);
+  refBkmkClientX = refBkmkClientY = -1;
+  isBkmkScrollInhibited = false;
+}
+
+function bkmkScrollHandler (e) {
+  let target = e.target; // Type depends ..
+  let className = target.className;
+//console.log("Bookmark scroll event: "+e.type+" layerX: "+e.layerX+" layerY: "+e.layerY+" pageX: "+e.pageX+" pageY: "+e.pageY+" target: "+target+" class: "+className);
+  // If not dragging a bookmark item, and scroll was not reactivated
+  // then disable scroll
+  if (isBkmkDragActive && !isBkmkItemDragged && !isBkmkScrollReactivated && !isBkmkScrollInhibited) {
+	Bookmarks.classList.replace(BScrollOk, BScrollKo);
+	isBkmkScrollInhibited = true;
+	// Reset position to reference
+	Bookmarks.scrollLeft = refBkmkScrollLeft;
+	Bookmarks.scrollTop = refBkmkScrollTop;
+	// Update reference point
+	refBkmkClientX = curBkmkClientX;
+	refBkmkClientY = curBkmkClientY;
+  }
+}
+
+/*
+ * Under Linux, receive event that mouse is getting out of Bookmarks by using
+ * a trick of adding a top border of 1px to Bookmarks, above the scrolling part.
+ * Else, since dragover is not repeated when the mouse is still, there was a case
+ * where no dragleave or dragexit event was received when the mouse was going out
+ * by the top, and so no way to know that to re-enable scrolling !
+ * Note: mousexxx and pointerxxx events are not reaching the object when there is
+ * a drag on it (I guess the drag implementation does a pointrId capture ...).
+ * 
+ * The specific case was when the mouse was entering slowly and pointing exactly at
+ * top of Bookmarks <div>, trigerring a dragenter and a dragover, then a scroll (so disable),
+ * but no more dragover, and when going out by 1px above Bookmarks, no dragleave or
+ * dragexit is sent !!
+ * The 1px border-top workaround does the trick, as it creates an area where there is
+ * no scroll bar which is getting those events. 
+ */
+let bkmkDragoverSimulTimerID;
+function bkmkMouseEnterHandler (e) {
+//console.log("mouseenter!");
+}
+
+function bkmkMouseLeaveHandler (e) {
+//console.log("mouseleave!");
+  if (bkmkDragoverSimulTimerID != undefined) {
+	clearTimeout(bkmkDragoverSimulTimerID);
+	bkmkDragoverSimulTimerID = undefined;
+  }
+}
+
+/*
+ * Under Linux, simulate a dragover event as workaround for them not firing continuously
+ */
+let curBkmkTarget, curBkmkDt;
+function simulBkmkDragover () {
+//console.log("fire!");
+  bkmkDragoverSimulTimerID = undefined;
+  let event = new DragEvent ("dragover",
+    {screenX: curBkmkScreenX,
+	 screenY: curBkmkScreenY,
+	 clientX: curBkmkClientX,
+	 clientY: curBkmkClientY,
+	 dataTransfer: curBkmkDt,
+	 view: window,
+     bubbles: true,
+     cancelable: true
+    }
+  );
+  curBkmkTarget.dispatchEvent(event); // Fire it on last dragover target
+}
+
+/*
+ * Function to re-enable scrolling on timeout after last drag event
+ */
+function bkmkDragTimeout () {
+//console.log("timeout!");
+  isBkmkDragActive = false;
+  refBkmkScrollLeft = refBkmkScrollTop = -1;
+  bkmkDragTimerID = undefined;
+  if (isBkmkScrollReactivated) {
+	isBkmkScrollReactivated = false;
+  }
+  else {
+	enableBkmkScroll();
+  }
+}
+
+/*
+ * Handle drag scrolling inhibition on Bookmarks table 
+ */
+function handleBkmkDragScroll (eventId, e) {
+  curBkmkScreenX = e.screenX;
+  curBkmkScreenY = e.screenY;
+  curBkmkClientX = e.clientX;
+  curBkmkClientY = e.clientY;
+//console.log("event: "+eventId+" clientX: "+curBkmkClientX+" clientY: "+curBkmkClientY);
+  // If starting a drag, remember current scroll position as reference
+  if (!isBkmkDragActive) {
+	// Remember current scroll position as reference
+	refBkmkScrollLeft = Bookmarks.scrollLeft;
+	refBkmkScrollTop = Bookmarks.scrollTop;
+	// Remember reference point
+	refBkmkClientX = curBkmkClientX;
+	refBkmkClientY = curBkmkClientY;
+	isBkmkDragActive = true;
+  }
+  if (bkmkDragTimerID != undefined) {
+	clearTimeout(bkmkDragTimerID);
+  }
+  // Set a timer to detect when out of the Sidebar and re-enable scrolling when there is no more drag event
+  bkmkDragTimerID = setTimeout(bkmkDragTimeout, TimeoutReEnableScroll);
+  // Take care of simulated dragover under Linux
+  if (bkmkDragoverSimulTimerID != undefined) {
+	clearTimeout(bkmkDragoverSimulTimerID);
+	bkmkDragoverSimulTimerID = undefined;
+  }
+  if (isLinux && (eventId == OverEvent)) { // Under Linux, fire regular dragover events as workaround,
+                                           // until mouseout or next drag event 
+	bkmkDragoverSimulTimerID = setTimeout(simulBkmkDragover, TimeoutSimulDragover);
+  }
+  // If scroll was inhibited and we are far enough from the reference point, re-enable it.
+  if ((Math.abs(curBkmkClientX - refBkmkClientX) > HystReEnableScroll)
+	  || (Math.abs(curBkmkClientY - refBkmkClientY) > HystReEnableScroll)) {
+	isBkmkScrollReactivated = true;
+	if (isBkmkScrollInhibited) {
+	  enableBkmkScroll();
+	}
+  }
+}
+
+/*
+ * We received a drop event, reset everything 
+ */
+function resetBkmkDragScroll () {
+  isBkmkDragActive = false;
+  refBkmkScrollLeft = refBkmkScrollTop = -1;
+  if (bkmkDragTimerID != undefined) {
+	clearTimeout(bkmkDragTimerID);
+	bkmkDragTimerID = undefined; // Do not restart a timer
+  }
+  if (bkmkDragoverSimulTimerID != undefined) {
+	clearTimeout(bkmkDragoverSimulTimerID);
+	bkmkDragoverSimulTimerID = undefined;
+  }
+  if (isBkmkScrollInhibited) {
+	enableBkmkScroll();
+  }
+  isBkmkScrollReactivated = false;
+}
+
+/*
+ * Receive event from scrolls on results table
+ *
+ * e is of type MouseEvent (click)
+ */
+let isRsltItemDragged = false;
+let isRsltScrollInhibited = false;
+let isRsltDragActive = false;
+let refRsltScrollLeft = -1;
+let refRsltScrollTop = -1;
+let curRsltScreenX;
+let curRsltScreenY;
+let curRsltClientX;
+let curRsltClientY;
+let rsltDragTimerID;
+/*
+ * Enable results scrolling 
+ */
+function enableRsltScroll () {
+  SearchResult.classList.replace(RScrollKo, RScrollOk);
+  isRsltScrollInhibited = false;
+}
+
+/*
+ * Disable results scrolling 
+ */
+function disableRsltScroll () {
+  SearchResult.classList.replace(RScrollOk, RScrollKo);
+  isRsltScrollInhibited = true;
+}
+
+function rsltScrollHandler (e) {
+  let target = e.target; // Type depends ..
+  let className = target.className;
+//console.log("Results scroll event: "+e.type+" layerX: "+e.layerX+" layerY: "+e.layerY+" pageX: "+e.pageX+" pageY: "+e.pageY+" target: "+target+" class: "+className);
+  // If not dragging a result item, and scroll was not reactivated
+  // then disable scroll
+  if (isRsltDragActive && !isRsltScrollInhibited) {
+	disableRsltScroll();
+	// Reset position to reference
+	SearchResult.scrollLeft = refRsltScrollLeft;
+	SearchResult.scrollTop = refRsltScrollTop;
+  }
+}
+
+/*
+ * Same trick as for Bookmarks ..
+ */
+let rsltDragoverSimulTimerID;
+function rsltMouseEnterHandler (e) {
+//console.log("rslt mouseenter!");
+}
+
+function rsltMouseLeaveHandler (e) {
+//console.log("rslt mouseleave!");
+  if (rsltDragoverSimulTimerID != undefined) {
+	clearTimeout(rsltDragoverSimulTimerID);
+	rsltDragoverSimulTimerID = undefined;
+  }
+}
+
+/*
+ * Under Linux, simulate a dragover event as workaround for them not firing continuously
+ */
+let curRsltTarget, curRsltDt;
+function simulRsltDragover () {
+//console.log("rslt fire!");
+  rsltDragoverSimulTimerID = undefined;
+  let event = new DragEvent ("dragover",
+    {screenX: curRsltScreenX,
+	 screenY: curRsltScreenY,
+	 clientX: curRsltClientX,
+	 clientY: curRsltClientY,
+	 dataTransfer: curRsltDt,
+	 view: window,
+     bubbles: true,
+     cancelable: true
+    }
+  );
+  curRsltTarget.dispatchEvent(event); // Fire it on last dragover target
+}
+
+/*
+ * Function to re-enable scrolling on timeout after last drag event
+ */
+function rsltDragTimeout () {
+//console.log("rslt timeout!");
+  if (!isRsltItemDragged) {
+	isRsltDragActive = false;
+	refRsltScrollLeft = refRsltScrollTop = -1;
+	rsltDragTimerID = undefined;
+	enableRsltScroll();
+  }
+}
+
+/*
+ * Handle drag scrolling inhibition on Bookmarks table 
+ */
+function handleRsltDragScroll (eventId, e) {
+  curRsltScreenX = e.screenX;
+  curRsltScreenY = e.screenY;
+  curRsltClientX = e.clientX;
+  curRsltClientY = e.clientY;
+//console.log("rslt event: "+eventId+" clientX: "+curRsltClientX+" clientY: "+curRsltClientY);
+  // If starting a drag, remember current scroll position as reference
+  if (!isRsltDragActive) {
+	// Remember current scroll position as reference
+	refRsltScrollLeft = SearchResult.scrollLeft;
+	refRsltScrollTop = SearchResult.scrollTop;
+	isRsltDragActive = true;
+  }
+  // Set a timer to detect when out of the Sidebar and re-enable scrolling when there is no more drag event
+  if (rsltDragTimerID != undefined) {
+	clearTimeout(rsltDragTimerID);
+  }
+  rsltDragTimerID = setTimeout(rsltDragTimeout, TimeoutReEnableScroll);
+  // Take care of simulated dragover under Linux
+  if (rsltDragoverSimulTimerID != undefined) {
+	clearTimeout(rsltDragoverSimulTimerID);
+	rsltDragoverSimulTimerID = undefined;
+  }
+  if (isLinux && (eventId == OverEvent)) { // Under Linux, fire regular dragover events as workaround,
+                                           // until mouseout or next drag event 
+	rsltDragoverSimulTimerID = setTimeout(simulRsltDragover, TimeoutSimulDragover);
+  }
+}
+
+/*
  * Drag start event handler, on the bookmarks table
  * 
  * e = DragEvent
@@ -2464,19 +2994,18 @@ function bkmkContextHandler (e) {
  * Sets global variables rowDragged (HTMLRowElmeent) and BNDragged (BookmarkNode),
  * as well as the index min/max range indicating the no drop zone.
  */
-let rowDragged;
-let BNDragged;
 let noDropMinRowIndex = -1;
 let noDropMaxRowIndex = -1;
 function bkmkDragStartHandler (e) {
-  rowDragged = e.target; // Should always be a [object HTMLTableRowElement] by construction
+  let rowDragged = e.target; // Should always be a [object HTMLTableRowElement] by construction
 //trace("Drag start event: "+e.type+" target: "+rowDragged+" class: "+rowDragged.classList);
 //trace("Draggable: "+rowDragged.draggable+" Protected: "+rowDragged.dataset.protect);
   if (rowDragged.dataset.protect != "true") {
+	isBkmkItemDragged = true; // Signal we are dragging an internal item
     let BN_id = rowDragged.dataset.id;
 //trace("BN_id: "+BN_id);
     // Now, get dragged BN
-    BNDragged = curBNList[BN_id];
+    let BNDragged = curBNList[BN_id];
 
     // Get some text describing what we are moving
     let type = BNDragged.type;
@@ -2496,8 +3025,51 @@ function bkmkDragStartHandler (e) {
     // Set the event dataTransfer
     let dt = e.dataTransfer;
     dt.setData("application/x-bookmark", BN_id);
-    if (isBookmark)
+	// Native Bookmark data is like {"title":"Nouveau dossier","id":2238,"itemGuid":"VQ8ulNGyfXk0","instanceId":"jvwImUhXA2rV","parent":2099,"parentGuid":"CLSASmpIpBmQ",
+    //                               "dateAdded":1536393478662000,"lastModified":1536393478662000,"type":"text/x-moz-place-container"}
+    //								{"title":"_  New bookmark","id":2350,"itemGuid":"JE2j0D-5tnpT","instanceId":"jvwImUhXA2rV","parent":2028,"parentGuid":"XmOZ-HAGbfEM",
+    //								 "dateAdded":1550944109935000,"lastModified":1551218607521000,"type":"text/x-moz-place","uri":"about:blank"}
+    //								{"title":"","id":2239,"itemGuid":"gORenOTsYJdk","instanceId":"jvwImUhXA2rV","parent":2028,"parentGuid":"XmOZ-HAGbfEM",
+    //								 "dateAdded":1536396421579000,"lastModified":1551022707690000,"type":"text/x-moz-place-separator"}
+    let json;
+    if (isFolder) {
+      json = JSON.stringify(
+        {title: BNDragged.title,
+         itemGuid: BN_id,
+         parentGuid: BNDragged.parentId,
+         dateAdded: BNDragged.dateAdded,
+         lastModified: BNDragged.lastModified,
+         type: "text/x-moz-place-container"
+        }
+      );
+    }
+    else if (isBookmark) {
+      json = JSON.stringify(
+        {title: BNDragged.title,
+         itemGuid: BN_id,
+         parentGuid: BNDragged.parentId,
+         dateAdded: BNDragged.dateAdded,
+         lastModified: BNDragged.lastModified,
+         type: "text/x-moz-place",
+         uri: text
+        }
+      );
+    }
+    else { // Separator
+      json = JSON.stringify(
+        {title: "",
+         itemGuid: BN_id,
+         parentGuid: BNDragged.parentId,
+         dateAdded: BNDragged.dateAdded,
+         lastModified: BNDragged.lastModified,
+         type: "text/x-moz-place-separator"
+        }
+      );
+    }
+    dt.setData("text/x-moz-place", json);
+    if (isBookmark) {
       dt.setData("text/uri-list", text);
+    }
     dt.setData("text/plain", text);
     dt.effectAllowed = "move";
 
@@ -2522,6 +3094,11 @@ function bkmkDragStartHandler (e) {
  * e = DragEvent
  */
 function bkmkDragEndHandler (e) {
+  // Signal we stopped dragging an internal item
+  isBkmkItemDragged = false;
+  isBkmkDragActive = false;
+  refBkmkScrollLeft = refBkmkScrollTop = -1;
+
   let target = e.target;
   let dt = e.dataTransfer;
   noDropMinRowIndex = noDropMaxRowIndex = -1;
@@ -2537,7 +3114,11 @@ function bkmkDragEndHandler (e) {
  * as well as the index min/max range indicating the no drop zone.
  */
 function resultsDragStartHandler (e) {
-  rowDragged = e.target; // Should always be a [object HTMLTableRowElement] by construction
+  // Inhibit result pane scrolling
+  disableRsltScroll();
+  isRsltItemDragged = true; // Signal we are dragging an internal item
+
+  let rowDragged = e.target; // Should always be a [object HTMLTableRowElement] by construction
 //trace("Drag start event: "+e.type+" target: "+rowDragged+" class: "+rowDragged.classList);
 //trace("Draggable: "+rowDragged.draggable+" Protected: "+rowDragged.dataset.protect);
 
@@ -2547,7 +3128,7 @@ function resultsDragStartHandler (e) {
   if (rowDragged.dataset.protect != "true") {
 //trace("BN_id: "+BN_id);
     // Now, get dragged BN
-    BNDragged = curBNList[BN_id];
+    let BNDragged = curBNList[BN_id];
 
     // Get some text describing what we are moving
     let type = BNDragged.type;
@@ -2567,8 +3148,51 @@ function resultsDragStartHandler (e) {
     // Set the event dataTransfer
     let dt = e.dataTransfer;
     dt.setData("application/x-bookmark", BN_id);
-    if (isBookmark)
+	// Native Bookmark data is like {"title":"Nouveau dossier","id":2238,"itemGuid":"VQ8ulNGyfXk0","instanceId":"jvwImUhXA2rV","parent":2099,"parentGuid":"CLSASmpIpBmQ",
+    //                               "dateAdded":1536393478662000,"lastModified":1536393478662000,"type":"text/x-moz-place-container"}
+    //								{"title":"_  New bookmark","id":2350,"itemGuid":"JE2j0D-5tnpT","instanceId":"jvwImUhXA2rV","parent":2028,"parentGuid":"XmOZ-HAGbfEM",
+    //								 "dateAdded":1550944109935000,"lastModified":1551218607521000,"type":"text/x-moz-place","uri":"about:blank"}
+    //								{"title":"","id":2239,"itemGuid":"gORenOTsYJdk","instanceId":"jvwImUhXA2rV","parent":2028,"parentGuid":"XmOZ-HAGbfEM",
+    //								 "dateAdded":1536396421579000,"lastModified":1551022707690000,"type":"text/x-moz-place-separator"}
+    let json;
+    if (isFolder) {
+      json = JSON.stringify(
+        {title: BNDragged.title,
+         itemGuid: BN_id,
+         parentGuid: BNDragged.parentId,
+         dateAdded: BNDragged.dateAdded,
+         lastModified: BNDragged.lastModified,
+         type: "text/x-moz-place-container"
+        }
+      );
+    }
+    else if (isBookmark) {
+      json = JSON.stringify(
+        {title: BNDragged.title,
+         itemGuid: BN_id,
+         parentGuid: BNDragged.parentId,
+         dateAdded: BNDragged.dateAdded,
+         lastModified: BNDragged.lastModified,
+         type: "text/x-moz-place",
+         uri: text
+        }
+      );
+    }
+    else { // Separator
+      json = JSON.stringify(
+        {title: "",
+         itemGuid: BN_id,
+         parentGuid: BNDragged.parentId,
+         dateAdded: BNDragged.dateAdded,
+         lastModified: BNDragged.lastModified,
+         type: "text/x-moz-place-separator"
+        }
+      );
+    }
+    dt.setData("text/x-moz-place", json);
+    if (isBookmark) {
       dt.setData("text/uri-list", text);
+    }
     dt.setData("text/plain", text);
     dt.effectAllowed = "move";
 
@@ -2593,9 +3217,76 @@ function resultsDragStartHandler (e) {
  * e = DragEvent
  */
 function resultsDragEndHandler (e) {
+  // Enable result pane scrolling again
+  enableRsltScroll();
+  isRsltItemDragged = false; // Signal we stopped dragging an internal item
+  // If any bookmark was dragged to the bookmark pane, this is finished
+  isBkmkDragActive = false;
+  refBkmkScrollLeft = refBkmkScrollTop = -1;
+
   let target = e.target;
   let dt = e.dataTransfer;
 //  trace("Drag end event: "+e.type+" target: "+target+" class: "+target.classList);
+}
+
+/*
+ * Drag enter event handler, on results table
+ * 
+ * e = DragEvent
+ */
+function rsltDragEnterHandler (e) {
+  let target = e.target;
+  let dt = e.dataTransfer;
+//console.log("Reslt drag enter event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
+  // Handle drag scrolling inhibition
+  handleRsltDragScroll(EnterEvent, e);
+  dt.dropEffect = "none"; // Signal drop not allowed
+}
+
+/*
+ * Drag over event handler
+ * 
+ * e = DragEvent
+ */
+function rsltDragOverHandler (e) {
+  let target = e.target;
+  let dt = e.dataTransfer;
+  if (isLinux) {
+	curRsltTarget = target;
+	curRsltDt = dt;
+  }
+//console.log("Rslt drag over event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
+  // Handle drag scrolling inhibition
+  handleRsltDragScroll(OverEvent, e);
+  dt.dropEffect = "none"; // Signal drop not allowed
+}
+
+/*
+ * Drag leave event handler
+ * 
+ * e = DragEvent
+ */
+function rsltDragLeaveHandler (e) {
+  let target = e.target;
+  let dt = e.dataTransfer;
+//console.log("Rslt drag leave event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
+  // Handle drag scrolling inhibition
+  handleRsltDragScroll(LeaveEvent, e);
+  dt.dropEffect = "none"; // Signal drop not allowed
+}
+
+/*
+ * Drag exit event handler
+ * 
+ * e = DragEvent
+ */
+function rsltDragExitHandler (e) {
+  let target = e.target;
+  let dt = e.dataTransfer;
+//console.log("Rslt drag exit event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
+  // Handle drag scrolling inhibition
+  handleRsltDragScroll(ExitEvent, e);
+  dt.dropEffect = "none"; // Signal drop not allowed
 }
 
 /*
@@ -2610,22 +3301,43 @@ function checkDragType (dt) {
 
   // When the dragged element is one of our bookmarks its dt.types will be
   //   dt.types        : application/x-bookmark,[text/uri-list,]text/plain
+  // When it is a native Bookmark, it will be
+  //   dt.types        : text/x-moz-place
+  //		with data like: {"title":"Nouveau dossier","id":2238,"itemGuid":"VQ8ulNGyfXk0","instanceId":"jvwImUhXA2rV","parent":2099,"parentGuid":"CLSASmpIpBmQ",
+  //                         "dateAdded":1536393478662000,"lastModified":1536393478662000,"type":"text/x-moz-place-container"}
+  //						{"title":"_  New bookmark","id":2350,"itemGuid":"JE2j0D-5tnpT","instanceId":"jvwImUhXA2rV","parent":2028,"parentGuid":"XmOZ-HAGbfEM",
+  //						 "dateAdded":1550944109935000,"lastModified":1551218607521000,"type":"text/x-moz-place","uri":"about:blank"}
+  //						{"title":"","id":2239,"itemGuid":"gORenOTsYJdk","instanceId":"jvwImUhXA2rV","parent":2028,"parentGuid":"XmOZ-HAGbfEM",
+  //						 "dateAdded":1536396421579000,"lastModified":1551022707690000,"type":"text/x-moz-place-separator"}
   // When it is a tab, it will be
   //   dt.types        : text/x-moz-text-internal
   // When it is the (i) in the location bar
   //   dt.types        : text/x-moz-url,text/uri-list,text/plain,text/html
+  // When it is the URL address in the location bar
+  //   dt.types        : text/x-moz-url,text/plain,text/html
   // When it is a link in the HTML page:
   //   dt.types        : text/x-moz-url,text/x-moz-url-data,text/x-moz-url-desc,text/uri-list,text/_moz_htmlcontext,text/_moz_htmlinfo,text/html,text/plain
   // When it ia a selected text in HTML page:
   //   dt.types        : text/_moz_htmlcontext,text/_moz_htmlinfo,text/html,text/plain
   if (dt.types.includes("application/x-bookmark")
+	  || dt.types.includes("text/x-moz-place")
 	  || dt.types.includes("text/x-moz-text-internal")
 	  || dt.types.includes("text/uri-list")
+	  || dt.types.includes("text/x-moz-url")
 	 ) {
 	isSupported = true;
   }
 
   return(isSupported);
+}
+
+/*
+ * Fast string compare function without paring to int ..
+ */
+function isStringA_le_B (a, b) {
+  let la = a.length;
+  let lb = b.length;
+  return(((la < lb) || ((la == lb) && (a <= b))));
 }
 
 /*
@@ -2635,48 +3347,57 @@ function checkDragType (dt) {
  * 
  * Return HTMLTableRowElement
  * Also sets the global variables bkmkitem_x to the piece to highlight for insertion
- * and the Booleans isBkmkitem_f and isFolderClosed
+ * and the Booleans isBkmkitem_f, isFolderClosed and isFolderEmpty.
  */
 let bkmkitem_x;
 let isBkmkitem_f;
 let isFolderClosed;
+let isFolderEmpty;
 let isProtected;
 let isTopItem;
 function getDragToRow (target) {
   let classList = target.classList;
   let className = target.className;
   let row;
+  let nextRow;
+  let level;
 
   if (classList == undefined) { // Apparently drag enter events can be on the text inside Span..
 	row = (bkmkitem_x = target.parentElement.parentElement).parentElement.parentElement;
 	isProtected = (row.dataset.protect == "true");
-	isTopItem = (row.dataset.level == "0");
+	isTopItem = ((level = row.dataset.level) == "0");
 	isBkmkitem_f = (row.dataset.type == "folder");
 	if (isBkmkitem_f) {
       if (bkmkitem_x.previousElementSibling.classList.contains("twistieac"))
 		isFolderClosed = true;
 	  else   isFolderClosed = false;
+      nextRow = row.nextElementSibling;
+      isFolderEmpty = (nextRow == undefined) || isStringA_le_B(nextRow.dataset.level, level);
 	}
   }
   else if (className.includes("fav")) {
 	row = (bkmkitem_x = target.parentElement).parentElement.parentElement;
 	isProtected = (row.dataset.protect == "true");
-	isTopItem = (row.dataset.level == "0");
+	isTopItem = ((level = row.dataset.level) == "0");
 	isBkmkitem_f = (row.dataset.type == "folder");
 	if (isBkmkitem_f) {
 	  if (bkmkitem_x.previousElementSibling.classList.contains("twistieac"))
 		isFolderClosed = true;
 	  else   isFolderClosed = false;
+      nextRow = row.nextElementSibling;
+      isFolderEmpty = (nextRow == undefined) || isStringA_le_B(nextRow.dataset.level, level);
 	}
   }
   else if (classList.contains("bkmkitem_f")) {
 	row = (bkmkitem_x = target).parentElement.parentElement;
 	isProtected = (row.dataset.protect == "true");
-	isTopItem = (row.dataset.level == "0");
+	isTopItem = ((level = row.dataset.level) == "0");
 	isBkmkitem_f = true;
     if (bkmkitem_x.previousElementSibling.classList.contains("twistieac"))
 	  isFolderClosed = true;
 	else   isFolderClosed = false;
+    nextRow = row.nextElementSibling;
+    isFolderEmpty = (nextRow == undefined) || isStringA_le_B(nextRow.dataset.level, level);
   }
   else if (className.startsWith("bkmkitem_")) {
 	row = (bkmkitem_x = target).parentElement.parentElement;
@@ -2687,24 +3408,28 @@ function getDragToRow (target) {
   else if (className.startsWith("twistie")) {
 	row = target.parentElement.parentElement;
 	isProtected = (row.dataset.protect == "true");
-	isTopItem = (row.dataset.level == "0");
+	isTopItem = ((level = row.dataset.level) == "0");
 	bkmkitem_x = target.nextElementSibling;
 	isBkmkitem_f = true;
     if (classList.contains("twistieac"))
 	  isFolderClosed = true;
 	else   isFolderClosed = false;
+    nextRow = row.nextElementSibling;
+    isFolderEmpty = (nextRow == undefined) || isStringA_le_B(nextRow.dataset.level, level);
   }
   else if (className.includes("brow")) {
 	row = target.parentElement;
 	isProtected = (row.dataset.protect == "true");
-	isTopItem = (row.dataset.level == "0");
+	isTopItem = ((level = row.dataset.level) == "0");
 	bkmkitem_x = target.firstElementChild;
 	if (bkmkitem_x.className.startsWith("twistie")) {
+      isBkmkitem_f = true;
       if (bkmkitem_x.classList.contains("twistieac"))
   	    isFolderClosed = true;
   	  else   isFolderClosed = false;
       bkmkitem_x = bkmkitem_x.nextElementSibling;
-      isBkmkitem_f = true;
+      nextRow = row.nextElementSibling;
+      isFolderEmpty = (nextRow == undefined) || isStringA_le_B(nextRow.dataset.level, level);
 	}
 	else   isBkmkitem_f = false;
   }
@@ -2732,7 +3457,35 @@ function openFolderTimeoutHandler () {
 }
 
 /*
- * Highlight the insert point on bkmkitem_x
+ * Remove insert point on prevBkmkitem_x
+ * 
+ * e = DragEvent
+ * 
+ * Cancels any folder closed timer
+ */
+let prevBkmkitem_x = null;
+let prevInsertPos = undefined;
+function highlightRemove (e) {
+  if (openFolderTimerID != null) { // Cancel timeout
+	clearTimeout(openFolderTimerID);
+	openFolderTimerID = null;
+  }
+
+  // Reset style
+  if (prevBkmkitem_x != null) {
+	let style = prevBkmkitem_x.style;
+	style.borderTopColor = "";
+	style.background = "";
+	style.borderBottomColor = "";
+
+	// No more previous values
+	prevBkmkitem_x = null;
+	prevInsertPos = undefined;
+  }
+}
+
+/*
+ * Highlight the insert point on bkmkitem_x, clearing prevBkmkitem_x if not already done
  * 
  * e = DragEvent
  * 
@@ -2740,50 +3493,68 @@ function openFolderTimeoutHandler () {
  * Also activates a timer so that when staying on a closed folder for more than 1s, then
  * we open it.
  */
-let prevBkmkitem_x = null;
-let prevInsertPos = undefined;
 function highlightInsert (e) {
   let bkmkRect = bkmkitem_x.getBoundingClientRect();
   let style;
-//  trace("x: "+bkmkRect.x+" y: "+bkmkRect.y+" left: "+bkmkRect.left+" top: "+bkmkRect.top+" right: "+bkmkRect.right+" bottom: "+bkmkRect.bottom+" width: "+bkmkRect.width+" height: "+bkmkRect.height)
-//  trace("clientX: "+e.clientX+" clientY: "+e.clientY+" offsetX: "+e.offsetX+" offsetY: "+e.offsetY+" pageX: "+e.pageX+" pageY: "+e.pageY+" screenX: "+e.screenX+" screenY: "+e.screenY)
+//trace("x: "+bkmkRect.x+" y: "+bkmkRect.y+" left: "+bkmkRect.left+" top: "+bkmkRect.top+" right: "+bkmkRect.right+" bottom: "+bkmkRect.bottom+" width: "+bkmkRect.width+" height: "+bkmkRect.height)
+//trace("clientX: "+e.clientX+" clientY: "+e.clientY+" offsetX: "+e.offsetX+" offsetY: "+e.offsetY+" pageX: "+e.pageX+" pageY: "+e.pageY+" screenX: "+e.screenX+" screenY: "+e.screenY)
   let insertPos;
   let y = e.clientY; 
 
   if (isBkmkitem_f) { // We can drop inside a folder
 	if (!isProtected            // Cannot insert before or after a protected (= top) folder
 	    && (y <= bkmkRect.top + bkmkRect.height / 4)) {
-      if (openFolderTimerID != null) { // Cancel timeout
-		clearTimeout(openFolderTimerID);
-		openFolderTimerID = null;
-	  }
       insertPos = -1;
       // If changed from previous, update style (avoid to overload for nothing ..)
       if ((prevBkmkitem_x != bkmkitem_x) || (prevInsertPos != insertPos)) {
+    	if (prevBkmkitem_x != null) { // Previous highlight was not removed, a leave or exit event is missing ..
+    	  highlightRemove(undefined);
+    	}
     	style = (prevBkmkitem_x = bkmkitem_x).style;
     	prevInsertPos = insertPos;
         style.borderTopColor = "#0065B7";
         style.background = "";
         style.borderBottomColor = "";
       }
-	}
-	else if (!isProtected            // Cannot insert before or after a protected (= top) folder 
-	         && (y >= bkmkRect.bottom - bkmkRect.height / 4)) {
-	  if (openFolderTimerID != null) { // Cancel timeout
+      if (openFolderTimerID != null) { // Cancel timeout
 		clearTimeout(openFolderTimerID);
 		openFolderTimerID = null;
 	  }
+	}
+	else if (!isProtected            // Cannot insert before or after a protected (= top) folder
+	         && (y >= bkmkRect.bottom - bkmkRect.height / 4)
+			 && (isFolderClosed || isFolderEmpty) // Do not propose the insert next sibling on an open and non empty folder
+			) {
       insertPos = 1;
       // If changed from previous, update style (avoid to overload for nothing ..)
       if ((prevBkmkitem_x != bkmkitem_x) || (prevInsertPos != insertPos)) {
+    	if (prevBkmkitem_x != null) { // Previous highlight was not removed, a leave or exit event is missing ..
+    	  highlightRemove(undefined);
+    	}
     	style = (prevBkmkitem_x = bkmkitem_x).style;
     	prevInsertPos = insertPos;
         style.borderTopColor = "";
         style.background = "";
         style.borderBottomColor = "#0065B7";
       }
+	  if (openFolderTimerID != null) { // Cancel timeout
+		clearTimeout(openFolderTimerID);
+		openFolderTimerID = null;
+	  }
 	}
 	else {
+      insertPos = 0;
+      // If changed from previous, update style (avoid to overload for nothing ..)
+      if ((prevBkmkitem_x != bkmkitem_x) || (prevInsertPos != insertPos)) {
+    	if (prevBkmkitem_x != null) { // Previous highlight was not removed, a leave or exit event is missing ..
+    	  highlightRemove(undefined);
+    	}
+    	style = (prevBkmkitem_x = bkmkitem_x).style;
+    	prevInsertPos = insertPos;
+        style.borderTopColor = "";
+        style.background = "#CDE8FF";
+        style.borderBottomColor = "";
+      }
 	  if (isFolderClosed){
 		if (openFolderTimerID == null) { // Set timeout
 	      openFolderTimerID = setTimeout(openFolderTimeoutHandler, OpenFolderTimeout);
@@ -2795,26 +3566,16 @@ function highlightInsert (e) {
 		  openFolderTimerID = null;
 		}
 	  }
-      insertPos = 0;
-      // If changed from previous, update style (avoid to overload for nothing ..)
-      if ((prevBkmkitem_x != bkmkitem_x) || (prevInsertPos != insertPos)) {
-    	style = (prevBkmkitem_x = bkmkitem_x).style;
-    	prevInsertPos = insertPos;
-        style.borderTopColor = "";
-        style.background = "#CDE8FF";
-        style.borderBottomColor = "";
-      }
 	}
   }
   else {
-	if (openFolderTimerID != null) { // Cancel timeout
-      clearTimeout(openFolderTimerID);
-	  openFolderTimerID = null;
-	}
 	if (y <= bkmkRect.top + bkmkRect.height / 2) {
       insertPos = -1;
       // If changed from previous, update style (avoid to overload for nothing ..)
       if ((prevBkmkitem_x != bkmkitem_x) || (prevInsertPos != insertPos)) {
+    	if (prevBkmkitem_x != null) { // Previous highlight was not removed, a leave or exit event is missing ..
+    	  highlightRemove(undefined);
+    	}
     	style = (prevBkmkitem_x = bkmkitem_x).style;
     	prevInsertPos = insertPos;
         style.borderTopColor = "#0065B7";
@@ -2825,39 +3586,22 @@ function highlightInsert (e) {
 	  insertPos = 1;
       // If changed from previous, update style (avoid to overload for nothing ..)
       if ((prevBkmkitem_x != bkmkitem_x) || (prevInsertPos != insertPos)) {
+    	if (prevBkmkitem_x != null) { // Previous highlight was not removed, a leave or exit event is missing ..
+    	  highlightRemove(undefined);
+    	}
     	style = (prevBkmkitem_x = bkmkitem_x).style;
     	prevInsertPos = insertPos;
         style.borderTopColor = "";
         style.borderBottomColor = "#0065B7";
       }
 	}
+	if (openFolderTimerID != null) { // Cancel timeout
+      clearTimeout(openFolderTimerID);
+	  openFolderTimerID = null;
+	}
   }
 //  trace("insertPos: "+insertPos);
   return(insertPos);
-}
-
-/*
- * Remove insert point on bkmkitem_x
- * 
- * e = DragEvent
- * 
- * Cancels any folder closed timer
- */
-function highlightRemove (e) {
-  if (openFolderTimerID != null) { // Cancel timeout
-	clearTimeout(openFolderTimerID);
-	openFolderTimerID = null;
-  }
-
-  // No more previous values
-  prevBkmkitem_x = null;
-  prevInsertPos = undefined;
-
-  // Reset style
-  let style = bkmkitem_x.style;
-  style.borderTopColor = "";
-  style.background = "";
-  style.borderBottomColor = "";
 }
 
 /*
@@ -2868,7 +3612,9 @@ function highlightRemove (e) {
 function bkmkDragEnterHandler (e) {
   let target = e.target;
   let dt = e.dataTransfer;
-//  trace("Drag enter event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
+//console.log("Drag enter event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
+  // Handle drag scrolling inhibition
+  handleBkmkDragScroll(EnterEvent, e);
   if (checkDragType(dt)
 	  && ((target.className == undefined)  // When on Text, className and classList are undefined.
 	      || (target.className.length > 0) // For some reason, when the mouse is over the lifts,
@@ -2880,15 +3626,20 @@ function bkmkDragEnterHandler (e) {
     let row = getDragToRow(target);
 //    trace("Enter row: "+row+" class: "+row.classList+" BN_id: "+row.dataset.id);
 //    trace("Bkmkitem_x: "+bkmkitem_x+" class: "+bkmkitem_x.classList);
-    let index = row.rowIndex;
-    if ((index >= noDropMinRowIndex) && (index <= noDropMaxRowIndex)
-    	|| (isProtected && !isTopItem) // Protection, can't drop on non top draggable elements = specials
-       ) {
+    if (row == undefined) { // We are on the scrollbars for example
       dt.dropEffect = "none"; // Signal drop not allowed
     }
     else {
-      e.preventDefault(); // Allow drop
-      highlightInsert(e);
+      let index = row.rowIndex;
+      if ((index >= noDropMinRowIndex) && (index <= noDropMaxRowIndex)
+    	  || (isProtected && !isTopItem) // Protection, can't drop on non top draggable elements = specials
+       	) {
+    	dt.dropEffect = "none"; // Signal drop not allowed
+      }
+      else {
+    	e.preventDefault(); // Allow drop
+    	highlightInsert(e);
+      }
     }
   }
   else {
@@ -2904,7 +3655,13 @@ function bkmkDragEnterHandler (e) {
 function bkmkDragOverHandler (e) {
   let target = e.target;
   let dt = e.dataTransfer;
-//  trace("Drag over event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
+  if (isLinux) {
+	curBkmkTarget = target;
+	curBkmkDt = dt;
+  }
+//console.log("Drag over event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
+  // Handle drag scrolling inhibition
+  handleBkmkDragScroll(OverEvent, e);
   if (checkDragType(dt)
 	  && ((target.className == undefined)  // When on Text, className and classList are undefined.
 	      || (target.className.length > 0) // For some reason, when the mouse is over the lifts,
@@ -2916,15 +3673,20 @@ function bkmkDragOverHandler (e) {
     let row = getDragToRow(target);
 //    trace("Over row: "+row+" class: "+row.classList+" BN_id: "+row.dataset.id);
 //    trace("Bkmkitem_x: "+bkmkitem_x+" class: "+bkmkitem_x.classList);
-    let index = row.rowIndex;
-    if ((index >= noDropMinRowIndex) && (index <= noDropMaxRowIndex)
-       	|| (isProtected && !isTopItem) // Protection, can't drop on non top draggable elements = specials
-       ) {
+    if (row == undefined) { // We are on the scrollbars for example
       dt.dropEffect = "none"; // Signal drop not allowed
     }
     else {
-      e.preventDefault(); // Allow drop
-      highlightInsert(e);
+      let index = row.rowIndex;
+      if ((index >= noDropMinRowIndex) && (index <= noDropMaxRowIndex)
+    	  || (isProtected && !isTopItem) // Protection, can't drop on non top draggable elements = specials
+       	) {
+    	dt.dropEffect = "none"; // Signal drop not allowed
+      }
+      else {
+    	e.preventDefault(); // Allow drop
+    	highlightInsert(e);
+      }
     }
   }
   else {
@@ -2940,7 +3702,9 @@ function bkmkDragOverHandler (e) {
 function bkmkDragLeaveHandler (e) {
   let target = e.target;
   let dt = e.dataTransfer;
-//  trace("Drag leave event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
+//console.log("Drag leave event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
+  // Handle drag scrolling inhibition
+  handleBkmkDragScroll(LeaveEvent, e);
   let targetType = Object.prototype.toString.call(target).slice(8, -1);
   if (checkDragType(dt)
       && (targetType != "HTMLDocument") // When we drop on a dropEffect=none zone (drop not fired)
@@ -2953,11 +3717,16 @@ function bkmkDragLeaveHandler (e) {
     // Get the enclosing row
     let row = getDragToRow(target);
 //    trace("Leave row: "+row+" class: "+row.classList+" BN_id: "+row.dataset.id);
-    let index = row.rowIndex;
-    if (((index < noDropMinRowIndex) || (index > noDropMaxRowIndex))
-        && (!isProtected || isTopItem) // Protection, can't drop on non top draggable elements = specials
-       ) {
-	  highlightRemove(e);
+    if (row == undefined) { // We are on the scrollbars for example
+      dt.dropEffect = "none"; // Signal drop not allowed
+    }
+    else {
+      let index = row.rowIndex;
+      if (((index < noDropMinRowIndex) || (index > noDropMaxRowIndex))
+    	  && (!isProtected || isTopItem) // Protection, can't drop on non top draggable elements = specials
+       	) {
+    	highlightRemove(e);
+      }
     }
   }
 }
@@ -2970,7 +3739,9 @@ function bkmkDragLeaveHandler (e) {
 function bkmkDragExitHandler (e) {
   let target = e.target;
   let dt = e.dataTransfer;
-//  trace("Drag exit event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
+//console.log("Drag exit event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
+  // Handle drag scrolling inhibition
+  handleBkmkDragScroll(ExitEvent, e);
   let targetType = Object.prototype.toString.call(target).slice(8, -1);
   if (checkDragType(dt)
       && (targetType != "HTMLDocument") // When we drop on a dropEffect=none zone (drop not fired)
@@ -2983,11 +3754,16 @@ function bkmkDragExitHandler (e) {
     // Get the enclosing row
     let row = getDragToRow(target);
 //    trace("Exit row: "+row+" class: "+row.classList+" BN_id: "+row.dataset.id);
-    let index = row.rowIndex;
-    if (((index < noDropMinRowIndex) || (index > noDropMaxRowIndex))
-        && (!isProtected || isTopItem) // Protection, can't drop on non top draggable elements = specials
-       ) {
-      highlightRemove(e);
+    if (row == undefined) { // We are on the scrollbars for example
+      dt.dropEffect = "none"; // Signal drop not allowed
+    }
+    else {
+      let index = row.rowIndex;
+      if (((index < noDropMinRowIndex) || (index > noDropMaxRowIndex))
+    	  && (!isProtected || isTopItem) // Protection, can't drop on non top draggable elements = specials
+       	) {
+    	highlightRemove(e);
+      }
     }
   }
 }
@@ -2998,14 +3774,17 @@ function bkmkDragExitHandler (e) {
  * e = DragEvent
  */
 function bkmkDropHandler (e) {
+  e.preventDefault(); // Prevent browser to interpret the drop by itself (like open a page for a URL/bookmark drop)
   let target = e.target;
   let dt = e.dataTransfer;
-//  trace("Drag drop event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList+" ctrlKey: "+e.ctrlKey);
+//console.log("Drag drop event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList+" ctrlKey: "+e.ctrlKey);
 /*  trace("dt.dropEffect   : "+dt.dropEffect);
   trace("dt.effectAllowed: "+dt.effectAllowed);
   trace("dt.items        : "+dt.items);
   trace("dt.types        : "+dt.types);
 */
+  // Stop scrolling inhibition
+  resetBkmkDragScroll();
   if (checkDragType(dt)
 	  && ((target.className == undefined)  // When on Text, className and classList are undefined.
 	      || (target.className.length > 0) // For some reason, when the mouse is over the lifts,
@@ -3051,14 +3830,14 @@ function bkmkDropHandler (e) {
 /*
 let typesLength;
 let data;
-trace("-------------------");
-trace("InsertPos: "+insertPos);
-trace("Items length : "+dt.items.length);
+console.log("-------------------");
+console.log("InsertPos: "+insertPos);
+console.log("Items length : "+dt.items.length);
 for (let i=0 ; i<dt.items.length; i++) {
-  trace("... items["+i+"].kind = "+dt.items[i].kind + "; type = "+dt.items[i].type);
+  console.log("... items["+i+"].kind = "+dt.items[i].kind + "; type = "+dt.items[i].type);
 }
-trace("mozItemCount : "+mozItemCount);
-trace("itemCount    : "+itemCount);
+console.log("mozItemCount : "+mozItemCount);
+console.log("itemCount    : "+itemCount);
 for (let i=0 ; i<itemCount ; i++) {
   if (i == 0) {
 	types = dt.types;
@@ -3073,17 +3852,17 @@ for (let i=0 ; i<itemCount ; i++) {
 //	  types[i] = list.item(i);
 //	}
   }
-  trace("Types length : "+types.length);
+  console.log("Types length : "+types.length);
   for (let j=0 ; j<types.length; j++) {
 	type = types[j];
-	trace("... types["+i+", "+j+"] = "+type);
+	console.log("... types["+i+", "+j+"] = "+type);
 	if (i == 0) {
 	  data = dt.getData(type);
 	}
 	else {
 	  data = dt.mozGetDataAt(type, i);
 	}
-	trace("...... data["+i+", "+type+"] = <<"+data+">>");
+	console.log("...... data["+i+", "+type+"] = <<"+data+">>");
   }
 }
 */
@@ -3100,13 +3879,35 @@ for (let i=0 ; i<itemCount ; i++) {
 //		  types = dt.mozTypesAt(i);
 		  types = Array.from(dt.mozTypesAt(i));
 		}
-		if (types.includes("application/x-bookmark")) { // Move or copy the dragged bookmark
+		if (types.includes(type = "application/x-bookmark")	 // Move or copy the dragged bookmark
+			|| types.includes(type = "text/x-moz-place") 	 // Dragging a native Bookmark to us
+		   ) {
+		  let draggedBN_id;
+		  if (i == 0) {
+			draggedBN_id = dt.getData(type);
+		  }
+		  else {
+			draggedBN_id = dt.mozGetDataAt(type, i);
+		  }
+		  if (type == "text/x-moz-place") {
+			// data is like {"title":"Nouveau dossier","id":2238,"itemGuid":"VQ8ulNGyfXk0","instanceId":"jvwImUhXA2rV","parent":2099,"parentGuid":"CLSASmpIpBmQ",
+		    //               "dateAdded":1536393478662000,"lastModified":1536393478662000,"type":"text/x-moz-place-container"}
+		    //				{"title":"_  New bookmark","id":2350,"itemGuid":"JE2j0D-5tnpT","instanceId":"jvwImUhXA2rV","parent":2028,"parentGuid":"XmOZ-HAGbfEM",
+		    //				 "dateAdded":1550944109935000,"lastModified":1551218607521000,"type":"text/x-moz-place","uri":"about:blank"}
+		    //				{"title":"","id":2239,"itemGuid":"gORenOTsYJdk","instanceId":"jvwImUhXA2rV","parent":2028,"parentGuid":"XmOZ-HAGbfEM",
+		    //				 "dateAdded":1536396421579000,"lastModified":1551022707690000,"type":"text/x-moz-place-separator"}
+			let bookmark = JSON.parse(draggedBN_id);
+			draggedBN_id = bookmark.itemGuid;
+		  }
+		  let BNDragged = curBNList[draggedBN_id];
+		  let rowDragged = curRowList[draggedBN_id];
+//		  }
 	   	  if (insertPos == 0) { // Drop to a folder, add at end
 	   		if (e.ctrlKey) { // Copy
 	   		  pasteBkmk(BNDragged, BN);
 	   		}
 	   		else { // Move
-	   		  browser.bookmarks.move(rowDragged.dataset.id,
+	   		  browser.bookmarks.move(draggedBN_id,
 		                             {parentId: BN_id
 		                             }
 	   		  );
@@ -3150,23 +3951,33 @@ for (let i=0 ; i<itemCount ; i++) {
 		  else {
 			url = dt.mozGetDataAt(type, i);
 		  }
-		  // Bug in browser.tabs.query() !
-		  // When there is a # in the url, it finds the open tab but returns an empty array :-(
-		  // So lets remove the # part ..
-		  let posDash = url.indexOf("#");
-		  let urlSearch;
-		  if (posDash != -1) {
-			urlSearch = url.slice(0, posDash);
+		  // If this is an "about:reader?url=" URL, cannot use the matching pattern form as it does not find "about:" tbas
+		  // Trying a work around using "active" tabs .. seems to work and return only 1 tab ..
+		  // => Maybe I should switch to it for any kind of URL ?
+		  let isAboutReaderUrl = url.startsWith("about:reader?url=");
+		  let gettingTabs;
+		  if (isAboutReaderUrl) { // Remember the initial form, and decode the url for retrieval
+			gettingTabs = browser.tabs.query({windowId: myWindowId, active: true});
 		  }
 		  else {
-			urlSearch = url;
+			// browser.tabs.query() only uses special a limited pattern matching form ..
+			// So lets remove the parts it cannot support .. at the risk of getting several tabs, so need to triage later
+			let urlObj = new URL (url);
+			let protocol = urlObj.protocol;
+//			let host = urlObj.host;
+			let hostname = urlObj.hostname;
+//			let port = urlObj.port;
+			let pathname = urlObj.pathname;
+			let search = urlObj.search;
+//			let hash = urlObj.hash;
+			let urlSearch = protocol + "//" + hostname + pathname + search;
+//console.log("Query tab for url: "+url+" urlSearch: "+urlSearch);
+			// Get tab corresponding to url
+			gettingTabs = browser.tabs.query({windowId: myWindowId, url: urlSearch});
 		  }
-//trace("Query tab for url: "+url)
-		  // Get tab corresponding to url
-		  browser.tabs.query({windowId: myWindowId, url: urlSearch})
-		  .then (
+		  gettingTabs.then (
 	        function (a_tabs) {
-	          // In case of #, we can get multiple tabs because of the shortened url .. retrieve the good one
+	          // In case of multiple tabs because of the shortened url .. retrieve the good one
 	          let len = a_tabs.length;
 //trace("tabs length: "+len);
 	          let droppedTab;
@@ -3228,7 +4039,9 @@ for (let i=0 ; i<itemCount ; i++) {
 	        }
 		  );
 		}
-		else if (types.includes(type = "text/uri-list")) { // Dragging a page link to us
+		else if (types.includes(type = "text/uri-list")		// Dragging a page link or (i) in the location bar to us
+				 || types.includes(type = "text/x-moz-url")	// Dragging the location bar URL address
+			    ) {
 		  let url;
 		  let title;
 		  let titleType = "text/x-moz-url-desc";
@@ -3246,11 +4059,15 @@ for (let i=0 ; i<itemCount ; i++) {
 		      title = dt.mozGetDataAt("text/x-moz-url", i);
 		    }
 		  }
-	      if (title.length == 0) {
+		  let splitIndex = url.indexOf("\n"); // Remove any "\n" and following part if there is in URL 
+		  if (splitIndex > 0) {
+			url = url.slice(0, splitIndex);
+		  }
+	      if (title.length == 0) { // If title is empty, use the URL as title
 	    	title = url;
 	      }
-	      else {
-	    	let splitIndex = title.indexOf("\n");
+	      else { // If there is an "\n", keep the part after
+	    	splitIndex = title.indexOf("\n");
 	    	title = title.slice(splitIndex+1);
 	      }
 
@@ -4003,11 +4820,22 @@ function keyHandler (e) {
  * e is of type MouseEvent (click, but apparently is also called with right and aux clicks .. 
  *   still saying "click" in e.type .. wonder why .. but e.button is correct
  *   => use this for clearing menus when appropriate)
+ *
+ * Use global variable mousedownTarget to detect a bug in Linux on contextmenu events resulting
+ * in the click event target always equal to body ..
+ * 
  */
+let mousedownTarget;
 function clickHandler (e) {
   let target = e.target; // Type depends ..
+  if (mousedownTarget != target) { // Fight against Linux bog on click after contextmenu event with FF66 ..
+	target = mousedownTarget; // Restore the normal target it should have ...
+  }
+  if ((target.nodeName == "INPUT") || (target.nodeName == "LABEL")) { // If Radio input in menu, get to englobing <div>
+	target = target.parentElement
+  }
   let classList = target.classList;
-//trace("General click event: "+e.type+" button: "+e.button+" target: "+target+" class: "+target.classList);
+//console.log("General click event: "+e.type+" button: "+e.button+" target: "+target+" target.nodeName: "+target.nodeName+" class: "+classList);
 
   if (!classList.contains("menudisabled")) { // Click on a disabled menu element
 	                                         // won't have any action
@@ -4399,7 +5227,7 @@ function clickHandler (e) {
       // Trigger asynchronous favicon retrieval process
       let url = BN.url;
       if ((url != undefined)
-       	  && !url.startsWith("about:")) { // about: is protected - security error ..
+       	  && !url.startsWith("about:")) { // about: is protected - security error .. => no fetch
        	// This is a bookmark, so here no need for cloneBN(), there is no tree below
 //        faviconWorker.postMessage(["get2", BN_id, url, true]);
     	let postMsg = ["get2", BN_id, url, true];
@@ -4500,24 +5328,109 @@ function clickHandler (e) {
 	    );
 	  });
 	}
+	else if (classList.contains("menuopenbsp2")) { // Open BSP2 in a new tab, full view
+	  menuAction = true;
+      let href = SelfURL;
+      // Open in new tab, referred by this tab to come back to it when closing
+      // Get current active tab as opener id to come back to it when closing the new tab
+      browser.tabs.query({windowId: myWindowId, active: true})
+      .then (
+        function (a_tabs) {
+      	if (beforeFF57)
+      	  browser.tabs.create({url: href});
+      	else
+      	  browser.tabs.create({url: href, openerTabId: a_tabs[0].id});
+        }
+      );
+	}
+	else if (classList.contains("menusfboth")) { // Search options
+	  menuAction = true;
+	  setSFieldTitleUrlHandler();
+	}
+	else if (classList.contains("menusftitle")) { // Search options
+	  menuAction = true;
+	  setSFieldTitleOnlyHandler();
+	}
+	else if (classList.contains("menusfurl")) { // Search options
+	  menuAction = true;
+	  setSFieldUrlOnlyHandler();
+	}
+	else if (classList.contains("menussall")) { // Search options
+	  menuAction = true;
+	  setSScopeAllHandler();
+	}
+	else if (classList.contains("menusssubfolder")) { // Search options
+	  menuAction = true;
+	  setSScopeSubfolderHandler();
+	}
+	else if (classList.contains("menusmwords")) { // Search options
+	  menuAction = true;
+	  setSMatchWordsHandler();
+	}
+	else if (classList.contains("menusmregexp")) { // Search options
+	  menuAction = true;
+	  setSMatchRegexpHandler();
+	}
 
     // Clear open menus on left or middle click, or on right click but only on (a menu action
 	// or outside bookmarks or results).
     // Indeed, sometimes, the "click" Handler is called after the "context" Handler
-    // instead of before, and so we do  not want to close what we just opened :-( (in Linux at least)
-    if ((e.button != 2) || menuAction || (classList == undefined) || (classList.length == 0)) {
+    // instead of before, and so we do not want to close what we just opened :-( (in Linux at least)
+	let button = e.button;
+	let targetType = Object.prototype.toString.call(target).slice(8, -1);
+//console.log("targetType: "+targetType+" classList: "+classList+" classList.length: "+classList.length);
+    if ((button != 2) || menuAction || (classList == undefined) || (classList.length == 0)
+    	|| (targetType == "HTMLBodyElement") || (targetType == "HTMLInputElement") || (targetType == "HTMLTextAreaElement")
+       ) {
       clearMenu();
     }
   }
 }
 
 /*
+ * Context menu on Magnifier glass
+ */
+function searchButtonHandler (e) {
+  e.stopImmediatePropagation();
+/*
+  let button = e.button;
+  let target = e.target;
+  let classList = target.classList;
+  console.log("noDefaultAction event: "+e.type+" button: "+button+" phase: "+e.eventPhase+" target: "+target+" class: "+target.classList);
+*/
+  clearMenu(); // Clear any open menu
+
+//console.log("Magnifier glass context menu");
+  myMenu_open = myMGlassMenu_open = true;
+  drawMenu(MyMGlassMenu, e.clientY, e.clientX);
+}
+
+/*
  * Prevent default context menus or aux actions except in a few places
- * Called twice when context click, once with contextmenu, and once with auxclick event
+ * Called twice when context click = once with contextmenu + once with auxclick event
+ * Called once on auxclick
+ * Called all the times with mousedown events, whatever button.
  */
 function noDefaultAction (e) {
   let target = e.target; // Type depends ..
-//trace("noDefaultAction event: "+e.type+" button: "+e.button+" phase: "+e.eventPhase+" target: "+target+" class: "+target.classList);
+  let eventType = e.type;
+  let classList = target.classList;
+//console.log("noDefaultAction event: "+eventType+" button: "+e.button+" phase: "+e.eventPhase+" target: "+target+"target.nodeName: "+target.nodeName+" class: "+classList);
+
+  // To fight a bug on Linux on context menu = it appears that the click event on a contextmenu event (button 2)
+  // has now with FF66 its target set to the top body element, whatever element it is on.
+  // So let's remember the target at mousedown time, so that things can be ignored if the target on click
+  // event has changed and is different from what it was at mousedown time.
+  if (eventType == "mousedown") {
+	mousedownTarget = target;
+	// Close any menu if we are in Linux and in the Searchbox or the trace box
+	let targetType = Object.prototype.toString.call(target).slice(8, -1);
+//console.log("targetType: "+targetType);
+	if (isLinux && ((targetType == "HTMLInputElement") || (targetType == "HTMLTextAreaElement"))
+		&& !classList.contains("inputradio")) { // Do not close on input radio inside search box button menu
+	  clearMenu();
+	}
+  }
 
   if ((e.button == 1) || (e.button == 2)) {
 	// Prevent default context menu except in the search box and in the trace box
@@ -4541,7 +5454,10 @@ function handleMsgResponse (message) {
   if (message != undefined) {
 	let msg = message.content;
 //    console.log("Background sent a response: <<"+msg+">> received in sidebar:"+myWindowId);
-    if (msg == "getCurBNList") {
+    if (msg == "savedCurBnId") {
+      goBkmkItem(message.bnId);
+    }
+    else if (msg == "getCurBNList") {
       curBNList = message.json;
       countBookmarks = message.countBookmarks;
       countFetchFav = message.countFetchFav;
@@ -4575,6 +5491,20 @@ function sendAddonMessage (msg) {
   browser.runtime.sendMessage(
 	{source: "sidebar:"+myWindowId,
 	 content: msg
+	}
+  ).then(handleMsgResponse, handleMsgError);
+}
+
+/*
+ * Send current selected bookmark Id to Background (when we are a private window)
+ * 
+ * bnId = String
+ */
+function sendAddonMsgCurBnId (bnId) {
+  browser.runtime.sendMessage(
+	{source: "sidebar:"+myWindowId,
+	 content: "saveCurBnId",
+	 bnId: bnId
 	}
   ).then(handleMsgResponse, handleMsgError);
 }
@@ -4621,7 +5551,7 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  // When coming from sidebar:
 	  //   sender.url: moz-extension://28a2a188-53d6-4f91-8974-07cd0d612f9e/sidebar/panel.html
 	  let msg = request.content;
-//		console.log("Got message <<"+msg+">> from "+request.source+" in "+myWindowId);
+//	  console.log("Got message <<"+msg+">> from "+request.source+" in "+myWindowId);
 //      console.log("  sender.tab: "+sender.tab);
 //      console.log("  sender.frameId: "+sender.frameId);
 //      console.log("  sender.id: "+sender.id);
@@ -4660,14 +5590,37 @@ function handleAddonMessage (request, sender, sendResponse) {
   	  		function (err) {
   	  		  let msg = "Error on processing changedOptions : "+err;
   	  		  console.log(msg);
-  	  		  console.log("lineNumber: "+err.lineNumber);
-  	  		  console.log("fileName:   "+err.fileName);
+  			  if (err != undefined) {
+  	  		  	console.log("fileName:   "+err.fileName);
+  				console.log("lineNumber: "+err.lineNumber);
+  			  }
   	  		}
   	  	  );
   	  	}
   	  	else { // Bacground page is accessible, all was loaded inside it, so get from there
   	  	  refreshOptionsBgnd(backgroundPage);
   	  	  changedOptions();
+  	  	}
+	  }
+	  else if (msg.startsWith("savedSearchOptions")) { // Reload and process search options
+  	  	// Refresh options
+  	  	if ((backgroundPage == undefined) || (backgroundPage.ready == undefined)) { // Load by ourselves
+  	  	  refreshOptionsLStore()
+  	  	  .then(setSearchOptions)
+  	  	  .catch( // Asynchronous, like .then
+  	  		function (err) {
+  	  		  let msg = "Error on processing changedOptions : "+err;
+  	  		  console.log(msg);
+  			  if (err != undefined) {
+  	  		  	console.log("fileName:   "+err.fileName);
+  				console.log("lineNumber: "+err.lineNumber);
+  			  }
+  	  		}
+  	  	  );
+  	  	}
+  	  	else { // Bacground page is accessible, all was loaded inside it, so get from there
+  	  	  refreshOptionsBgnd(backgroundPage);
+  	  	  setSearchOptions();
   	  	}
 	  }
 	  else if (msg.startsWith("resetSizes")) { // Option page reset sizes button was pressed
@@ -4724,8 +5677,11 @@ function handleAddonMessage (request, sender, sendResponse) {
   }
   catch (error) {
 	console.log("Error processing message: "+request.content);
-	console.log("message:    "+error.message);
-	console.log("lineNumber: "+error.lineNumber);
+	if (error != undefined) {
+	  console.log("message:    "+error.message);
+	  console.log("fileName:   "+error.fileName);
+	  console.log("lineNumber: "+error.lineNumber);
+	}
   }
 }
 /*
@@ -4734,12 +5690,14 @@ function handleAddonMessage (request, sender, sendResponse) {
 function closeHandler (e) {
 //  console.log("Sidebar close: "+e.type);
 
-  // Signal to background page we are going off
-  if (backgroundPage != undefined) {
-    backgroundPage.closeSidebar(myWindowId);
-  }
-  else {
-	sendAddonMessage("Close:"+myWindowId);
+  // If running in sidebar, signal to background page we are going off
+  if (isInSidebar) {
+	if (backgroundPage != undefined) {
+	  backgroundPage.closeSidebar(myWindowId);
+	}
+	else {
+	  sendAddonMessage("Close:"+myWindowId);
+	}
   }
 }
 
@@ -4845,7 +5803,20 @@ function completeDisplay () {
   Bookmarks.addEventListener("contextmenu", bkmkContextHandler);
   SearchResult.addEventListener("auxclick", resultsAuxHandler);
   Bookmarks.addEventListener("auxclick", bkmkAuxHandler);
-  
+  SearchResult.addEventListener("scroll", rsltScrollHandler);
+  Bookmarks.addEventListener("scroll", bkmkScrollHandler);
+  if (isLinux) {
+	Bookmarks.addEventListener("dragenter", bkmkMouseEnterHandler, true);
+	Bookmarks.addEventListener("dragexit", bkmkMouseLeaveHandler, true);
+	Bookmarks.addEventListener("dragleave", bkmkMouseLeaveHandler, true);
+	SearchResult.addEventListener("dragenter", rsltMouseEnterHandler, true);
+	SearchResult.addEventListener("dragexit", rsltMouseLeaveHandler, true);
+	SearchResult.addEventListener("dragleave", rsltMouseLeaveHandler, true);
+  }
+
+  // Setup mouse handlers for search button
+  SearchButtonInput.addEventListener("click", searchButtonHandler);
+
   // General event handlers for a click anywhere in the document .. used to clear menus
   // and prevent default menus
   addEventListener("keydown", keyHandler);
@@ -4853,12 +5824,12 @@ function completeDisplay () {
   addEventListener("mousedown", noDefaultAction);
   addEventListener("contextmenu", noDefaultAction);
   addEventListener("auxclick", noDefaultAction);
-  window.addEventListener("blur", onBlur);
+  addEventListener("blur", onBlur);
 
   // Detect when sidebar is closed
-//  window.addEventListener("beforeunload", closeHandler);
-//  window.addEventListener("pagehide", closeHandler);
-  window.addEventListener("unload", closeHandler);
+//  addEventListener("beforeunload", closeHandler);
+//  addEventListener("pagehide", closeHandler);
+  addEventListener("unload", closeHandler);
 //  window.onclose = closeHandler;
 
   // Event handlers for drag & drop
@@ -4871,6 +5842,10 @@ function completeDisplay () {
   Bookmarks.addEventListener("dragleave", bkmkDragLeaveHandler);
   Bookmarks.addEventListener("dragexit", bkmkDragExitHandler);
   Bookmarks.addEventListener("drop", bkmkDropHandler);
+  SearchResult.addEventListener("dragenter", rsltDragEnterHandler);
+  SearchResult.addEventListener("dragover", rsltDragOverHandler);
+  SearchResult.addEventListener("dragleave", rsltDragLeaveHandler);
+  SearchResult.addEventListener("dragexit", rsltDragExitHandler);
 
   let computedStyle = window.getComputedStyle(MyBProtMenu, null);
   trace("fontFamily = '"+computedStyle["fontFamily"]+"'", true);
@@ -4879,21 +5854,25 @@ function completeDisplay () {
 //    trace(prop+" = '"+computedStyle[prop]+"'");
 //  }
 
-  // Signal to background page we are here
-  if (backgroundPage == undefined) {
-	sendAddonMessage("New:"+myWindowId);
-  }
-  else {
-	// Trace stats
-	trace("Stats:\r\n------", true);
-	trace("Bookmarks:         "+countBookmarks, true);
-	trace("Favicons to fetch: "+countFetchFav, true);
-	trace("Folders:           "+countFolders, true);
-	trace("Separators:        "+countSeparators, true);
-	trace("Oddities:          "+countOddities, true);
-	trace("--------------------", true);
+  // If we are running in the sidebar, signal to background page we are here,
+  // and show laat selected bookmark if any
+  if (isInSidebar) {
+	if (backgroundPage == undefined) {
+	  sendAddonMessage("New:"+myWindowId);
+	}
+	else {
+	  // Trace stats
+	  trace("Stats:\r\n------", true);
+	  trace("Bookmarks:         "+countBookmarks, true);
+	  trace("Favicons to fetch: "+countFetchFav, true);
+	  trace("Folders:           "+countFolders, true);
+	  trace("Separators:        "+countSeparators, true);
+	  trace("Oddities:          "+countOddities, true);
+	  trace("--------------------", true);
 
-	backgroundPage.newSidebar(myWindowId);
+	  let bnId = backgroundPage.newSidebar(myWindowId);
+      goBkmkItem(bnId);
+	}
   }
 
   // Focus on searchtext input at initial load
@@ -5069,6 +6048,7 @@ function setupUI () {
   }
   else if (platformOs == "linux") {
 	trace("Setting Linux variations", true);
+	isLinux = true;
 	setPageFontSize(fs);
 	let ms = Math.floor((DfltMenuSizeLinux - 20) * fs / DfltFontSize) + 20;
 	if (fs < 12)
@@ -5147,7 +6127,9 @@ function initialize2 () {
 	treeBuildDuration = backgroundPage.treeBuildDuration;
 	trace("Background tree build duration: "+treeBuildDuration+" ms", true);
 	saveDuration = backgroundPage.saveDuration;
+	isSlowSave = backgroundPage.isSlowSave;
 	trace("Background save duration: "+saveDuration+" ms", true);
+	trace("isSlowSave: "+isSlowSave, true);
 	countBookmarks = backgroundPage.countBookmarks;
 	countFetchFav = backgroundPage.countFetchFav;
 	countFolders = backgroundPage.countFolders;
@@ -5172,6 +6154,7 @@ function initialize2 () {
 
   // Set the scene ..
   setupUI();
+  setSearchOptions();
 
   if (searchHeight_option != undefined) { // Set current saved size 
 	SearchResult.style.height = searchHeight_option; 
@@ -5226,12 +6209,14 @@ function initialize2 () {
 	  let name = extensionInfo.name;
 	  let version = extensionInfo.version;
 	  trace("BSP2 version: "+version, true);
-	  let title1 = name + " v" +version;
+//	  let title1 = name + " v" +version;
 	  let title2 = name + "\nv" +version;
-	  browser.sidebarAction.setTitle(
-		{title: title1
-		}
-	  );
+	  if (isInSidebar) {
+		browser.sidebarAction.setTitle(
+		  {title: name
+		  }
+		);
+	  }
 	  MGlassImg.title = title2;
 	}
   );
@@ -5287,7 +6272,7 @@ function initialize () {
 
 		// Process read values from Store (they are already in Global variables from libstore.js)
 		endLoadTime = new Date();
-		trace("Load local store duration: "+(loadDuration = (endLoadTime.getTime() - startTime.getTime()))+" ms", true);
+		trace("Load local store duration (full): "+(loadDuration = (endLoadTime.getTime() - startTime.getTime()))+" ms", true);
 		TracePlace.hidden = !traceEnabled_option;
 
 		if (backgroundReady) {
@@ -5326,7 +6311,7 @@ function initialize () {
 
 		// Process read values from Store (they are already in Global variables from libstore.js)
 		endLoadTime = new Date();
-		trace("Load local store duration: "+(loadDuration = (endLoadTime.getTime() - startTime.getTime()))+" ms", true);
+		trace("Load local store duration (folders only): "+(loadDuration = (endLoadTime.getTime() - startTime.getTime()))+" ms", true);
 
 		if (backgroundPage.ready) {
 //		  console.log("Background is Ready 1");
@@ -5374,18 +6359,19 @@ function initialize () {
  * Main code:
  * ----------
 */
-// Start when we have the platform and the background page
-Promise.all([p_platform, p_background, p_ffversion])
+// Start when we have the platform, the background page, FF version and tab info
+Promise.all([p_platform, p_background, p_ffversion, p_getTab])
 .then(
   function (a_values) { // An array of one value per Promise is returned
-	p_platform = p_background = p_ffversion = undefined;
+	p_platform = p_background = p_ffversion = p_getTab = undefined;
 
 	// Rerieve values in the same order
 	platformOs = a_values[0].os; // info object
 	let page = a_values[1];
 	let info = a_values[2];
+	let tabInfo = a_values[3];
 	beforeFF57 = ((ffversion = info.version) < "57.0");
-	beforeFF58 = ((ffversion = info.version) < "58.0");
+	beforeFF58 = (ffversion < "58.0");
 
 	// In a private browsing window (incognito), this will be null
 	if (page != null) { // Not in a private browsing window
@@ -5394,6 +6380,13 @@ Promise.all([p_platform, p_background, p_ffversion])
 	else { // In a private browsing window
 	  trace("In private browsing window", true);
 	}
+
+	// In a sidebar, this will be undefined
+	if (tabInfo == undefined) { // If undefined, we are running in sidebar, not in a tab
+//console.log("is in sidebar");
+	  isInSidebar = true;
+	}
+	
 	initialize();
   }
 );

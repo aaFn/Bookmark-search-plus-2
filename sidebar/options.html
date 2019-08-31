@@ -56,14 +56,17 @@
     <label for="immediatefavdisplay">Revert to old behavior of immediate favicon display. <i>Slows down bookmark tree availability</i></label>
     <br/>
     <input type="checkbox" id="loadffapi">
-    <label for="loadffapi">Revert to old behavior of loading full bookmark tree from FF API at each FF restart. <i>Slows down bookmark tree availability</i></label>
-    <button type="button" id="reloadffapi">Reload from FF API now</button>
+    <label for="loadffapi">Revert to old behavior of loading full bookmark tree from Firefox API at each restart. <i>Slows down bookmark tree availability</i></label>
+    <button type="button" id="reloadffapi">Reload all bookmarks from FF now</button>
     <br/>
     <input type="checkbox" id="delayLoad" disabled>
     <label for="delayLoad"> (not yet effective) Load bookmarks only when required to (show result or open folder), do not load all at start. <i>For large volumes</i></label>
   </p>
   <p>
     <b>User Interface:</b><br/>
+    <input type="checkbox" id="reversepath">
+    <label for="reversepath">Reverse folder hierarchy in paths</label>
+    <br/>
     <input type="checkbox" id="remembersizes">
     <label for="remembersizes">Remember size of resizeable objects - search pane, edit bookmark property, ..</label>
     <button type="button" id="resetsizes" disabled>Reset defaults</button>

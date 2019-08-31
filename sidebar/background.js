@@ -27,7 +27,10 @@ browser.runtime.getBrowserInfo()
 });
 
 const SaveMinHysteresis = 2000; // Space saves to lower memory consumption
+const SaveMinSlowHysteresis = 10000; // Space saves to lower memory consumption, when save is slow (superior to SaveMinHysteresis)
 const SaveMaxHysteresis = 25000; // Space saves during massive favicon operations to lower memory consumption
+const MaxNoSaveDuration = 300000; // In case of slow save, max 5 minutes for all pending saves to be delayed,
+                                  // after that do one save to make sure we're not losing too much.
 const SidebarScanInterval = 1000; // Every 1 s
 //Declared in libstore.js
 //const VersionImg16 = "-img16"; // Signal that all favicons are in 16x16 format
@@ -78,6 +81,7 @@ browser.runtime.getPlatformInfo()
 //var mostVisitedBNId, mostVisitedBN, recentTagBNId, recentTagBN, recentBkmkBNId, recentBkmkBN;
 
 var loadDuration, treeLoadDuration, treeBuildDuration, saveDuration;
+var isSlowSave = false;
 var curBNList = {}; // Current list of BookmarkNode - Saved in storage at each modification
 var bypassedFFAPI = false;
 var rootBN; // Type is BookmarkNode. This is curBNList[0]
@@ -88,6 +92,7 @@ var rootBN; // Type is BookmarkNode. This is curBNList[0]
  */
 let justInstalled; // Signal if we were just installed or this is an update
 let isSidebarOpen = {};			// Track state of open sidebars
+let sidebarCurId = {};			// Track cursor possition of each sidebar to remember it across sidebar close
 let privateSidebarsList = {};	// Track private windows sidebars
 let sidebarScanIntervalId = undefined; // To scan open private sidebars ...
 //let faviconWorker; // For background retrieval of favicons
@@ -138,6 +143,7 @@ let saving = false;
 let saveQueued = false;
 let saveHysteresis = SaveMinHysteresis;
 let lastSaveCallTime = undefined;
+let lastSaveTime = undefined;
 function recallSaveBNList () {
   setTimeout(
     function () {
@@ -171,6 +177,10 @@ function endSaveBNList () { // Save finished
   if (endSaveTime == undefined) {
 	endSaveTime = new Date();
 	trace("Save duration: "+(saveDuration = (endSaveTime.getTime() - endTreeBuildTime.getTime()))+" ms", true);
+	if (saveDuration > SaveMinHysteresis) {
+	  isSlowSave = true;
+	  trace("isSlowSave: true");
+	}
 
 	// Cleanup saved info and release memory, all is now maintained in cur... lists
 	savedBkmkUriList = undefined;
@@ -188,6 +198,73 @@ function errorSaveBNList (err) { // Error on Save
 
 const saveObject0 = {savedBNList: undefined, fTime: undefined, fIndex: 0};
 const saveObject1 = {savedBNListBak: undefined, fTimeBak: undefined, fIndex: 1};
+let executeSaveTimerID;
+function executeSaveBNList () {
+  let curDate = new Date ();
+  lastSaveTime = curDate.getTime();
+  if (executeSaveTimerID != undefined) {
+	executeSaveTimerID = undefined;
+  }
+  try {
+	let saveObj;
+// 	    if (delayLoad_option && (savedBNList != undefined)) { // Merge both list when saving to
+//                                                            // keep what was not yet verified
+//        saveObj = Object.assign({}, savedBNList, curBNList);
+//      }
+//      else {
+	saveObj = curBNList;
+//    }
+	let json = BN_serialize(saveObj[0]);
+	saveObj = undefined; // Free pointer on object
+//console.log("json.length = "+json.length);
+//recallSaveBNList();
+//resolve();
+
+	let saveObject;
+	if (!enableFlipFlop_option || (fIndex == 0)) {
+	  saveObject = saveObject0;
+	  saveObject0.savedBNList = json;
+	  saveObject0.fTime = lastSaveTime;
+//		saveObject0.fIndex = 0;
+//      console.log("savedBNList");
+	}
+	else {
+	  saveObject = saveObject1;
+	  saveObject1.savedBNListBak = json;
+	  saveObject1.fTimeBak = lastSaveTime;
+//		saveObject1.fIndex = 1;
+//      console.log("savedBNListBak");
+	}
+	json = undefined; // Free pointer on string
+	browser.storage.local.set(saveObject)
+	.then(endSaveBNList)
+	.catch(errorSaveBNList);
+
+	// Free json string and time
+	delete saveObject0.savedBNList;
+	delete saveObject0.fTime;
+	delete saveObject1.savedBNListBak;
+	delete saveObject1.fTimeBak;
+  } catch (error) { // Most probably out of memory error
+        	        // Calm down, stop the save chain
+	console.log("saveBNList() error: "+error);
+
+	// Clear flags, we're not busy anymore
+	saving = false;
+	saveQueued = false;
+
+	// Stop and restart the favicon worker so that refresh favicon remains operational
+	// (often, the worker gets "killed" by the out of memory situation)
+/*
+    faviconWorker.terminate();
+    faviconWorker = new Worker("favicon.js");
+    faviconWorker.onmessage = asyncFavicon;
+    faviconWorker.onerror = errorFavicon;
+    faviconWorker.onmessageerror = msgerrorFavicon;
+*/
+  }
+}
+
 function saveBNList () {
 //  trace("saveBNList");
 //  let t1 = new Date();
@@ -195,94 +272,62 @@ function saveBNList () {
   // Recalculate hysteresis in function of call frequency
   let curDate = new Date ();
   let curTime = curDate.getTime();
-  if (lastSaveCallTime == undefined) {
-	lastSaveCallTime = curTime;
-  }
-  else {
+  if (lastSaveCallTime != undefined) {
     let delay = curTime - lastSaveCallTime; // In ms
-	if (delay < SaveMinHysteresis) { // Doing favicon fetching, increase to maximum
+	if (delay < SaveMinHysteresis) { // Doing favicon fetching or doing too often, increase to maximum hysteresis
 	  saveHysteresis = SaveMaxHysteresis; 
 	}
 	else { // Reset to minimum
-  	  saveHysteresis = SaveMinHysteresis; 
+	  if (isSlowSave) {
+  	  	saveHysteresis = SaveMinSlowHysteresis;
+	  }
+	  else {
+  	  	saveHysteresis = SaveMinHysteresis;
+	  }
 	}
-	lastSaveCallTime = curTime;
   }
+  lastSaveCallTime = curTime;
 
   // Execute or register save request for later
   if (!saving) { // Avoid doing several saves at same time.
 	saving = true;
-	try {
-	  let saveObj;
-// 	      if (delayLoad_option && (savedBNList != undefined)) { // Merge both list when saving to
-//                                                              // keep what was not yet verified
-//          saveObj = Object.assign({}, savedBNList, curBNList);
-//        }
-//        else {
-	    saveObj = curBNList;
-//      }
-	  let json = BN_serialize(saveObj[0]);
-	  saveObj = undefined; // Free pointer on object
-//console.log("json.length = "+json.length);
-//recallSaveBNList();
-//resolve();
-
-	  let saveObject;
-	  if (!enableFlipFlop_option || (fIndex == 0)) {
-		saveObject = saveObject0;
-		saveObject0.savedBNList = json;
-		saveObject0.fTime = curTime;
-//		saveObject0.fIndex = 0;
-//        console.log("savedBNList");
-	  }
-	  else {
-		saveObject = saveObject1;
-		saveObject1.savedBNListBak = json;
-		saveObject1.fTimeBak = curTime;
-//		saveObject1.fIndex = 1;
-//        console.log("savedBNListBak");
-	  }
-	  json = undefined; // Free pointer on string
-	  browser.storage.local.set(saveObject)
-	  .then(endSaveBNList)
-	  .catch(errorSaveBNList);
-
-	  // Free json string and time
-	  delete saveObject0.savedBNList;
-	  delete saveObject0.fTime;
-	  delete saveObject1.savedBNListBak;
-	  delete saveObject1.fTimeBak;
-	} catch (error) { // Most probably out of memory error
-        	          // Calm down, stop the save chain
-	  console.log("saveBNList() error: "+error);
-
-	  // Clear flags, we're not busy anymore
-	  saving = false;
-	  saveQueued = false;
-
-	  // Stop and restart the favicon worker so that refresh favicon remains operational
-	  // (often, the worker gets "killed" by the out of memory situation)
-/*
-      faviconWorker.terminate();
-      faviconWorker = new Worker("favicon.js");
-      faviconWorker.onmessage = asyncFavicon;
-      faviconWorker.onerror = errorFavicon;
-      faviconWorker.onmessageerror = msgerrorFavicon;
-*/
+	if (isSlowSave) { // Delay save to allow reactivity on UI
+	  executeSaveTimerID = setTimeout(executeSaveBNList, SaveMinSlowHysteresis);
+	}
+	else { // Execute immediately
+	  executeSaveBNList();
 	}
   }
   else { // Already saving .. queue and do only once later when ongoing one 
          // + hysteresis is finished
 	saveQueued = true;
+	if (executeSaveTimerID != undefined) { // If slow save and there is a pending delayed save, restart delay
+	                                       // to save, to preserve UI responsiveness.
+	  									   // Can lose data if user stops FF before save really occurred !!
+	  // Protection: do not delay for more than MaxNoSaveDuration (5 minutes)
+	  if ((lastSaveTime != undefined) && (curTime - lastSaveTime < MaxNoSaveDuration)) {
+		clearTimeout(executeSaveTimerID);
+		executeSaveTimerID = setTimeout(executeSaveBNList, SaveMinSlowHysteresis);
+	  }
+	  else {
+	  }
+	}
   }
 }
 
 /*
  * Called by a sidebar when opening
+ * 
+ * Return the corresponding saved cursor position if any (a Bookmark Id String)
  */
 function newSidebar (windowId) {
 //  console.log("Background received newSidebar notification from "+windowId);
   isSidebarOpen[windowId] = true;
+  let bnId = sidebarCurId[windowId];
+  if (bnId == undefined) { // No value for that window, use last saved value instead
+	bnId = lastcurbnid_option;
+  }
+  return(bnId);
 }
 
 /*
@@ -291,6 +336,17 @@ function newSidebar (windowId) {
 function closeSidebar (windowId) {
 //  console.log("Background received closeSidebar notification from "+windowId);
   delete isSidebarOpen[windowId];
+}
+
+/*
+ * Remember current selected bookmark id for each window, and save it to local store for
+ * next FF restart.
+ */
+function saveCurBnId (windowId, bnId) {
+  lastcurbnid_option = sidebarCurId[windowId] = bnId;
+  browser.storage.local.set({
+	lastcurbnid_option: bnId
+  });
 }
 
 /*
@@ -309,6 +365,7 @@ function scanSidebars () {
 //          console.log("Deleting "+windowId);
 		  delete privateSidebarsList[windowId];
 		  delete isSidebarOpen[windowId];
+		  // Do not delete entry in sidebarCurId to keep it across sidebar sessions
 		  if (privateSidebarsList.length == 0) {
 			clearInterval(sidebarScanIntervalId);
 			sidebarScanIntervalId = undefined;
@@ -323,6 +380,7 @@ function scanSidebars () {
 //          console.log("Window doesn't exist anymore, deleting it: "+windowId);
 		  delete privateSidebarsList[windowId];
 		  delete isSidebarOpen[windowId];
+		  // Do not delete entry in sidebarCurId to keep it across sidebar sessions
 		}
 	  }
 	);
@@ -569,9 +627,15 @@ function refreshRecentBkmks (a_BTN) {
   let listBN = [];
   let node;
   for (let i of a_BTN) {
-	i.id = "place:" + i.id;
+	let bnId = i.id;
+	i.id = "place:" + bnId;
 	node = BN_create(i, 2, undefined); // Do not fetch any favicon yet
 	node.protect = true;
+	// Get favicon of origin BN if existing
+	let origBN = curBNList[bnId];
+	if (origBN != undefined) {
+	  node.faviconUri = origBN.faviconUri;
+	}
 	listBN.push(node);
   }
 
@@ -772,14 +836,9 @@ function handleAddonMessage (request, sender, sendResponse) {
 //console.log("  sender.url: "+sender.url);
 //console.log("  sender.tlsChannelId: "+sender.tlsChannelId);
 
-	if (msg.startsWith("New:")) { // New private window sidebar opening - Register it
-	  let windowId = parseInt(msg.slice(4), 10);
-	  privateSidebarsList[windowId] = windowId;
-	  newSidebar(windowId);
-	  // Start private windows sidebar tracking, except if FF56 as we cannot track sidebar status in that version
-	  if ((sidebarScanIntervalId == undefined) && !beforeFF57) {
-		sidebarScanIntervalId = setInterval(scanSidebars, SidebarScanInterval);
-	  }
+	if (msg.startsWith("saveCurBnId")) {
+	  let windowId = parseInt(request.source.slice(8), 10);
+	  saveCurBnId(windowId, request.bnId);
 	}
 	else if (msg.startsWith("Close:")) { // Private window closing - De-register it
 	                                     // In fact, this message never comes :-(
@@ -796,6 +855,7 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  let advancedClick_option_old = advancedClick_option;
 	  let closeSearch_option_old = closeSearch_option;
 	  let openTree_option_old = openTree_option;
+	  let reversePath_option_old = reversePath_option;
 	  let rememberSizes_option_old = rememberSizes_option;
 	  let setFontSize_option_old = setFontSize_option;
 	  let fontSize_option_old = fontSize_option;
@@ -863,6 +923,7 @@ function handleAddonMessage (request, sender, sendResponse) {
 			       || (advancedClick_option_old != advancedClick_option)
 			       || (closeSearch_option_old != closeSearch_option)
 			       || (openTree_option_old != openTree_option)
+			       || (reversePath_option_old != reversePath_option)
 			       || (traceEnabled_option_old != traceEnabled_option)
 			      ) { // Those options only require a re-read and some minor actions
 			sendAddonMessage("savedOptions");
@@ -873,8 +934,29 @@ function handleAddonMessage (request, sender, sendResponse) {
 		function (err) {
 		  let msg = "Error on processing addon message : "+err;
 		  console.log(msg);
-		  console.log("lineNumber: "+err.lineNumber);
-		  console.log("fileName:   "+err.fileName);
+		  if (err != undefined) {
+			console.log("lineNumber: "+err.lineNumber);
+			console.log("fileName:   "+err.fileName);
+		  }
+		}
+	  );
+	}
+	else if (msg.startsWith("savedSearchOptions")) { // Reload them all
+	  refreshOptionsLStore()
+	  .then(
+		function () {
+		  // Signal to others the change in option
+		  sendAddonMessage("savedSearchOptions");
+		}
+	  )
+	  .catch( // Asynchronous, like .then
+		function (err) {
+		  let msg = "Error on processing savedSearchOptions : "+err;
+		  console.log(msg);
+		  if (err != undefined) {
+			console.log("lineNumber: "+err.lineNumber);
+			console.log("fileName:   "+err.fileName);
+		  }
 		}
 	  );
 	}
@@ -889,8 +971,10 @@ function handleAddonMessage (request, sender, sendResponse) {
 		function (err) {
 		  let msg = "Error on processing reloadFFAPI : "+err;
 		  console.log(msg);
-		  console.log("lineNumber: "+err.lineNumber);
-		  console.log("fileName:   "+err.fileName);
+		  if (err != undefined) {
+			console.log("lineNumber: "+err.lineNumber);
+			console.log("fileName:   "+err.fileName);
+		  }
 		}
 	  );
 	}
@@ -926,7 +1010,21 @@ function handleAddonMessage (request, sender, sendResponse) {
 	}
  
 	// Answer
-	if (msg.startsWith("getCurBNList")) {
+	if (msg.startsWith("New:")) { // New private window sidebar opening - Register it
+	  let windowId = parseInt(msg.slice(4), 10);
+	  privateSidebarsList[windowId] = windowId;
+	  let bnId = newSidebar(windowId);
+	  // Start private windows sidebar tracking, except if FF56 as we cannot track sidebar status in that version
+	  if ((sidebarScanIntervalId == undefined) && !beforeFF57) {
+		sidebarScanIntervalId = setInterval(scanSidebars, SidebarScanInterval);
+	  }
+	  sendResponse(
+		{content: "savedCurBnId",
+		 bnId: bnId
+		}
+	   );
+	}
+	else if (msg.startsWith("getCurBNList")) {
 	  let json = BN_serialize(curBNList[0]);
 	  sendResponse(
 		{content: "getCurBNList",
@@ -969,11 +1067,13 @@ function handleAddonMessage (request, sender, sendResponse) {
   }
   catch (error) {
 	console.log("Error processing message: "+request.content);
-	console.log("message:    "+error.message);
-	console.log("lineNumber: "+error.lineNumber);
-	console.log("fileName:   "+error.fileName);
-//	console.log("   keys: "+Object.keys(error));
-//	console.log("   values: "+Object.values(error));
+	if (error != undefined) {
+	  console.log("message:    "+error.message);
+	  console.log("lineNumber: "+error.lineNumber);
+	  console.log("fileName:   "+error.fileName);
+//		console.log("   keys: "+Object.keys(error));
+//		console.log("   values: "+Object.values(error));
+	}
   }
 }
 
@@ -1012,7 +1112,7 @@ let getInstallStatus = new Promise (
   }
 );
 function handleInstall (details) {
-  console.log("Install event reason: "+details.reason+" Temporary: "+details.temporary);
+  console.log("Install event reason: "+details.reason+" - Temporary: "+details.temporary);
   if (details.reason == "install") {
 	justInstalled = true;
   }
@@ -1931,7 +2031,7 @@ function completeBookmarks () {
   // Add BSP2 specific context menu / submenu on bookmarks 
   browser.menus.create({ // Main menu
     id: mainMenuId,
-    title: "BSP2 Show path to &bookmark item",
+    title: "BSP2 Path to &bookmark item",
     contexts: ["bookmark"]
   });
   browser.menus.create({ // Sub menu 1
@@ -2070,8 +2170,10 @@ function initialize2 () {
 		function (err) {
 		  let msg = "initialize2() error : "+err;
 		  console.log(msg);
-		  console.log("lineNumber: "+err.lineNumber);
-		  console.log("fileName:   "+err.fileName);
+		  if (err != undefined) {
+			console.log("lineNumber: "+err.lineNumber);
+			console.log("fileName:   "+err.fileName);
+		  }
 		}
 	  );
 	}
@@ -2092,8 +2194,10 @@ function initialize2 () {
   } catch (err) {
 	let msg = "Error in initialize2() : "+err;
 	console.log(msg);
-	console.log("lineNumber: "+err.lineNumber);
-	console.log("fileName:   "+err.fileName);
+	if (err != undefined) {
+	  console.log("lineNumber: "+err.lineNumber);
+	  console.log("fileName:   "+err.fileName);
+	}
   }
 }
 
@@ -2239,8 +2343,10 @@ readFullLStore(false, trace)
 		function (err) {
 		  let msg = "Error on gotInstallStatus : "+err;
 		  console.log(msg);
-		  console.log("lineNumber: "+err.lineNumber);
-		  console.log("fileName:   "+err.fileName);
+		  if (err != undefined) {
+			console.log("lineNumber: "+err.lineNumber);
+			console.log("fileName:   "+err.fileName);
+		  }
 		}
 	  );
 	  // The install status will never come on regular FF start and no addon install, so timeout 50 ms on it
@@ -2252,8 +2358,10 @@ readFullLStore(false, trace)
   function (err) {
 	let msg = "Error on loading from local storage : "+err;
 	console.log(msg);
-	console.log("lineNumber: "+err.lineNumber);
-	console.log("fileName:   "+err.fileName);
+	if (err != undefined) {
+	  console.log("lineNumber: "+err.lineNumber);
+	  console.log("fileName:   "+err.fileName);
+	}
   }
 );
 

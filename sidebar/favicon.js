@@ -51,8 +51,10 @@ function answerBack (bnId, uri) {
   catch (err) {
 	let msg = "Error in favicon call to asyncFavicon() : "+err;
 	console.log(msg);
-	console.log("lineNumber: "+err.lineNumber);
-	console.log("fileName:   "+err.fileName);
+	if (err != undefined) {
+	  console.log("lineNumber: "+err.lineNumber);
+	  console.log("fileName:   "+err.fileName);
+	}
   }
 
   if (uri != "starting:") {
@@ -150,8 +152,10 @@ function getUri (bnId, url, enableCookies) {
    	      function (err) {
    	    	let msg = "Response.blob Error :-S "+err;
    	    	console.log(msg, url);
-   	    	console.log("lineNumber: "+err.lineNumber);
-   	    	console.log("fileName:   "+err.fileName);
+   	    	if (err != undefined) {
+   	    	  console.log("lineNumber: "+err.lineNumber);
+   	    	  console.log("fileName:   "+err.fileName);
+   	    	}
    	    	answerBack(bnId, "error: "+msg);
    	      }
    	    );
@@ -444,8 +448,10 @@ function fetchFavicon (bnId, bnUrl, enableCookies) {
 		  function (err) {
 			let msg = "Error on loading from local storage : "+err;
 			console.log(msg);
-			console.log("lineNumber: "+err.lineNumber);
-			console.log("fileName:   "+err.fileName);
+			if (err != undefined) {
+			  console.log("lineNumber: "+err.lineNumber);
+			  console.log("fileName:   "+err.fileName);
+			}
 			answerBack(bnId, "error: "+msg);
 		  }
 		);
@@ -469,8 +475,10 @@ function fetchFavicon (bnId, bnUrl, enableCookies) {
       }
 	  let msg = "Page fetch Error :-S "+err;
 	  console.log(msg, bnUrl);
-	  console.log("lineNumber: "+err.lineNumber);
-	  console.log("fileName:   "+err.fileName);
+	  if (err != undefined) {
+		console.log("lineNumber: "+err.lineNumber);
+		console.log("fileName:   "+err.fileName);
+	  }
 	  answerBack(bnId, "error: "+msg);
 	}
   );
