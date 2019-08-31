@@ -1,8 +1,196 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's and some limitations I know of today.
+- 2.0.66 Improvements
+    - Remember last highlighted bookmark across sidebar sessions, and across FF sessions, if it still exists,
+      else go at top of the tree.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/82
+- 2.0.65 Improvements
+    - Removed the version number form the Sidebar title, this is superfuous now, as it is shown by hovering
+      on the magnigying glass, and on the Star icon in the toolbar, and anyway not really the place for it.
+    - Added new option "Reverse folder hierarchy in paths", effective in BSP2 Property popups, and in the
+      native Bookmark sidebar, Bookmark Library and Toolbar bookmark context submenus.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/96
+    - Added complex searching, allowing to select on field (both, title, url), on scope (all, current
+      folder) and to change the match method (words, regex).
+        - The magnifier glass becomes an active button
+        - Its filling, image and color changes depending on the selected search combination
+        - Default is (both, all, words), and corresponds to the traditional mode, which is also the native
+          Bookmark Sidebar behavior.
+        - https://github.com/aaFn/Bookmark-search-plus-2/issues/90
+        - https://github.com/aaFn/Bookmark-search-plus-2/issues/28
+    - The "Open BSP2 in a tab" hidden menu becomes now directly accessible through that button.
+- 2.0.64 Improvements
+    - In case of slow save (see 2.0.63), set a maximum duration of 5 minutes on delayed saves.
+      This is to make sure that we are not losing too many changes in case Firefox is closed while having
+      a continued flow of bookmark changes delaying save.
+      Typically occurs when fetching large bunches of favicons, like when BSP2 gets installed = this is
+      to make sure we're not endlessly forgetting favicons, when fetching all of them is longer than the
+      FF browser session and user exits it before full favicon fetching completion ..
+      Again can only occur for very large numbers of bookmarks, so this is a very specific case.
+- 2.0.63 Improvements
+    - Introduced for users with large numbers of bookmarks (> 10000 ?) a workaround delay on save to local
+      storage when there is a slow save (> 2s), to maintain UI responsiveness.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/103
+      - As long as there are actions on BSP2 UI, the delay is restarted to continue being responsive.
+        The delay is 10s .. so for big numbers of bookmarks users, please always allow 10s of inactivity
+        after your last action on BSP2 UI before closing FF.
+      - As said above, this is a workaround, while waiting that FF improves on saves to local storage (this
+        is already much better as of 67.0.4, crossing fingers this will continue to improve). 
+      - Indeed, since FF 66, Indexed DB's are used for local storage instead of simple json text files,
+        as per:
+          https://www.mozilla.org/en-US/firefox/66.0/releasenotes/
+          https://blog.mozilla.org/addons/2019/02/15/extensions-in-firefox-66/
+          https://blog.mozilla.org/addons/2018/08/03/new-backend-for-storage-local-api/
+          https://bugzilla.mozilla.org/show_bug.cgi?id=1406181
+          https://www.reddit.com/r/firefox/comments/ar78wr/firefox_extensions_to_use_different_storage_type/egmdkul/
+      - This new local storage format is in fact slowing down a lot Firefox when number of bookmarks are big,
+        and this is making the UI quite unresponsive.
+      - I am also thinking it could be the source of Firefox occasionally "forgetting" to save to its
+        internal DB some changes on bookmarks for a few users with very large numbers of bookmarks, resulting
+        in loss of work on their side afterwards when they reload from the internal DB, or want to work
+        directly on the native Bookmark sidebar.
+      - Drawback of the workaround is a slight chance to have de-synchronization on BSP2 side for users with
+        large numbers of bookmarks, if FF is closed before BSP2 had time to do its delayed save (10s) = to be
+        resolved by pressing the "Reload all bookmarks from FF now" button in the Options page. 
+- 2.0.62 Bugs & Improvements
+    - Corrected a bug which caused an exception when dragging a bookmark to the last folder of the
+      tree, if that one was empty.
+    - Added popup display of a folder name when hovering over it in search result, like in main tree.
+    - Aligned folders with other bookmark items in search results to avoid giving the impression that
+      results after it are children of it.
+      Added a twistie at front of it to keep it visually distinguishable from normal bookmarks in
+      big result lists.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/84
+- 2.0.61 Bugs & Improvements
+    - Increased the number of retries for the Linux FF startup robustness feature from 3 to 10,
+      to get some margin, as 3 seems to be the minimum number I observe when the problem occurs.
+    - Fixed bad URL in bookmark when dragging and dropping the address from the address bar to the
+      bookmark tree, it was keeping the title in it from the drag info.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/101
+    - Added handling of "about:reader" URL bookmarks like normal (non protected) bookmarks.
+      However, it is not possible to open a tab from such a bookmark since FF is preventing that
+      by security, with the error: `Illegal URL: about:reader?url=http...`
+      So nothing happens when clicking on such a bookmark (apart from the error generated in the browser
+      console, interrupting the code execution and preventing the action).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/104
+    - Accept dragging and dropping Reader type of tabs / addresses into the bookmarks tree.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/104
+- 2.0.60 Bugs & Improvements
+    - Changed the name of the Reload bookmarks button in options page to something more meaningful
+      to all users.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/93
+    - Avoid favicon fetching when refreshing the Recently Bookmarked list items by getting the
+      original item favicon from the tree, when already existing.
+    - Added retries on read from local store at FF start time. It appears that on Linux, after FF changed
+      local storage from JSON files to Indexed DB's in FF 66, we can have failures
+        "TransactionInactiveError: A request was placed against a transaction which is currently not active, or which is finished"
+      when reading "local storage " as FF is starting.
+      When this happens, this is blocking BSP2 background task in error :-(
+    - Added some robustness on a few events when adding new bookmarks, to resist to some de-synchro
+      I am seeing appeared with FF 65/66 .. :-(
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/99
+- 2.0.59 Bugs & Improvements
+    - Improved handling of FF66 bug workaround on Linux for target element which is set to body.
+    - Improved handling of events to clear open context menus when right clicking inside search box
+      or inside the trace box.
+    - Corrected a bug on error logging when the error given by FF is undefined (!!), which was making
+      the background task to stop in exception.
+- 2.0.58 Improvements
+    - Improved visiblity of folder twisties by adjusting to Windows 10 Explorer colors.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/89
+    - Workaround for an FF66 bug in Linux on contextmenu events, where the target element of the
+      subsequent click event is changed to be always body !
+      This was resulting in the context menu to always disappear when release button 2, and to make
+      the default body menu to appear :-(
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/9
+    - Changed behavior of default menu, which is now only a context menu on the magnifier glass, in
+      preparation for https://github.com/aaFn/Bookmark-search-plus-2/issues/90
+- 2.0.57 Bugs & Improvements
+    - Improved insertion as first item of an open non empty folder, which demanded precise movements to
+      distinguish between 'folder next sibbling' and 'folder first item'. Now only first item is possible,
+      so as to avoid hassle to the user of distinguishing between the two.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/89
+    - Saturated a little more the hover color to make it more visible.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/89
+    - Forcing text color to black in the searchbox, in case an internal theme is overriding the sidebar page
+      default and setting it to white on white background ...
+- 2.0.56 Bugs & Improvements
+    - Corrected a regression introduced in 2.0.55 when dragging onto a folder.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/89
+    - Palliated for missing "leave" and "exit" events on drag and drop, which FF appears to forget
+      to send sometimes, and which was resulting in unwanted remaining insert highlight marks. Especially
+      under Linux.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/89
+- 2.0.55 Bugs & Improvements
+    - Corrected the mouse pointer behavior on context menus when BSP2 is open in a tab, as it was sometimes
+      a text cursor.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/89
+    - Added handling for a very rare case where a search result would return a separator .. ignore it.
+    - Corrected a bug on dragging and dropping a tab whose URL was holding a port number, ending in a
+      code exception and no bookmark created.
+    - Added capability to drag from tabbed BSP2 to sidebar BSP2, and vice versa.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/89
+    - Added capability to drag from tabbed BSP2 to native Bookmark sidebar, and vice versa.
+      This got a limitation though, tracked in FF bug https://bugzilla.mozilla.org/show_bug.cgi?id=1531539,
+      that folders cannot be dragged towards the native sidebar, and that bookmark items and separators are
+      copied instead of being moved.
+      Reverse direction is working fine.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/89
+- 2.0.54 Bugs & Improvements
+    - Improved on displaying multiple spaces in bookmark titles, by instructing HTML to preserve space
+      formatting and not collapse them into one space.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/88
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/89
+    - Refreshed the "nofavicon" and "nofavicontmp" icons with the latest icons used by FF now in the
+      native Bookmark sidebar.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/89
+    - Added a basic handling for specific "place:" bookmark items not emulated (yet ?) by BSP2, by showing
+      their URL as title instead of no title, so as to give the user some clue on what such items are, and
+      an easier way to report / describe them on GitHub. 
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/89
+    - Corrected a few locations inside the sidebar where right click was not closing a context menu open
+      on a bookmark item.
+    - Added a context menu on the magnifier glass (inside the search box), and on the blank parts of the body,
+      with an action to allow opening BSP2 in a full tab for very wide visiblity, since FF limits the size of
+      sidebars.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/71
+- 2.0.53 Bugs & Improvements
+    - Added support for drag and drop of the URL address text selected in the Location bar.
+- 2.0.52 Bugs & Improvements
+    - Corrected a rare bug where auto-scrolling was disabled when dragging around end of panel, in the case
+      of dragging from outside but not triggering an initial scroll at entry (because the bookmark pane
+      was already at its end scroll position).
+    - Improved the Linux implementation on "prevent initial auto-scrolling" by simulating continuous
+      dragover events.
+      A bug is also filed on Bugzilla to signal that FF is not following its specs on dragover under Linux
+        Cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1523769
+    - Applied to the search result panel the same behavior of disabling auto-scrolling when dragging an
+      outside element over it.
+    - Changed handling of internal favicons like "folder" and "nofavicon", which for speed purpose were
+      using img HTML elements with no src= attributes and only a background image, and use now div HTML elements
+      instead (still with background images).
+      Indeed, starting with FF65, img HTML elements with no src= attribute start to show 2 box-shadow: inset
+      effects above the background image.
+        Cf. https://github.com/aaFn/Bookmark-search-plus-2/issues/83
+- 2.0.51 Bugs & Improvements
+    - Shortened the submenu name added by BSP2 to FF native context menus to "BSP2 Path to bookmark item"
+      (removed "Show").
+    - Fixed the size of both the font and place size input fields in the BSP2 Options page, and increased
+      the size of the font one from 3em to 4em, as under XFCE this is too small and the button arrows are
+      overlaying the text inside the input.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/81
+    - Corrected a code exception occurring when dragging a bookmark item over the scrollbars.
+    - Prevent initial auto-scrolling from happening when dragging from outside to inside, by temporarily
+      disabling scrollbars until we get out of the bookmarks pane (with an hysteresis delay of 0.5s), or
+      until we go further inside the bookmarks, to enable auto-scroll to happen while remaining inside.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/77
+      Note that on Linux, I do not appear to get continuous dragover events (every 350 ms as per spec
+      https://developer.mozilla.org/en-US/docs/Web/Events), so this is creating an odd effect some times,
+      and I might end up disabling that improvement on Linux if I do not find a work around ... :-(
+    - Also prevent Search result pane scrolling when dragging an element out of it. 
 - 2.0.50 Bugs & Improvements
-    - Added a native FF context menu extension for bookmarks, to show their path. This is adding a
+    - Added a native FF context menu extension for FF bookmarks, to show their path. This is adding a
       "BSP2 Show path to bookmark item" specific submenu, to display the path to the bookmark item.
       For now, this works only on bookmarks toolbar or menu. This doesn't currently work for bookmark sidebar and
       library window items ... cf. API limitation on "bookmark" type

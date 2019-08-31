@@ -5,9 +5,9 @@
   "description": "Displays and filters bookmarks on search string, show parent folders.",
   "author": "aaFn",
 
-  "version": "2.0.50",
+  "version": "2.0.66",
 
-  "applications": {
+  "browser_specific_settings": {
     "gecko": {
       "id": "bookmarksearchplus2@aafn.org",
       "strict_min_version": "56.0"
