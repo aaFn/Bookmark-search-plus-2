@@ -1,0 +1,4 @@
+Mozilla Firefox icon for folders used in the native bookmark sidebar, before Firefox 56.
+
+Mozilla Foundation licensing & trademark is here https://www.mozilla.org/en-US/foundation/licensing/
+Mozilla Public License is here https://www.mozilla.org/en-US/MPL/
