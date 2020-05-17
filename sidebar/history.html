@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="history.css"/>
+  </head>
+
+<body id="body" class="fontdflt">
+  <div id="pane">
+    <div id="bookmarks" class="bscrollok">
+<!--
+      <table><tbody>
+        <tr data-id=".." data-type="meta"><td class="brow" tabindex="0" draggable="false">
+          <div class="meta" draggable="false">
+            <div class="seqnum" draggable="false">0</div>
+            <div class="histicon reloaded" title="reload+<date>" draggable="false"></div>
+            <span class="favtext" draggable="false">BSP2 reload</span>
+          </div>
+        </td></tr>
+        <tr data-id=".." data-type="bookmark"><td class="brow" tabindex="0" draggable="true">
+          <div class="bkmkitem_b inactive" draggable="false">
+            <div class="seqnum" draggable="false">1</div>
+            <div class="histicon created" title="create+<date>" draggable="false"></div>
+            <img src="/icons/nofavicon.png" class="favicon" draggable="false">
+            <span class="favtext" draggable="false">bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb</span>
+          </div>
+        </td></tr>
+        <tr data-id=".." data-type="separator"><td class="brow" tabindex="0" draggable="true">
+          <div class="bkmkitem_s" draggable="false">
+            <div class="seqnum" draggable="false">87</div>
+            <div class="histicon removed" title="remove+<date>" draggable="false"></div>
+            <div class="favseparator" draggable="false"></div>
+            <div class="favseparatorend" draggable="false"></div>
+          </div>
+        </td></tr>
+        <tr data-id=".." data-type="folder"><td class="brow" tabindex="0" draggable="true">
+          <div class="bkmkitem_f" draggable="false">
+            <div class="seqnum" draggable="false">123</div>
+            <div class="histicon moved_u" title="undo move+<date>" draggable="false"></div>
+            <div class="ffavicon" draggable="false"></div>
+            <span class="favtext" draggable="false">bbbbb</span>
+          </div>
+        </td></tr>
+      </tbody></table>
+-->
+    </div>
+  </div>  
+  <div id="node">
+    <table id="ndtable">
+      <tbody>
+        <tr>
+          <td colspan="2">#</td><td><span id="ndnum">&nbsp;</span></td>
+        </tr>
+        <tr>
+          <td colspan="2">Timestamp</td><td><span id="ndtimestamp">&nbsp;</span></td>
+        </tr>
+        <tr>
+          <td colspan="2">Action</td><td><span id="ndaction">&nbsp;</span></td>
+        </tr>
+        <tr>
+          <td colspan="2">State</td><td><span id="ndstate">&nbsp;</span></td>
+        </tr>
+        <tr><td colspan="3" class="ndrrule"></td></tr>
+        <tr>
+          <td rowspan="9" class="ndcol1">Common</td><td class="ndcol2">Bookmark id</td><td class="ndcol3"><div id="ndbnid" class="ndfield1">&nbsp;</div></td>
+        </tr>
+        <tr>
+          <td class="ndcol2">Bookmark type</td><td class="ndcol3"><div id="ndtype" class="ndfield1">&nbsp;</div></td>
+        </tr>
+        <tr>
+          <td class="ndcol2">Path</td><td class="ndcol3"><div id="ndpath" class="ndfield2">&nbsp;</div></td>
+        </tr>
+        <tr>
+          <td class="ndcol2">Index</td><td class="ndcol3"><div id="ndindex" class="ndfield1">&nbsp;</div></td>
+        </tr>
+        <tr>
+          <td class="ndcol2">Parent id</td><td class="ndcol3"><div id="ndparentid" class="ndfield1">&nbsp;</div></td>
+        </tr>
+        <tr>
+          <td class="ndcol2">Title</td><td class="ndcol3"><div id="ndtitle" class="ndfield2">&nbsp;</div></td>
+        </tr>
+        <tr>
+          <td class="ndcol2">Favicon</td><td class="ndcol3"><div id="ndfavicon" class="favicon"></div></td>
+        </tr>
+        <tr>
+          <td class="ndcol2">URL</td><td class="ndcol3"><div id="ndurl" class="ndfield2">&nbsp;</div></td>
+        </tr>
+        <tr>
+          <td class="ndcol2">Child ids</td><td class="ndcol3"><div id="ndchildids" class="ndfield2">&nbsp;</div></td>
+        </tr>
+        <tr><td colspan="3" class="ndrrule"></td></tr>
+        <tr>
+          <td rowspan="3" class="ndcol1">Move</td><td class="ndcol2">To path</td><td class="ndcol3"><div id="ndtopath" class="ndfield2">&nbsp;</div></td>
+        </tr>
+        <tr>
+          <td class="ndcol2">To index</td><td class="ndcol3"><div id="ndtoindex" class="ndfield1">&nbsp;</div></td>
+        </tr>
+        <tr>
+          <td class="ndcol2">To parent id</td><td class="ndcol3"><div id="ndtoparentid" class="ndfield1">&nbsp;</div></td>
+        </tr>
+        <tr><td colspan="3" class="ndrrule"></td></tr>
+        <tr>
+          <td rowspan="2" class="ndcol1">Change</td><td class="ndcol2">To title</td><td class="ndcol3"><div id="ndtotitle" class="ndfield2">&nbsp;</div></td>
+        </tr>
+        <tr>
+          <td class="ndcol2">To URL</td><td class="ndcol3"><div id="ndtourl" class="ndfield2">&nbsp;</div></td>
+        </tr>
+        <tr><td colspan="3" class="ndrrule"></td></tr>
+        <tr>
+          <td class="ndcol1">Reorder</td><td class="ndcol2">To child ids</td><td class="ndcol3"><div id="ndtochildids" class="ndfield2">&nbsp;</div></td>
+        <tr><td colspan="3" class="ndrrule"></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div id="actions">
+    <div id="abuttons">
+  	  <br>
+      <span>Actions:</span><br>
+      <button type="button" id="aundo" disabled>Undo (Ctrl-Z)</button>
+      <button type="button" id="aredo" disabled>Redo (Ctrl-Y)</button>
+      <button type="button" id="aundotosel" disabled>Restore to selected (undo all after)</button>
+      <button type="button" id="areplay" disabled>Replay selection</button>
+    </div>
+  	<br>
+  	<div id="atextlog">
+      <span>Log:</span><br>
+    </div>
+    <textarea readonly id="alog"></textarea>
+  </div>
+  <script src="libstore.js"></script>
+  <script src="BookmarkNode.js"></script>
+  <script src="HistoryNode.js"></script>
+  <script src="history.js"></script>
+</body>
+
+</html>

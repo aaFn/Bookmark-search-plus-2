@@ -1,0 +1,380 @@
+.fontdflt {
+  font: caption;
+}
+
+.fontwin {
+  font: 12px "Segoe UI";
+}
+
+html {
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0px;
+  height: calc(100% - 0px);
+  width: calc(100% - 0px);
+  display: grid;
+  grid-template-columns: min-content minmax(400px, auto);
+  grid-template-rows: 400px minmax(200px, auto);
+}
+
+#pane {
+  grid-column-start: 1;
+  grid-column-end: 2;
+  grid-row-start: 1;
+  grid-row-end: 3;
+  overflow: auto;
+  resize: horizontal;
+  width: 200px;
+  min-width: 200px;
+  max-width: 400px;
+  border: 1px solid #F0F0F0;
+  background-color: white;
+  color: #222426;
+  display: flex;
+  flex-direction: column;
+}
+
+#bookmarks {
+  margin: 0 0 0 0;
+  border-top: 1px solid white;
+  flex: auto;
+}
+
+.bscrollok {
+  overflow: auto;
+}
+
+.bscrollko {
+  overflow: hidden;
+}
+
+table {
+  min-width: calc(100% - 2px);
+  border-spacing: 0;
+}
+
+tbody {
+  min-width: 100%;
+}
+
+.brow {
+  min-width: 100%;
+  background-color: white;
+  border: 1px solid white;
+  padding: 0;
+  min-height: 16px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.selbrow {
+  min-width: 100%;
+  background-color: #D9D9D9;
+  border-color: #D9D9D9 #D9D9D9 #CCCCCC;
+  border-width: 1px;
+  border-style: solid;
+  padding: 0;
+  min-height: 16px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.brow:hover, .selbrow:hover {
+  background-color: #D7EDFF;
+  border-color: #D7EDFF;
+}
+
+.brow:focus, .selbrow:focus {
+  outline: none;
+  background-color: #CDE8FF;
+  border-color: #7BC3FF;
+}
+
+.seqnum {
+  height: 16px;
+  width: 5ch;
+  flex: none;
+  cursor: default;
+}
+
+.nocursor {
+  flex: none;
+  height: 16px;
+  width: 16px;
+  vertical-align: text-bottom;
+}
+
+.urcursor {
+  flex: none;
+  height: 16px;
+  width: 16px;
+  vertical-align: text-bottom;
+  background-image: url("/icons/urcursor.png");
+}
+
+.histicon {
+  flex: none;
+  height: 16px;
+  width: 16px;
+  margin-right: 4px;
+  vertical-align: text-bottom;
+}
+
+.started {
+  background-image: url("/icons/started.png");
+}
+
+.reloaded {
+  background-image: url("/icons/reloaded.png");
+}
+
+.reloadeda {
+  background-image: url("/icons/reloadeda.png");
+}
+
+.created {
+  background-image: url("/icons/created.png");
+}
+
+.created_u {
+  background-image: url("/icons/created_u.png");
+}
+
+.created_r {
+  background-image: url("/icons/created_r.png");
+}
+
+.moved {
+  background-image: url("/icons/moved.png");
+}
+
+.movedd {
+  background-image: url("/icons/movedd.png");
+}
+
+.moved_u {
+  background-image: url("/icons/moved_u.png");
+}
+
+.moved_r {
+  background-image: url("/icons/moved_r.png");
+}
+
+.reordered {
+  background-image: url("/icons/reordered.png");
+}
+
+.reorderedd {
+  background-image: url("/icons/reorderedd.png");
+}
+
+.reordered_u {
+  background-image: url("/icons/reordered_u.png");
+}
+
+.reordered_r {
+  background-image: url("/icons/reordered_r.png");
+}
+
+.removed {
+  background-image: url("/icons/removed.png");
+}
+
+.removedd {
+  background-image: url("/icons/removedd.png");
+}
+
+.removed_u {
+  background-image: url("/icons/removed_u.png");
+}
+
+.removed_r {
+  background-image: url("/icons/removed_r.png");
+}
+
+.changed {
+  background-image: url("/icons/changed.png");
+}
+
+.changedd {
+  background-image: url("/icons/changed.png");
+}
+
+.changed_u {
+  background-image: url("/icons/changed_u.png");
+}
+
+.changed_r {
+  background-image: url("/icons/changed_r.png");
+}
+
+.inactive {
+  opacity: 0.5;
+}
+
+.meta {
+  flex: none;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  cursor: default;
+  border-top: solid 2px transparent;
+  border-bottom: solid 2px transparent;
+  margin-top: -2px;
+  margin-bottom: -2px;
+}
+
+.bkmkitem_b {
+  flex: none;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  cursor: default;
+  border-top: solid 2px transparent;
+  border-bottom: solid 2px transparent;
+  margin-top: -2px;
+  margin-bottom: -2px;
+}
+
+.bkmkitem_f {
+  flex: none;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  cursor: default;
+  border-top: solid 2px transparent;
+  border-bottom: solid 2px transparent;
+  margin-top: -2px;
+  margin-bottom: -2px;
+}
+
+.bkmkitem_s {
+  flex: auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-top: solid 2px transparent;
+  border-bottom: solid 2px transparent;
+  margin-top: -2px;
+  margin-bottom: -2px;
+}
+
+.favseparator {
+  flex: auto;
+  border-bottom: 1px solid #222426;
+}
+
+.brow:hover .bkmkitem_s .favseparator, .brow:focus .bkmkitem_s .favseparator, .selbrow .bkmkitem_s .favseparator {
+  border-bottom-color: #222426;
+}
+
+.favseparatorend {
+  flex: none;
+  width: 1px;
+  height: 16px;
+}
+
+.ffavicon {
+  flex: none;
+  height: 16px;
+  width: 16px;
+  vertical-align: text-bottom;
+  background-image: url("/icons/folder.png");
+}
+
+.nofavicon {
+  flex: none;
+  height: 16px;
+  width: 16px;
+  vertical-align: text-bottom;
+  background-image: url("/icons/nofavicon.png");
+}
+
+.favicon {
+  flex: none;
+  height: 16px;
+  width: 16px;
+  vertical-align: text-bottom;
+}
+
+.favtext {
+  margin-left: 3px;
+  white-space: pre;
+}
+
+#node {
+  overflow: auto;
+  border: 1px solid #F0F0F0;
+  border-bottom-color: #E0E0E0;
+  background: #F0F0F0;
+}
+
+#ndtable {
+  width: calc(100% - 2px);
+}
+
+.ndcol1 {
+  min-width: 80px;
+  width: 80px;
+}
+
+.ndcol2 {
+  min-width: 120px;
+  width: 120px;
+}
+
+.ndcol3 {
+}
+
+.ndrrule {
+  border-top: 1px solid #A0A0A0;	
+  border-bottom: 1px solid #A0A0A0;
+  padding: 0;	
+}
+
+.ndfield1 {
+  border: 1px solid #A0A0A0;
+  padding: 0 4px 0 4px;
+  width: 25ch;
+}
+
+.ndfield2 {
+  border: 1px solid #A0A0A0;
+  padding: 0 4px 0 4px;
+  width: calc(100% - 10px);
+  white-space: pre;
+}
+
+#actions { 
+  overflow: auto;
+  border: 1px solid #F0F0F0;
+  border-top-color: #E0E0E0;
+  background: #F0F0F0;
+  display: flex;
+  flex-direction: column;
+}
+
+#buttons {
+  flex: none;
+}
+
+#atextlog {
+  flex: none;
+}
+
+#alog {
+  flex: auto;
+  width: calc(100% - 10px);
+  margin-left: 2px;
+  resize: none;
+  font-size: x-small;
+  white-space: pre;
+  background: #F0F0F0;
+  overflow: visible;
+}

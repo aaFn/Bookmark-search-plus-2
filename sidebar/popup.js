@@ -24,20 +24,22 @@ gettingItem.then((res) => {
   let height;
   let width;
   if (remembersizes_option) {
-    height = res.popupheight_option;
-    width = res.popupwidth_option;
+	height = res.popupheight_option;
+	width = res.popupwidth_option;
+//console.log("popup.js entrance - remembersizes_option set - top="+top+" left="+left+" height="+height+" width="+width);
   }
   else {
-    height = PopupHeight;
-    width = PopupWidth;
+	height = PopupHeight;
+	width = PopupWidth;
+//console.log("popup.js entrance - top="+top+" left="+left);
   }
   browser.windows.update(browser.windows.WINDOW_ID_CURRENT,
-                         {left: left,
-	                      top: top,
-	                      height: height,
-	                      width: width
-	                     }
-                        );
+	  					 {left: left,
+						  top: top,
+						  height: height,
+						  width: width
+	  					 }
+  						);
 });
 //----- End of position ignored workaround -----
 
@@ -65,9 +67,9 @@ let platformOs;
 let myWindowId;
 let myTab;
 let myType; //String = type of window being open. This conditions button names and actions
-            // Can be:	newbkmk
+			// Can be:	newbkmk
 			//          newfldr
-            //          propbkmk
+			//          propbkmk
 			//			propfldr
 let isPropPopup; // To signal if we are a properties popup, or a creation one
 let isFolder; // To signal if we are on folder or a bookmark item
@@ -85,7 +87,7 @@ let btnUrl;
  */
 function keyHandler (e) {
   let target = e.target; // Type depends ..
-//  console.log("Key event: "+e.type+" key: "+e.key+" char: "+e.char+" target: "+target);
+//console.log("Key event: "+e.type+" key: "+e.key+" char: "+e.char+" target: "+target);
 
   if (e.key == "Escape") {
 	// Shortcut to exit popup
@@ -98,26 +100,36 @@ function keyHandler (e) {
 	  // Commit any change and close self
 	  if (btnId != undefined) {
 		if (isFolder) {
-	      browser.bookmarks.update(
-  	        btnId,
-  	        {title: TitleInput.value,
-  	        }
-  	      );
+		  browser.bookmarks.update(
+			btnId,
+			{title: TitleInput.value,
+			}
+		  );
 		}
 		else {
-	      let value = AddressInput.value;
-	      if (value.length == 0)
-		    value = "about:blank";
-	      browser.bookmarks.update(
-	        btnId,
-	        {title: TitleInput.value,
-		     url: value	
-	        }
-	      );
-	    }
+		  let value = AddressInput.value;
+		  if (value.length == 0)
+			value = "about:blank";
+		  browser.bookmarks.update(
+			btnId,
+			{title: TitleInput.value,
+			 url: value	
+			}
+		  );
+		}
 	  }
 	  ackInputHandler();
 	}
+  }
+}
+
+/*
+ * Fire when there is a mouse wheel event
+ * Used to disblae zooming with Ctrl+mouse wheel
+ */
+function onWheel (aEvent) {
+  if (aEvent.ctrlKey && !aEvent.altKey && !aEvent.metaKey && !aEvent.shiftKey) {
+	aEvent.preventDefault();
   }
 }
 
@@ -127,11 +139,11 @@ function keyHandler (e) {
 function titleInputHandler () {
   // Modify title of the bookmark
   if (btnId != undefined) {
-    browser.bookmarks.update(
-      btnId,
-      {title: TitleInput.value
-      }
-    );
+	browser.bookmarks.update(
+	  btnId,
+	  {title: TitleInput.value
+	  }
+	);
   }
 }
 
@@ -155,16 +167,16 @@ function addressInputHandler () {
   // Modify url of the bookmark if ok
   if (AddressInput.validity.valid) {
 	AckInput.disabled = false;
-    let value = AddressInput.value;
-    if (value.length == 0)
+	let value = AddressInput.value;
+	if (value.length == 0)
 	  value = "about:blank";
-    if (btnId != undefined) {
-      browser.bookmarks.update(
-        btnId,
-        {url: value	
-        }
-      );
-    }
+	if (btnId != undefined) {
+	  browser.bookmarks.update(
+		btnId,
+		{url: value	
+		}
+	  );
+	}
   }
   else {
 	AckInput.disabled = true;
@@ -177,46 +189,65 @@ function addressInputHandler () {
 function closeSelf () {
   btnId = undefined; // To avoid closeHandler to remove / update it ...
 
-/*	  console.log("wInfo.top: "+wInfo.top+" screenY: "+window.screenY);
-	  console.log("calc top: "+(window.screen.top+window.screenY));
-	  console.log("wInfo.left: "+wInfo.left+" screenX: "+window.screenX);
-	  console.log("calc left: "+(window.screen.left+window.screenX));
-*/
-  // Get and remember our own position
-  let top = window.screenY;
-  let left = window.screenX;
+  // Get the CSS pixel ratio
+  // Note: window.windowUtils does not work ...
+  let pixelsPerCSS = window.devicePixelRatio;
+//console.log("closeSelf() - window.devicePixelRatio="+pixelsPerCSS);
+
+  // Get and remember our own position, converting to real pixels
+  let top = Math.floor(window.screenY * pixelsPerCSS);
+  let left = Math.floor(window.screenX * pixelsPerCSS);
 /*  browser.windows.getCurrent()
   .then(
 	function (wInfo) {
+	  console.log("wInfo.top: "+wInfo.top+" screenY: "+window.screenY);
+	  console.log("calc top: "+(window.screen.top+window.screenY));
+	  console.log("wInfo.left: "+wInfo.left+" screenX: "+window.screenX);
+	  console.log("calc left: "+(window.screen.left+window.screenX));
+
 	  let top = wInfo.top;
 	  let left = wInfo.left;
 */
       let saving;
 	  if (remembersizes_option) {
-		let height = window.outerHeight;
-		let width = window.outerWidth;
+		let height = Math.floor(window.outerHeight*pixelsPerCSS);
+		let width = Math.floor(window.outerWidth*pixelsPerCSS);
 		saving = browser.storage.local.set({
 		  popuptop_option: top,
 		  popupleft_option: left,
 		  popupheight_option: height,
 		  popupwidth_option: width
 		});
+//console.log("closeSelf() - remembersizes_option set - top="+top+" left="+left+" height="+height+" width="+width);
 	  }
       else {
         saving = browser.storage.local.set({
 		  popuptop_option: top,
 		  popupleft_option: left
 		});
+//console.log("closeSelf() - top="+top+" left="+left);
 	  }
+/*
+browser.windows.getCurrent()
+.then(
+  function (wInfo) {
+	let top1 = wInfo.top;
+	let left1 = wInfo.left;
+	let height1 = wInfo.height;
+	let width1 = wInfo.width;
+console.log("closeSelf() - browser.windows.getCurrent wInfo - top="+top1+" left="+left1+" height="+height1+" width="+width1);
+  }
+);
+*/
 	  saving.then(
 		function () {
-	      // window.close() is not working, in spite of setting allowScriptsToClose: true
-	      // in browser.windows.create(), and of having a URL in "moz-extension:" !!
-	      // Firefox Bug ??
-	      // Have to resort to using the trick below ..
-	      let winId = browser.windows.WINDOW_ID_CURRENT;
-	      browser.windows.remove(winId);
-	    //  window.close();
+		  // window.close() is not working, in spite of setting allowScriptsToClose: true
+		  // in browser.windows.create(), and of having a URL in "moz-extension:" !!
+		  // Firefox Bug ??
+		  // Have to resort to using the trick below ..
+		  let winId = browser.windows.WINDOW_ID_CURRENT;
+		  browser.windows.remove(winId);
+		  //window.close();
 		}
 	  );
 //	}
@@ -237,30 +268,30 @@ function ackInputHandler () {
 function cancelInputHandler () {
 //  console.log("Cancel clicked");
   if (isPropPopup) { // Cancel on properties = set back previous values, and then close
-    browser.bookmarks.update(
-      btnId,
-      (isFolder ?
-         {title: btnTitle
-         }
-        :
-         {title: btnTitle,
-          url: btnUrl	
-         }
-      )
-    )
-    .then(
-      function () {
-        closeSelf();
-      }
-    );
+	browser.bookmarks.update(
+	  btnId,
+	  (isFolder ?
+		 {title: btnTitle
+		 }
+	   :
+	     {title: btnTitle,
+		  url: btnUrl	
+	     }
+	  )
+	)
+	.then(
+	  function () {
+		closeSelf();
+	  }
+	);
   }
   else { // Delete the bookmark, then close
-    browser.bookmarks.remove(btnId)
-    .then(
-      function () {
-        closeSelf();
-      }
-    );
+	browser.bookmarks.remove(btnId)
+	.then(
+	  function () {
+		closeSelf();
+	  }
+	);
   }
 }
 
@@ -268,7 +299,7 @@ function cancelInputHandler () {
  * Handle window close
  */
 function closeHandler (e) {
-//  console.log("Close clicked: "+e.type);
+//console.log("Close clicked: "+e.type);
   // Note that this is unclean ... the promise to be returned by browser.bookmarks.update
   // or by ()browser.bookmarks.remove()
   // will never be able to be dispatched to something stil existing, therefore generating
@@ -278,43 +309,49 @@ function closeHandler (e) {
   // then update/remove the bookmark .. but I guess I am lazy tonight .. that will be one
   // more junk message .. too bad for the console ..
   if (btnId != undefined) {
-    // Get and remember our own position (and size if option is activated)
-	let top = window.screenY;
-	let left = window.screenX;
+	// Get the CSS pixel ratio
+	// Note: window.windowUtils does not work ...
+	let pixelsPerCSS = window.devicePixelRatio;
+	console.log("closeHandler() - window.devicePixelRatio="+pixelsPerCSS);
+
+	// Get and remember our own position (and size if option is activated), converting to real pixels
+	let top = Math.floor(window.screenY * pixelsPerCSS);
+	let left = Math.floor(window.screenX * pixelsPerCSS);
 	if (remembersizes_option) {
-	  let height = window.outerHeight;
-	  let width = window.outerWidth;
+	  let height = Math.floor(window.outerHeight*pixelsPerCSS);
+	  let width = Math.floor(window.outerWidth*pixelsPerCSS);
 	  browser.storage.local.set({
-	    popuptop_option: top,
-	    popupleft_option: left,
-	    popupheight_option: height,
-	    popupwidth_option: width
+		popuptop_option: top,
+		popupleft_option: left,
+		popupheight_option: height,
+		popupwidth_option: width
 	  });
-//      console.log("Outer h,w: "+height+","+width);
+//console.log("closeHandler() - remembersizes_option set - top="+top+" left="+left+" height="+height+" width="+width);
 	}
 	else {
 	  browser.storage.local.set({
-	    popuptop_option: top,
-	    popupleft_option: left
+		popuptop_option: top,
+		popupleft_option: left
 	  });
+//console.log("closeHandler() - top="+top+" left="+left);
 	}
 
 	if (isPropPopup) { // Set back previous values
-      browser.bookmarks.update(
-	    btnId,
-	    (isFolder ?
-	       {title: btnTitle
-	       }
+	  browser.bookmarks.update(
+		btnId,
+		(isFolder ?
+		   {title: btnTitle
+		   }
 		 :
 		   {title: btnTitle,
-		    url: btnUrl	
-		   }
+		   url: btnUrl	
+		 }
 		)
-      );
-    }
-    else { // Delete the bookmark.
-      browser.bookmarks.remove(btnId);
-    }
+	  );
+	}
+	else { // Delete the bookmark
+	  browser.bookmarks.remove(btnId);
+	}
   }
 }
 
@@ -357,105 +394,106 @@ browser.runtime.getPlatformInfo().then(function(info){
   // Get Id of the window we are running in
   //browser.windows.getCurrent(
   browser.windows.get(browser.windows.WINDOW_ID_CURRENT,
-                      {populate: true	
-                      }
-                     )
+	  				  {populate: true	
+	  				  }
+  					 )
   .then(
-    (windowInfo) => {
-      myWindowId = windowInfo.id;
-      myTab = windowInfo.tabs[0];
-      let myUrl = myTab.url; 
-//      console.log("Id: "+windowInfo.id+" Window title: "+windowInfo.title+" Window type: "+windowInfo.type+" Tabs length: "+windowInfo.tabs.length);
-//      console.log("Tab title: "+myTab.title+" Tab url: "+myUrl);
+	(windowInfo) => {
+	  myWindowId = windowInfo.id;
+	  myTab = windowInfo.tabs[0];
+	  let myUrl = myTab.url; 
+//console.log("Id: "+windowInfo.id+" Window title: "+windowInfo.title+" Window type: "+windowInfo.type+" Tabs length: "+windowInfo.tabs.length);
+//console.log("Tab title: "+myTab.title+" Tab url: "+myUrl);
 
-      // Some variations depending on platform
-      if (platformOs == "win") {
-    	let fontDflt = "fontdflt";
-    	let fontWin = "fontwin";
-    	Body.classList.replace(fontDflt, fontWin);
-        TitleInput.classList.replace(fontDflt, fontWin);
-        AddressInput.classList.replace(fontDflt, fontWin);
-        AckInput.classList.replace(fontDflt, fontWin);
-        CancelInput.classList.replace(fontDflt, fontWin);
-      }
-      else if (platformOs == "linux") {
-      	let fontSize = "12px";
-        Body.style.fontSize = fontSize;
-        TitleInput.style.fontSize = fontSize;
-        AddressInput.style.fontSize = fontSize;
-        AckInput.style.fontSize = fontSize;
-        CancelInput.style.fontSize = fontSize;
-      }
-      else if (platformOs == "mac") {
-    	let fontSize = "12px";
-        Body.style.fontSize = fontSize;
-        TitleInput.style.fontSize = fontSize;
-        AddressInput.style.fontSize = fontSize;
-        AckInput.style.fontSize = fontSize;
-        CancelInput.style.fontSize = fontSize;
-      }
+	  // Some variations depending on platform
+	  if (platformOs == "win") {
+		let fontDflt = "fontdflt";
+		let fontWin = "fontwin";
+		Body.classList.replace(fontDflt, fontWin);
+		TitleInput.classList.replace(fontDflt, fontWin);
+		AddressInput.classList.replace(fontDflt, fontWin);
+		AckInput.classList.replace(fontDflt, fontWin);
+		CancelInput.classList.replace(fontDflt, fontWin);
+	  }
+	  else if (platformOs == "linux") {
+		let fontSize = "12px";
+		Body.style.fontSize = fontSize;
+		TitleInput.style.fontSize = fontSize;
+		AddressInput.style.fontSize = fontSize;
+		AckInput.style.fontSize = fontSize;
+		CancelInput.style.fontSize = fontSize;
+	  }
+	  else if (platformOs == "mac") {
+		let fontSize = "12px";
+		Body.style.fontSize = fontSize;
+		TitleInput.style.fontSize = fontSize;
+		AddressInput.style.fontSize = fontSize;
+		AckInput.style.fontSize = fontSize;
+		CancelInput.style.fontSize = fontSize;
+	  }
 
-      // Parse the url, it will give us our type of window, the BTN.id, BTN.title and BTN.url
-      let paramsPos = myUrl.indexOf("?");
+	  // Parse the url, it will give us our type of window, the BTN.id, BTN.title and BTN.url
+	  let paramsPos = myUrl.indexOf("?");
 
-      // There should be 5 arguments, url should be the last and can itself contain "&"
-      let paramStr;
-      let endPos;
-      for (let i=0 ; i<4 ; i++) {
-        endPos = myUrl.indexOf("&", paramsPos+1);
-        if (endPos == -1) { // Reached last param
-          break;
-        }
-        paramStr = myUrl.slice(paramsPos+1, endPos);
-        paramParse(paramStr);
-        paramsPos = endPos;
-      }
-      // Get last param until end of string
-      paramStr = myUrl.slice(paramsPos+1);
-      paramParse(paramStr);
-//      console.log("Type: "+myType+" BTN id: "+btnId+" title: "+btnTitle);
-//      console.log("Url: "+btnUrl);
-      
-      // Adjust Window contents
-      if (myType.startsWith("prop")) {
-        isPropPopup = true;
-        AckInput.value = "Save";
-      }
-      else {
-        isPropPopup = false;
-      }
-      PathLabel.textContent = btnPath;
-      TitleInput.value = btnTitle;
-      TitleInput.select();
-      if (myType.endsWith("fldr")) { // No URL for folders
-        isFolder = true;
-        AddressLabel.hidden = true;
-        AddressInput.hidden = true;
-        AckInput.disabled = false;
-      }
-      else { // Bookmark popup, we have a URL
-        isFolder = false;
-        if (btnUrl != "about:blank") {
-          AddressInput.value = btnUrl;
-        }
-        if (AddressInput.validity.valid) {
-   		  AckInput.disabled = false;
-        }
-      }
+	  // There should be 5 arguments, url should be the last and can itself contain "&"
+	  let paramStr;
+	  let endPos;
+	  for (let i=0 ; i<4 ; i++) {
+		endPos = myUrl.indexOf("&", paramsPos+1);
+		if (endPos == -1) { // Reached last param
+		  break;
+		}
+		paramStr = myUrl.slice(paramsPos+1, endPos);
+		paramParse(paramStr);
+		paramsPos = endPos;
+	  }
+	  // Get last param until end of string
+	  paramStr = myUrl.slice(paramsPos+1);
+	  paramParse(paramStr);
+//console.log("Type: "+myType+" BTN id: "+btnId+" title: "+btnTitle);
+//console.log("Url: "+btnUrl);
 
-      // General event handler for keyboard actions
-      addEventListener("keydown", keyHandler, true);
+	  // Adjust Window contents
+	  if (myType.startsWith("prop")) {
+		isPropPopup = true;
+		AckInput.value = "Save";
+	  }
+	  else {
+		isPropPopup = false;
+	  }
+	  PathLabel.textContent = btnPath;
+	  TitleInput.value = btnTitle;
+	  TitleInput.select();
+	  if (myType.endsWith("fldr")) { // No URL for folders
+		isFolder = true;
+		AddressLabel.hidden = true;
+		AddressInput.hidden = true;
+		AckInput.disabled = false;
+	  }
+	  else { // Bookmark popup, we have a URL
+		isFolder = false;
+		if (btnUrl != "about:blank") {
+		  AddressInput.value = btnUrl;
+		}
+		if (AddressInput.validity.valid) {
+		  AckInput.disabled = false;
+		}
+	  }
 
-      // Catch commited changes to each input box contents
-      TitleInput.addEventListener("change", titleInputHandler);
-      AddressInput.addEventListener("input", addressInputModifiedHandler);
-      AddressInput.addEventListener("change", addressInputHandler);
+	  // General event handler for keyboard or mouse actions
+	  addEventListener("keydown", keyHandler, true);
+	  addEventListener('wheel', onWheel, {capture: true}); // To disable zooming
 
-      // Catch button clicks, and window close
-      AckInput.addEventListener("click", ackInputHandler);
-      CancelInput.addEventListener("click", cancelInputHandler);
-      window.onbeforeunload = closeHandler; // Window close is like clicking Cancel button
-//      window.onclose = closeHandler; // Window close is like clicking Cancel button
-    }
+	  // Catch commited changes to each input box contents
+	  TitleInput.addEventListener("change", titleInputHandler);
+	  AddressInput.addEventListener("input", addressInputModifiedHandler);
+	  AddressInput.addEventListener("change", addressInputHandler);
+
+	  // Catch button clicks, and window close
+	  AckInput.addEventListener("click", ackInputHandler);
+	  CancelInput.addEventListener("click", cancelInputHandler);
+	  window.onbeforeunload = closeHandler; // Window close is like clicking Cancel button
+//	  window.onclose = closeHandler; // Window close is like clicking Cancel button
+	}
   );
 });
