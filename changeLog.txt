@@ -1078,7 +1078,7 @@ LIMitations / TODO's:
 - LIM: No way to synchronize the folders open state with the native FF bookmarks sidebar,
   or with the "All bookmarks" window, as this is not exposed by the Web Extension API's.
 
-- LIM: In FF integrated contect menu mode (FF >= 64), it is not possible for now to highlight
+- LIM: In FF integrated context menu mode (FF >= 64), it is not possible for now to highlight
   default actions in bold. In such a mode, so they are chown betwen "<" and ">".
   Note that the native FF bookmark sidebar does not highlight default actions (anymore ?).
 
