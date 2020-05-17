@@ -8,39 +8,44 @@
 // so use browser.runtime.getBrowserInfo() instead.
 //const Navigator = window.navigator; // Get version of navigator to detect unavailable features between FF 54 and FF 56
 //const BuildID = Navigator.buildID; // BuildID: 20100101 means that we have the websites.resistFingerprinting setting
-                                   // set .. see https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/privacy/websites
-                                   // This can happen when the Privacy Settings add-on is used for example ..
-                                   // See https://addons.mozilla.org/fr/firefox/addon/privacy-settings/ .. good news, this
-                                   //   add-on requires FF 57 minimum, and that particular setting exist only since FF 58,
-                                   //   so we cannot have it on FF 56 and it means BeforeFF57 must be false.
+								   // set .. see https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/privacy/websites
+								   // This can happen when the Privacy Settings add-on is used for example ..
+								   // See https://addons.mozilla.org/fr/firefox/addon/privacy-settings/ .. good news, this
+								   //   add-on requires FF 57 minimum, and that particular setting exist only since FF 58,
+								   //   so we cannot have it on FF 56 and it means BeforeFF57 must be false.
 //const BeforeFF57 = ((BuildID != "20100101") && (BuildID < "20171112125346"));
 //const BeforeFF63 = ((BuildID != "20100101") && (BuildID < "20181018182531"));
 let beforeFF57;
 let beforeFF60;
+let beforeFF62;
 let beforeFF63;
+let beforeFF64;
 browser.runtime.getBrowserInfo()
 .then(function (info) {
   let ffversion = info.version;
   beforeFF57 = (ffversion < "57.0");
   beforeFF60 = (ffversion < "60.0");
+  beforeFF62 = (ffversion < "62.0");
   beforeFF63 = (ffversion < "63.0");
+  beforeFF64 = (ffversion < "64.0");
 });
 
 const SaveMinHysteresis = 2000; // Space saves to lower memory consumption
 const SaveMinSlowHysteresis = 10000; // Space saves to lower memory consumption, when save is slow (superior to SaveMinHysteresis)
 const SaveMaxHysteresis = 25000; // Space saves during massive favicon operations to lower memory consumption
 const MaxNoSaveDuration = 300000; // In case of slow save, max 5 minutes for all pending saves to be delayed,
-                                  // after that do one save to make sure we're not losing too much.
+								  // after that do one save to make sure we're not losing too much.
 const SidebarScanInterval = 1000; // Every 1 s
+const HistoryNodeRetention = 30; // In days
 //Declared in libstore.js
 //const VersionImg16 = "-img16"; // Signal that all favicons are in 16x16 format
 //const VersionBNList = "-bnlist"; // Signal that we are in BookmarkNode tree format
 //const VersionSpecialFldr = "-spfldr"; // Signal that we are in Special Folder tree format
 //const DfltFontSize = 12; // 12px default
 //const DfltSpaceSize = 0; // 0px default
+//const DfltTextColor = "#222426"; // Default text color
+//const DfltBckgndColor = "white"; // Default background color
 const PopupURL = browser.extension.getURL("sidebar/popup.html");
-const mainMenuId = "show-path";  // Added menu item on bookmarks
-const subMenuPathId = "path-is"; // Added sub-menu item on bookmarks, to show path to bookmark
 
 const CvtCanvas = document.createElement('canvas'); // For image conversion to 16 x 16
 CvtCanvas.height = 16;
@@ -50,13 +55,13 @@ const CvtCtx = CvtCanvas.getContext("2d");
 //CvtCtx.fillStyle = "white";
 CvtCtx.imageSmoothingEnabled = false;
 CvtCtx.imageSmoothingQuality = "high";
+const CvtImageData = CvtCtx.createImageData(16, 16);
+const CvtIDData = CvtImageData.data;
 const CvtImage = new Image(16, 16);
 CvtImage.onload = convertOnLoad;
 CvtImage.onerror = errorCvtOnLoad;
 const CvtCanvas2 = document.createElement('canvas'); // For loading a favicon to downscale
 const CvtCtx2 = CvtCanvas2.getContext("2d");
-const CvtImageData = CvtCtx.createImageData(16, 16);
-const CvtIDData = CvtImageData.data;
 
 
 /*
@@ -73,8 +78,10 @@ browser.runtime.getPlatformInfo()
 //Declared in libstore.js
 //var migration_bnlist = false;
 //var migration_spfldr = false;
+//var savedBkmkUriList; (used in BookmarkNode.js on BN_create())
 //var savedBNList;
 //var savedBNListBak;
+//var savedHNList; 
 
 //Declared in BookmarkNode.js
 //var countBookmarks = 0, countFolders = 0, countSeparators = 0, countOddities = 0;
@@ -83,6 +90,7 @@ browser.runtime.getPlatformInfo()
 var loadDuration, treeLoadDuration, treeBuildDuration, saveDuration;
 var isSlowSave = false;
 var curBNList = {}; // Current list of BookmarkNode - Saved in storage at each modification
+var curHNList; // Current history of HistoryNode - Saved in storage at each modification
 var bypassedFFAPI = false;
 var rootBN; // Type is BookmarkNode. This is curBNList[0]
 
@@ -90,6 +98,7 @@ var rootBN; // Type is BookmarkNode. This is curBNList[0]
 /*
  * Global variables, private to background (let)
  */
+let selfName; // Our extension name
 let justInstalled; // Signal if we were just installed or this is an update
 let isSidebarOpen = {};			// Track state of open sidebars
 let sidebarCurId = {};			// Track cursor possition of each sidebar to remember it across sidebar close
@@ -97,6 +106,7 @@ let privateSidebarsList = {};	// Track private windows sidebars
 let sidebarScanIntervalId = undefined; // To scan open private sidebars ...
 //let faviconWorker; // For background retrieval of favicons
 let migr16x16Open = true; // Set to false on the first signalMigrate16x16() received
+let historyNodeRetention = HistoryNodeRetention; // Duration to keep HistoryNode
 let startTime, endLoadTime, endTreeLoadTime, endTreeBuildTime, endSaveTime;
 
 
@@ -146,14 +156,14 @@ let lastSaveCallTime = undefined;
 let lastSaveTime = undefined;
 function recallSaveBNList () {
   setTimeout(
-    function () {
-      saving = false; // Clear flag, we're not busy anymore
-      if (saveQueued) { // Something more to save, so save now
-    	saveQueued = false;
-    	saveBNList();
-      }
-    }
-    , saveHysteresis
+	function () {
+	  saving = false; // Clear flag, we're not busy anymore
+	  if (saveQueued) { // Something more to save, so save now
+		saveQueued = false;
+		saveBNList();
+	  }
+	}
+	, saveHysteresis
   );
 }
 
@@ -186,6 +196,8 @@ function endSaveBNList () { // Save finished
 	savedBkmkUriList = undefined;
 	savedBNList = undefined;
 	savedBNListBak = undefined;
+	savedHNList = undefined;
+	savedHNListBak = undefined;
   }
 }
 
@@ -196,8 +208,8 @@ function errorSaveBNList (err) { // Error on Save
   recallSaveBNList();
 }
 
-const saveObject0 = {savedBNList: undefined, fTime: undefined, fIndex: 0};
-const saveObject1 = {savedBNListBak: undefined, fTimeBak: undefined, fIndex: 1};
+const saveObject0 = {savedBNList: undefined, savedHNList: undefined, fTime: undefined, fIndex: 0};
+const saveObject1 = {savedBNListBak: undefined, savedHNListBak: undefined, fTimeBak: undefined, fIndex: 1};
 let executeSaveTimerID;
 function executeSaveBNList () {
   let curDate = new Date ();
@@ -207,46 +219,53 @@ function executeSaveBNList () {
   }
   try {
 	let saveObj;
-// 	    if (delayLoad_option && (savedBNList != undefined)) { // Merge both list when saving to
-//                                                            // keep what was not yet verified
-//        saveObj = Object.assign({}, savedBNList, curBNList);
-//      }
-//      else {
+//	if (delayLoad_option && (savedBNList != undefined)) { // Merge both list when saving to
+//														  // keep what was not yet verified
+//	  saveObj = Object.assign({}, savedBNList, curBNList);
+//	}
+//	else {
 	saveObj = curBNList;
 //    }
-	let json = BN_serialize(saveObj[0]);
+	let jsonBN = BN_serialize(saveObj[0]);
+	let jsonHN = historyListSerialize(curHNList);
 	saveObj = undefined; // Free pointer on object
-//console.log("json.length = "+json.length);
+//console.log("jsonHN.length = "+jsonHN.length);
+//console.log("jsonHN = "+jsonHN);
 //recallSaveBNList();
 //resolve();
 
 	let saveObject;
 	if (!enableFlipFlop_option || (fIndex == 0)) {
 	  saveObject = saveObject0;
-	  saveObject0.savedBNList = json;
+	  saveObject0.savedBNList = jsonBN;
+	  saveObject0.savedHNList = jsonHN;
 	  saveObject0.fTime = lastSaveTime;
-//		saveObject0.fIndex = 0;
-//      console.log("savedBNList");
+//	  saveObject0.fIndex = 0;
+//console.log("savedBNList");
 	}
 	else {
 	  saveObject = saveObject1;
-	  saveObject1.savedBNListBak = json;
+	  saveObject1.savedBNListBak = jsonBN;
+	  saveObject1.savedHNListBak = jsonHN;
 	  saveObject1.fTimeBak = lastSaveTime;
-//		saveObject1.fIndex = 1;
-//      console.log("savedBNListBak");
+//	  saveObject1.fIndex = 1;
+//console.log("savedBNListBak");
 	}
-	json = undefined; // Free pointer on string
+	jsonBN = undefined; // Free pointer on string
 	browser.storage.local.set(saveObject)
 	.then(endSaveBNList)
 	.catch(errorSaveBNList);
 
 	// Free json string and time
 	delete saveObject0.savedBNList;
+	delete saveObject0.savedHNList;
 	delete saveObject0.fTime;
 	delete saveObject1.savedBNListBak;
+	delete saveObject1.savedHNListBak;
 	delete saveObject1.fTimeBak;
-  } catch (error) { // Most probably out of memory error
-        	        // Calm down, stop the save chain
+  }
+  catch (error) { // Most probably out of memory error
+					// Calm down, stop the save chain
 	console.log("saveBNList() error: "+error);
 
 	// Clear flags, we're not busy anymore
@@ -266,23 +285,23 @@ function executeSaveBNList () {
 }
 
 function saveBNList () {
-//  trace("saveBNList");
-//  let t1 = new Date();
+//trace("saveBNList");
+//let t1 = new Date();
 
   // Recalculate hysteresis in function of call frequency
   let curDate = new Date ();
   let curTime = curDate.getTime();
   if (lastSaveCallTime != undefined) {
-    let delay = curTime - lastSaveCallTime; // In ms
+	let delay = curTime - lastSaveCallTime; // In ms
 	if (delay < SaveMinHysteresis) { // Doing favicon fetching or doing too often, increase to maximum hysteresis
 	  saveHysteresis = SaveMaxHysteresis; 
 	}
 	else { // Reset to minimum
 	  if (isSlowSave) {
-  	  	saveHysteresis = SaveMinSlowHysteresis;
+		saveHysteresis = SaveMinSlowHysteresis;
 	  }
 	  else {
-  	  	saveHysteresis = SaveMinHysteresis;
+		saveHysteresis = SaveMinHysteresis;
 	  }
 	}
   }
@@ -299,17 +318,15 @@ function saveBNList () {
 	}
   }
   else { // Already saving .. queue and do only once later when ongoing one 
-         // + hysteresis is finished
+		 // + hysteresis is finished
 	saveQueued = true;
 	if (executeSaveTimerID != undefined) { // If slow save and there is a pending delayed save, restart delay
-	                                       // to save, to preserve UI responsiveness.
+	  									   // to save, to preserve UI responsiveness.
 	  									   // Can lose data if user stops FF before save really occurred !!
 	  // Protection: do not delay for more than MaxNoSaveDuration (5 minutes)
 	  if ((lastSaveTime != undefined) && (curTime - lastSaveTime < MaxNoSaveDuration)) {
 		clearTimeout(executeSaveTimerID);
 		executeSaveTimerID = setTimeout(executeSaveBNList, SaveMinSlowHysteresis);
-	  }
-	  else {
 	  }
 	}
   }
@@ -320,12 +337,24 @@ function saveBNList () {
  * 
  * Return the corresponding saved cursor position if any (a Bookmark Id String)
  */
+let showInSidebarWId   = undefined;
+let showInSidebarTabId = undefined;
+let showInSidebarBnId  = undefined;
 function newSidebar (windowId) {
-//  console.log("Background received newSidebar notification from "+windowId);
+//console.log("Background received newSidebar notification from "+windowId);
   isSidebarOpen[windowId] = true;
   let bnId = sidebarCurId[windowId];
   if (bnId == undefined) { // No value for that window, use last saved value instead
 	bnId = lastcurbnid_option;
+  }
+  if ((showInSidebarWId == windowId) && (showInSidebarBnId != undefined)) {
+	setTimeout(
+	  sendAddonMsgShowBkmk(showInSidebarWId, showInSidebarTabId, showInSidebarBnId)
+	  , 50 // Wait 50 ms
+	);
+	showInSidebarWId   = undefined;
+	showInSidebarTabId = undefined;
+	showInSidebarBnId  = undefined;
   }
   return(bnId);
 }
@@ -334,7 +363,7 @@ function newSidebar (windowId) {
  * Called by a sidebar when closing
  */
 function closeSidebar (windowId) {
-//  console.log("Background received closeSidebar notification from "+windowId);
+//console.log("Background received closeSidebar notification from "+windowId);
   delete isSidebarOpen[windowId];
 }
 
@@ -353,20 +382,23 @@ function saveCurBnId (windowId, bnId) {
  * Verify if private window sidebars are still open. If not, update scanSidebars status
  */
 function scanSidebars () {
-  for (let i in privateSidebarsList) {
-	let windowId = privateSidebarsList[i];
-//    console.log("Scanning "+windowId);
+  let a_winId = Object.keys(privateSidebarsList);
+  let len = a_winId.length;
+  for (let i=0 ; i<len ; i++) {
+	let winId = a_winId[i]; // A String
+	let windowId = privateSidebarsList[winId]; // An integer
+//console.log("Scanning "+windowId);
 	browser.sidebarAction.isOpen(
 	  {windowId: windowId}
 	).then(
 	  function (open) {
-//        console.log(windowId+" is "+open);
+//console.log(windowId+" is "+open);
 		if (!open) { // Remove from lists of open sidebars
-//          console.log("Deleting "+windowId);
+//console.log("Deleting "+windowId);
 		  delete privateSidebarsList[windowId];
 		  delete isSidebarOpen[windowId];
 		  // Do not delete entry in sidebarCurId to keep it across sidebar sessions
-		  if (privateSidebarsList.length == 0) {
+		  if (--len <= 0) {
 			clearInterval(sidebarScanIntervalId);
 			sidebarScanIntervalId = undefined;
 		  }
@@ -374,13 +406,18 @@ function scanSidebars () {
 	  }
 	).catch( // Asynchronous also, like .then
 	  function (err) {
-	    // window doesn't exist anymore
-//        console.log("Error name: "+err.name+" Error message: "+err.message);
+		// window doesn't exist anymore
+//console.log("Error name: "+err.name+" Error message: "+err.message);
 		if (err.message.includes("Invalid window ID")) {
-//          console.log("Window doesn't exist anymore, deleting it: "+windowId);
+//console.log("Window doesn't exist anymore, deleting it: "+windowId);
 		  delete privateSidebarsList[windowId];
 		  delete isSidebarOpen[windowId];
 		  // Do not delete entry in sidebarCurId to keep it across sidebar sessions
+		  let len = Object.keys(privateSidebarsList).length;
+		  if (len == 0) {
+			clearInterval(sidebarScanIntervalId);
+			sidebarScanIntervalId = undefined;
+		  }
 		}
 	  }
 	);
@@ -391,7 +428,7 @@ function scanSidebars () {
  * Insert in a_obj and a_index, ordered by a_index
  * 
  * a_obj = list of already existing objects
- * a_index = corresponding list of their increasing indexes
+ * a_index = corresponding list of their increasing indexes (non continuous)
  * obj = object to insert
  * index = its index
  */
@@ -447,22 +484,23 @@ function insertList (a_obj, a_index, obj, index) {
  * a_BN = array of BookmarkNode to search
  * BN = BN to search for
  * 
- * Returns: an array [BN, index], index being position in a_BN, or undefined if not found.
+ * Returns: an array [BN, index], index being position in a_BN. Or undefined if not found.
  */
 function findBN (a_BN, BN) {
   let a_result; // undefined by default
   let bnId = BN.id;
   let bnTitle = BN.title;
   let bnUrl = BN.url;
-  if ((a_BN != undefined) && (a_BN.length > 0)) {
-	let j = 0;
-	let node;
-	for (let i of a_BN) {
+  let len;
+  if ((a_BN != undefined) && ((len = a_BN.length) > 0)) {
+	let j;
+	let node, i;
+	for (j=0 ; j<len ; j++) {
+	  i = a_BN[j];
 	  if ((i.id == bnId) && (i.title == bnTitle) && (i.url == bnUrl)) {
 		node = i;
 		break;
 	  }
-	  j++;
 	}
 	if (node != undefined) { // Found it !
 	  a_result = [node, j];
@@ -472,8 +510,8 @@ function findBN (a_BN, BN) {
 }
 
 /*
- * Refresh children of node with a new list of BN's, triggering create / updates / delete / moves
- * as needed.
+ * Refresh children of node with a new list of BN's, triggering create / delete / moves
+ * as needed on display.
  * 
  * BN = BookmarkNode with children to refresh
  * a_BN = array of BN to set as children
@@ -493,14 +531,17 @@ function refreshChildren (BN, a_BN) {
   let list1Del = []; // Will contain elements to delete and their id = [child, childId]
   let list1Common = []; // Will contain the Id of remaining common elements ordered by target position
   let list1Target = []; // List of target positions for element in list1Common
-  let list2Common = new Array(a_BN.length); // Will tell which elements of a_BN are common by setting them
-                                            // to something else than undefined
+  let len2 = a_BN.length;
+  let list2Common = new Array(len2); // Will tell which elements of a_BN are common by setting them
+  									 // to something else than undefined
   let j;
   let identical;
-  let index = 0;
   if (children != undefined) {
-	identical = (children.length == a_BN.length); // Identical until a difference is found
-	for (let child of children) {
+	let len1 = children.length;
+	identical = (len1 == len2); // Identical until a difference is found
+	let child;
+	for (let i=0 ; i<len1 ; i++) {
+	  child = children[i];
 	  childId = child.id;
 	  a_result = findBN(a_BN, child);
 	  if (a_result == undefined) { // Doesn't exist anymore
@@ -508,13 +549,17 @@ function refreshChildren (BN, a_BN) {
 		identical = false;
 	  }
 	  else { // Common element between children and a_BN
-		j = a_result[1];
-		if (j != index)
+		j = a_result[1]; // Get new index
+		if (j != i)
 		  identical = false;
-		list2Common[j] = true;
-		insertList(list1Common, list1Target, childId, j);
+		if (list2Common[j] == true) { // Already seen -> handle case of same element several times in the source list
+		  list1Del.push([child, childId]);
+		}
+		else {
+		  list2Common[j] = true;
+		  insertList(list1Common, list1Target, childId, j);
+		}
 	  }
-	  index++;
 	}
   }
   else {
@@ -524,7 +569,10 @@ function refreshChildren (BN, a_BN) {
 //identical = false;
   if (!identical) {
 	// Phase 2: delete, then reorder remaining common elements as needed
-	for (let i of list1Del) {
+	let i;
+	let len = list1Del.length;
+	for (j=0 ; j<len ; j++) {
+	  i = list1Del[j];
 	  BN_delete(i[0], bnId);
 	  // Save new current info
 	  saveBNList();
@@ -537,13 +585,14 @@ function refreshChildren (BN, a_BN) {
 		bnId: i[1]
 	  });
 	}
-	if (list1Common.length > 0) {
-	  bkmkReorderedHandler(bnId, {childIds: list1Common});
+	if (list1Common.length > 0) { // At this stage, the number of children is what remains in common
+	  // Same size on remaining children and childIds
+	  bkmkReorderedHandler(bnId, {childIds: list1Common}, false); // No record in hostory
 	}
 
 	// Phase 3: insert missing elements from a_BN
-	j = 0;
-	for (let i of a_BN) {
+	for (j=0 ; j<len2 ; j++) {
+	  i = a_BN[j];
 	  if (list2Common[j] == undefined) { // Not in common => add it
 		BN_insert(i, BN, j);
 
@@ -559,7 +608,6 @@ function refreshChildren (BN, a_BN) {
 		  index: j
 		});
 	  }
-	  j++;
 	}
   }
 }
@@ -567,14 +615,15 @@ function refreshChildren (BN, a_BN) {
 /*
  * Refresh / build the list of most visited sites
  * 
- * a_MVU = array of MostVisitedURL, containing the new items to put under mostVisitedBN
+ * a_MVU = array of MostVisitedURL object, containing the new items to put under mostVisitedBN
  * 
  * Uses global variable mostVisitedBN
  */
 function refreshMostVisited (a_MVU) {
   // Limit it to 10 items
-  if (a_MVU.length > 10) {
-	a_MVU.length = 10;
+  let len = a_MVU.length;
+  if (len > 10) {
+	len = a_MVU.length = 10;
   }
 
   // Convert to a list of special place: BN, all protected
@@ -583,8 +632,9 @@ function refreshMostVisited (a_MVU) {
   let node;
   let curDate = new Date ();
   let curTime = curDate.getTime();
-  let j = 0;
-  for (let i of a_MVU) {
+  let i;
+  for (let j=0 ; j<len ; j++) {
+	i = a_MVU[j];
 	BTN = new Object ();
 	BTN.dateAdded         = curTime;
 	BTN.dateGroupModified = curTime;
@@ -605,7 +655,6 @@ function refreshMostVisited (a_MVU) {
 	}
 	node.protect = true;
 	listBN.push(node);
-	j++;
   }
 
   // Refresh all children of mostVisitedBN with that list
@@ -625,14 +674,18 @@ function refreshMostVisited (a_MVU) {
 function refreshRecentBkmks (a_BTN) {
   // Convert to a list of special place: BN, all protected
   let listBN = [];
-  let node;
-  for (let i of a_BTN) {
-	let bnId = i.id;
+  let node, origBN;
+  let i;
+  let bnId;
+  let len = a_BTN.length;
+  for (let j=0 ; j<len ; j++) {
+	i = a_BTN[j];
+	bnId = i.id;
 	i.id = "place:" + bnId;
 	node = BN_create(i, 2, undefined); // Do not fetch any favicon yet
 	node.protect = true;
 	// Get favicon of origin BN if existing
-	let origBN = curBNList[bnId];
+	origBN = curBNList[bnId];
 	if (origBN != undefined) {
 	  node.faviconUri = origBN.faviconUri;
 	}
@@ -689,7 +742,10 @@ function sortBNList (a_BN) {
   let tempFldrs = [];
   let resultListBkmks = [];
   let tempBkmks = [];
-  for (let i of a_BN) {
+  let i;
+  let len = a_BN.length;
+  for (let j=0; j<len ; j++) {
+	i = a_BN[j];
 	if (i.type == "folder") {
 	  insertList(resultListFldrs, tempFldrs, i.id, i.title.toLowerCase());
 	}
@@ -753,15 +809,56 @@ async function sortFolder (bnId) {
 	}
 
 	// We now have a sorted list, move the bookmark items accordingly
-	j = 0;
 	let moveLoc = new Object ();
-	for (let i of resultList) {
-	  moveLoc.index = j++;
+	len = resultList.length;
+	for (j=0 ; j<len ; j++) {
+	  moveLoc.index = j;
 	  // Use await, as it seems that if we do not wait for completion of one move
 	  // to issue the next move, we end up with some disorder in FF :-(
-	  await browser.bookmarks.move(i, moveLoc);
+	  await browser.bookmarks.move(resultList[j], moveLoc);
 	}
   }  
+}
+
+/*
+ * Reload bookmarks from FF API for re-synchro (triggered by user, or auto-detected)
+ * 
+ * is_autoDetected = Boolean, true if this is provoked by BSP2 code, false if demanded by user 
+ */
+function reloadFFAPI (is_autoDetected) {
+  // Make sure completeBookmarks will behave properly on this tree reload
+  endLoadTime = new Date();
+  savedBNList = curBNList;
+  savedHNList = curHNList;
+  faviconWorkerPostMessage({data: ["hysteresis"]});
+  countBookmarks = countFolders = countSeparators = countOddities = countFetchFav = 0;
+
+  browser.bookmarks.getTree()
+  .then(storeAndConvertTree, onRejected)
+  .catch( // Asynchronous, like .then
+	function (err) {
+	  let msg = "Error on processing reloadFFAPI : "+err;
+	  console.log(msg);
+	  if (err != undefined) {
+		console.log("lineNumber: "+err.lineNumber);
+		console.log("fileName:   "+err.fileName);
+	  }
+	}
+  );
+
+  if (is_autoDetected) { // Ask all instances of sidebars to display a modal warning that
+						 // bookmark are being reloaded and to wait until then
+	sendAddonMessage("notifAutoFFReload");
+	// Record auto reload action
+	historyListAdd(curHNList, HNACTION_AUTORELOADFFAPI);
+  }
+  else {
+	sendAddonMessage("notifFFReload");
+	// Record manual reload action
+	historyListAdd(curHNList, HNACTION_RELOADFFAPI);
+  }
+  // Make sure we save the last known state, including history
+  saveBNList();
 }
 
 /*
@@ -807,6 +904,24 @@ function sendAddonMsgFavicon (bnId, uri) {
 }
 
 /*
+ * Send show bookmark to one sidebar
+ * 
+ * wId  = id of window holding the BSP2 sidebar
+ * tabd = id of bookmarked tabshowInSidebarTabId
+ * bnId = String, id of bookmark
+ */
+function sendAddonMsgShowBkmk (wId, tabId, bnId) {
+  browser.runtime.sendMessage(
+	{source: "background",
+	 content: "showBookmark",
+	 wId: wId,
+	 tabId: tabId,
+	 bnId: bnId
+	}
+  ).then(handleMsgResponse, handleMsgError);
+}
+
+/*
  * Send a complex message to sidebars
  * 
  * msg = an object {source: "background",
@@ -841,8 +956,8 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  saveCurBnId(windowId, request.bnId);
 	}
 	else if (msg.startsWith("Close:")) { // Private window closing - De-register it
-	                                     // In fact, this message never comes :-(
-	                                     // So have to poll such pages ...
+	  									 // In fact, this message never comes :-(
+	  									 // So have to poll such pages ...
 	  let windowId = parseInt(msg.slice(6), 10);
 	  closeSidebar(windowId);
 	}
@@ -853,6 +968,7 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  let enableCookies_option_old = enableCookies_option;
 	  let enableFlipFlop_option_old = enableFlipFlop_option;
 	  let advancedClick_option_old = advancedClick_option;
+	  let showPath_option_old = showPath_option;
 	  let closeSearch_option_old = closeSearch_option;
 	  let openTree_option_old = openTree_option;
 	  let reversePath_option_old = reversePath_option;
@@ -861,6 +977,12 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  let fontSize_option_old = fontSize_option;
 	  let setSpaceSize_option_old = setSpaceSize_option;
 	  let spaceSize_option_old = spaceSize_option;
+	  let matchTheme_option_old = matchTheme_option;
+	  let setColors_option_old = setColors_option;
+	  let textColor_option_old = textColor_option;
+	  let bckgndColor_option_old = bckgndColor_option;
+	  let altFldrImg_option_old = altFldrImg_option;
+	  let useAltFldr_option_old = useAltFldr_option;
 	  let traceEnabled_option_old = traceEnabled_option;
 	  refreshOptionsLStore()
 	  .then(
@@ -895,36 +1017,46 @@ function handleAddonMessage (request, sender, sendResponse) {
 			sendAddonMessage("reload");
 		  }
 		  else if ((SFSChanged = (setFontSize_option_old != setFontSize_option))
-			       || (FSChanged = (fontSize_option_old != fontSize_option))
-			      ) {
+			  	   || (FSChanged = (fontSize_option_old != fontSize_option))
+		  		  ) {
 			if ((SFSChanged && !setFontSize_option
-				            && (fontSize_option_old != DfltFontSize)
-				)                  // SFS changed state to unset, refresh only if FS changed
-			    || !SFSChanged     // Only the fontSize changed, which can happen only when SFS is set
+							&& (fontSize_option_old != DfltFontSize)
+				)				// SFS changed state to unset, refresh only if FS changed
+				|| !SFSChanged	// Only the fontSize changed, which can happen only when SFS is set
 			   ) {
 			  // Change to FS requires a full reload of all sidebars
 			  sendAddonMessage("reload");
 			}
 		  }
 		  else if ((SSSChanged = (setSpaceSize_option_old != setSpaceSize_option))
-		       	   || (SSChanged = (spaceSize_option_old != spaceSize_option))
-		      	  ) {
+			  	   || (SSChanged = (spaceSize_option_old != spaceSize_option))
+		  		  ) {
 			if ((SSSChanged && !setSpaceSize_option
-			            	&& (spaceSize_option_old != DfltSpaceSize)
-				)                  // SFS changed state to unset, refresh only if FS changed
-				|| !SSSChanged     // Only the fontSize changed, which can happen only when SFS is set
+							&& (spaceSize_option_old != DfltSpaceSize)
+				)				// SFS changed state to unset, refresh only if FS changed
+				|| !SSSChanged	// Only the fontSize changed, which can happen only when SFS is set
 			   ) {
 			  // Change to SS requires a full reload of all sidebars
 			  sendAddonMessage("reload");
 			}
 		  }
 		  else if ((enableCookies_option_old != enableCookies_option)
-			       || (enableFlipFlop_option_old != enableFlipFlop_option)
-			       || (advancedClick_option_old != advancedClick_option)
-			       || (closeSearch_option_old != closeSearch_option)
-			       || (openTree_option_old != openTree_option)
-			       || (reversePath_option_old != reversePath_option)
+			  	   || (enableFlipFlop_option_old != enableFlipFlop_option)
+			  	   || (advancedClick_option_old != advancedClick_option)
+			  	   || (showPath_option_old != showPath_option)
+			  	   || (closeSearch_option_old != closeSearch_option)
+			  	   || (openTree_option_old != openTree_option)
+			  	   || (reversePath_option_old != reversePath_option)
 			       || (traceEnabled_option_old != traceEnabled_option)
+			       || (matchTheme_option_old != matchTheme_option)
+			       || (setColors_option_old != setColors_option)
+			       || (setColors_option && ((textColor_option_old != textColor_option)
+			    	   						|| (bckgndColor_option_old = bckgndColor_option)
+			    	   					   )
+			    	  )
+			       || ((useAltFldr_option && (altFldrImg_option_old != altFldrImg_option))
+				  	   || (useAltFldr_option_old != useAltFldr_option)
+				  	  )
 			      ) { // Those options only require a re-read and some minor actions
 			sendAddonMessage("savedOptions");
 		  }
@@ -960,23 +1092,9 @@ function handleAddonMessage (request, sender, sendResponse) {
 		}
 	  );
 	}
-	else if (msg.startsWith("reloadFFAPI")) { // Option page "Reload tree from FF API" button was pressed
-	  endLoadTime = new Date();
-	  savedBNList = curBNList;
-	  faviconWorkerPostMessage({data: ["hysteresis"]});
-	  countBookmarks = countFolders = countSeparators = countOddities = countFetchFav = 0;
-	  browser.bookmarks.getTree()
-	  .then(storeAndConvertTree, onRejected)
-	  .catch( // Asynchronous, like .then
-		function (err) {
-		  let msg = "Error on processing reloadFFAPI : "+err;
-		  console.log(msg);
-		  if (err != undefined) {
-			console.log("lineNumber: "+err.lineNumber);
-			console.log("fileName:   "+err.fileName);
-		  }
-		}
-	  );
+	else if (msg.startsWith("reloadFFAPI")) { // Option page "Reload tree from FF API" button was pressed,
+	  										  // or an anomaly was detected.
+	  reloadFFAPI(msg == "reloadFFAPI_auto");
 	}
 	else if (msg.startsWith("resetSizes")) { // Option page reset sizes button was pressed
 	  // Relay to sidebars
@@ -1028,15 +1146,24 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  let json = BN_serialize(curBNList[0]);
 	  sendResponse(
 		{content: "getCurBNList",
-	     json: json,
-	     countBookmarks: countBookmarks,
-	     countFetchFav: countFetchFav,
-	     countFolders: countFolders,
-	     countSeparators: countSeparators,
-	     countOddities: countOddities,
-	     mostVisitedBNId: mostVisitedBNId,
-	     recentTagBNId: recentTagBNId, 
-	     recentBkmkBNId: recentBkmkBNId
+		 json: json,
+		 countBookmarks: countBookmarks,
+		 countFetchFav: countFetchFav,
+		 countFolders: countFolders,
+		 countSeparators: countSeparators,
+		 countOddities: countOddities,
+		 mostVisitedBNId: mostVisitedBNId,
+		 recentTagBNId: recentTagBNId, 
+		 recentBkmkBNId: recentBkmkBNId
+		}
+	  );
+	  json = undefined;
+	}
+	else if (msg.startsWith("getCurHNList")) {
+	  let json = historyListSerialize(curHNList);
+	  sendResponse(
+		{content: "getCurHNList",
+		 json: json
 		}
 	  );
 	  json = undefined;
@@ -1071,8 +1198,8 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  console.log("message:    "+error.message);
 	  console.log("lineNumber: "+error.lineNumber);
 	  console.log("fileName:   "+error.fileName);
-//		console.log("   keys: "+Object.keys(error));
-//		console.log("   values: "+Object.values(error));
+//console.log("   keys: "+Object.keys(error));
+//console.log("   values: "+Object.values(error));
 	}
   }
 }
@@ -1089,12 +1216,12 @@ function buttonClicked (tab) {
   // the browser.sidebarAction.close() and browser.sidebarAction.open() are not working :-(
   // => Have to track state through other mechanisms to not rely on Promises ...
   if (isSidebarOpen[windowId] == true) {
-//    console.log("Sidebar is open. Closing.");
-    browser.sidebarAction.close();
+//console.log("Sidebar is open. Closing.");
+	browser.sidebarAction.close();
   }
   else {
-//    console.log("Sidebar is closed. Opening.");
-    browser.sidebarAction.open();
+//console.log("Sidebar is closed. Opening.");
+	browser.sidebarAction.open();
   }
 }
 
@@ -1123,9 +1250,9 @@ function handleInstall (details) {
 }
 
 /*
- * Process list of conversions serially (to avoid several requests to overlap each other
+ * Serially process list of conversions (to avoid several requests overlapping with each other)
  *
- *  Uses global variables cvt16x16ConvertList, cvt16x16Len, cvtUri and destCvtBnId
+ * Uses global variables cvt16x16ConvertList, cvt16x16Len, cvtUri and destCvtBnId
  */
 let cvt16x16ConvertList = []; // A list of [bnId, uriToConvert]
 let cvt16x16Len = 0;
@@ -1160,40 +1287,40 @@ function cvt16x16Add (bnId, uri) {
 /*
  * Convert and store image in 16x16, triggered by end of CvtImage.src load
  * 
- * Uses global variables cvtUri, destCvtImg and destCvtBnId
+ * Uses global variables cvtUri and destCvtBnId
  */
 function convertOnLoad () {
-//trace("finished "+destCvtBnId);
+//console.log("finished "+destCvtBnId);
   let nh = CvtImage.naturalHeight;
   let nw = CvtImage.naturalWidth;
   let convertedUri;
-//  console.log("  nh,nw: "+nh+","+nw);
+//console.log("  nh,nw: "+nh+","+nw);
   if ((nh > 0) && (nw > 0) && ((nh != 16) || (nw != 16))) {
-//trace("converting");
-    try {
+//console.log("converting");
+	try {
 	  if ((nh > 16) && (nw > 16)) { // Only downscaling .. avoid FF canvas native algo, not really good
-//        console.log("  downscale");
-        // Get ImageData.data of the image
-        let srcIDData;
-	    CvtCanvas2.height = nh;
-	    CvtCanvas2.width = nw;
-	    CvtCtx2.drawImage(CvtImage, 0, 0);
-	    srcIDData = CvtCtx2.getImageData(0, 0, nw, nh).data;
+//console.log("  downscale");
+		// Get ImageData.data of the image
+		let srcIDData;
+		CvtCanvas2.height = nh;
+		CvtCanvas2.width = nw;
+		CvtCtx2.drawImage(CvtImage, 0, 0);
+		srcIDData = CvtCtx2.getImageData(0, 0, nw, nh).data;
 
-	    // Downscale into CvtImageData
-        downscaleImg(srcIDData, CvtIDData, nh, nw);
+		// Downscale into CvtImageData
+		downscaleImg(srcIDData, CvtIDData, nh, nw);
 
-	    // Put CvtImage into CvtCtx and get base64 uri
-	    CvtCtx.putImageData(CvtImageData, 0, 0);
-        convertedUri = CvtCanvas.toDataURL();
-//        console.log("  convertedUri: "+convertedUri);
+		// Put CvtImage into CvtCtx and get base64 uri
+		CvtCtx.putImageData(CvtImageData, 0, 0);
+		convertedUri = CvtCanvas.toDataURL();
+//console.log("  convertedUri: "+convertedUri);
 	  }
 	  else {
-	    //Ctx.fillRect(0, 0, 16, 16);
-	    CvtCtx.clearRect(0, 0, 16, 16);
-	    CvtCtx.drawImage(CvtImage, 0, 0, 16, 16);
-	    //Ctx.drawImage(CvtImage, 0, 0);
-        convertedUri = CvtCanvas.toDataURL();
+		//Ctx.fillRect(0, 0, 16, 16);
+		CvtCtx.clearRect(0, 0, 16, 16);
+		CvtCtx.drawImage(CvtImage, 0, 0, 16, 16);
+		//Ctx.drawImage(CvtImage, 0, 0);
+		convertedUri = CvtCanvas.toDataURL();
 
 /*
 	    createImageBitmap(CvtImage)
@@ -1210,7 +1337,7 @@ console.log("convertedUri: "+convertedUri);
 	    .catch(...);
 */
 	  }
-    }
+	}
 	catch (error) { // Error on rescale, keep original
 	  let title = curBNList[destCvtBnId].title;
 	  console.log("convertOnLoad error: "+error.type+" for "+cvtUri+" - "+destCvtBnId+" - "+title);
@@ -1229,6 +1356,7 @@ console.log("convertedUri: "+convertedUri);
 	  && (BN.faviconUri != convertedUri)) {
 //console.log("  different from previous uri: "+BN.faviconUri);
 	BN.faviconUri = convertedUri;
+	historyListUpdateFaviconUri(curHNList, destCvtBnId, convertedUri);
 	saveBNList();
 
 	// Signal to sidebars
@@ -1245,8 +1373,8 @@ console.log("convertedUri: "+convertedUri);
  * Set favicon on bookmark after migrating to 16x16
  */
 function setFavicon (bnId, uri) {
-//  trace("BN.id: "+bnId+" index: "+row.rowIndex+" Row id: "+row.dataset.id);
-//  console.log("setFavicon for: "+bnId+" uri: "+uri);
+//trace("BN.id: "+bnId+" index: "+row.rowIndex+" Row id: "+row.dataset.id);
+//console.log("setFavicon for: "+bnId+" uri: "+uri);
 
   // Special handling for x-icons, which are libraries of icons, not well handled
   // by Canvas 2d context drawImage(), since it takes only the first icon in the library.
@@ -1258,23 +1386,29 @@ function setFavicon (bnId, uri) {
   }
   // Go with new favicon conversion only if different from previous record
   let BN = curBNList[bnId];
-  let lastUri = BN.faviconUri;
-  if (lastUri != newUri) {
-//	  console.log("  different uri: "+newUri);
-	if ((lastUri == "/icons/nofavicontmp.png") && (countFetchFav > 0))
-	  countFetchFav--;
-	cvt16x16Add(bnId, newUri);
+  if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
+	reloadFFAPI(true);
   }
+  else {
+	let lastUri = BN.faviconUri;
+	if (lastUri != newUri) {
+//console.log("  different uri: "+newUri);
+	  if ((lastUri == "/icons/nofavicontmp.png") && (countFetchFav > 0))
+		countFetchFav--;
+	  cvt16x16Add(bnId, newUri);
+	}
+
 /*
-  let data = '<svg xmlns="http://www.w3.org/2000/svg" width="16px" height="16px">' +
-             '<foreignObject width="100%" height="100%">' +
-             '<img xmlns="http://www.w3.org/1999/xhtml" src="'+uri+'" height="16px" width="16px"/>' +
-             '</foreignObject>' +
-             '</svg>';
+	let data = '<svg xmlns="http://www.w3.org/2000/svg" width="16px" height="16px">' +
+			   '<foreignObject width="100%" height="100%">' +
+			   '<img xmlns="http://www.w3.org/1999/xhtml" src="'+uri+'" height="16px" width="16px"/>' +
+			   '</foreignObject>' +
+			   '</svg>';
 console.log("data: "+data);
-  data = encodeURIComponent(data);
-  CvtImage.src = "data:image/svg+xml," + data;
+	data = encodeURIComponent(data);
+	CvtImage.src = "data:image/svg+xml," + data;
 */
+  }
 }
 
 /*
@@ -1284,13 +1418,13 @@ console.log("data: "+data);
  */
 function setWaitingFavicon (bnId) {
   let uri = "/icons/waiting.gif";
-//  trace("bnId: "+bnId+" set to waiting");
+//console.log("bnId: "+bnId+" set to waiting");
 
   // Keep waiting image in memory only, do not save (it has the temporary one on disk anyway)
   let BN = curBNList[bnId];
   let lastUri = BN.faviconUri;
   if ((lastUri == "/icons/nofavicontmp.png") && (countFetchFav > 0))
-    countFetchFav--;
+	countFetchFav--;
   BN.faviconUri = uri;
 
   // Signal to sidebars
@@ -1304,7 +1438,7 @@ function setWaitingFavicon (bnId) {
  */
 function setNoFavicon (bnId) {
   let uri = "/icons/nofavicon.png";
-//  trace("BN.id: "+bnId+" index: "+row.rowIndex+" Row id: "+row.dataset.id+" uri: "+uri);
+//console.log("BN.id: "+bnId+" index: "+row.rowIndex+" Row id: "+row.dataset.id+" uri: "+uri);
 
   // Save new favicon, if different from previous record
   let BN = curBNList[bnId];
@@ -1313,6 +1447,7 @@ function setNoFavicon (bnId) {
 	if ((lastUri == "/icons/nofavicontmp.png") && (countFetchFav > 0))
 	  countFetchFav--;
 	BN.faviconUri = uri;
+	historyListUpdateFaviconUri(curHNList, destCvtBnId, uri);
 	saveBNList();
 
 	// Signal to sidebars
@@ -1337,7 +1472,7 @@ function errorCvtOnLoad (error) {
 }
 
 /*
- * Favicon background retrieval process
+ * Favicon background retrieval process (called from favicon.js)
  *
  * e is of type MessageEvent, containing a [bnId, uri]
  */
@@ -1348,38 +1483,39 @@ function asyncFavicon (e) {
   if (BN == undefined) // The bookmark was deleted meanwhile ... so just skip it, do nothing
 	return;
 
-//  trace("Async uri received for BN.id: "+bnId+" url: "+BN.url+" uri: <<"+uri.substr(0,50)+">>");
+//console.log("Async uri received for BN.id: "+bnId+" url: "+BN.url+" uri: <<"+uri.substr(0,50)+">>");
 
   // Refresh display of the icon, and save it
   if (uri.startsWith("error:")) { // Got an error ... trace it
-    trace("Error on getting favicon for "+bnId+":\r\n"
-          +"title: "+BN.title+"\r\n"
-          +"url:   "+BN.url+"\r\n"
-          +uri+"\r\n"
-          +"--------------------");
-    setNoFavicon(bnId);
+	trace("Error on getting favicon for "+bnId+":\r\n"
+		  +"title: "+BN.title+"\r\n"
+		  +"url:   "+BN.url+"\r\n"
+		  +uri+"\r\n"
+		  +"--------------------");
+	setNoFavicon(bnId);
   }
   else if (uri.startsWith("starting:")) { // We started retrieving a new favicon, signal it
-                                          // on the bookmarks table by a "waiting" icon
-    setWaitingFavicon(bnId);
+										  // on the bookmarks table by a "waiting" icon
+	setWaitingFavicon(bnId);
   }
   else if (!uri.startsWith("data:image/")
-           && !uri.startsWith("data:application/octet-stream")
-           && !uri.startsWith("data:text/plain")
-           && !uri.startsWith("data:text/html")
-           && !uri.startsWith("/icons/")
-          ) { // Received another data type than image ...!
-    trace("Didn't get an image on favicon for "+bnId+":\r\n"
-          +"url:   "+BN.url+"\r\n"
-          +uri+"\r\n"
-          +"--------------------");
-    setNoFavicon(bnId);
+	  	   && !uri.startsWith("data:application/octet-stream")
+	  	   && !uri.startsWith("data:text/plain")
+	  	   && !uri.startsWith("data:text/html")
+	  	   && !uri.startsWith("/icons/")
+  		  ) { // Received another data type than image ...!
+	trace("Didn't get an image on favicon for "+bnId+":\r\n"
+		  +"url:   "+BN.url+"\r\n"
+		  +uri+"\r\n"
+		  +"--------------------");
+	setNoFavicon(bnId);
   }
   else { // Valid URI returned
-    setFavicon(bnId, uri);
+	setFavicon(bnId, uri);
   }
 }
 
+/*
 function errorFavicon (e) {
   console.log('There is an error with faviconWorker !'+e.type);
   console.log(Object.keys(e));
@@ -1389,6 +1525,7 @@ function errorFavicon (e) {
 function msgerrorFavicon () {
   console.log('There is a message deserialization error with faviconWorker !');
 }
+*/
 
 /*
  * Migration of existing favicons to 16x16
@@ -1438,14 +1575,14 @@ function migrate16x16 (migr16x16ConvertList, migr16x16Len) {
 			migr16x16Len--;
 			destBn = curBNList[destBnId];
 			if (destBn != undefined) { // Still there (could have been deleted by the time ...)
-//              console.log("Rescaling: "+destImg.src.substr(0,50)+" - "+row.firstElementChild.firstElementChild.title);
+//console.log("Rescaling: "+destImg.src.substr(0,50)+" - "+row.firstElementChild.firstElementChild.title);
 			  // Special handling for x-icons, which are libraries of icons, not well handded
 			  // by Canvas 2d context drawImage(), since it takes only the first icon in the librrary.
 			  // Verify if this is an x-icon by header .. because the mime type is not always reliable !!
 			  let uri = destBn.faviconUri;
 			  migrUri = selectXIconImg(uri);
 			  if (migrUri != null) { // It is an x-ixon and there was more than 1, go with selected image
-//                console.log("  go with selected uri: "+migrUri);
+//console.log("  go with selected uri: "+migrUri);
 				MigrImage.src = migrUri;
 			  }
 			  else {
@@ -1466,34 +1603,34 @@ function migrate16x16 (migr16x16ConvertList, migr16x16Len) {
 	  let nh = MigrImage.naturalHeight;
 	  let nw = MigrImage.naturalWidth;
 	  try {
-	    if ((nh > 16) && (nw > 16)) { // Only downscaling .. avoid FF canvas native algo,
-	    	                          // not really good
-	      try {
-	  	    // Get ImageData.data of the image
-	  	    MigrCanvas2.height = nh;
-	  	    MigrCanvas2.width = nw;
-	  	    MigrCtx2.drawImage(MigrImage, 0, 0);
-	  	    let srcIDData = MigrCtx2.getImageData(0, 0, nw, nh).data;
+		if ((nh > 16) && (nw > 16)) { // Only downscaling .. avoid FF canvas native algo,
+		  							  // not really good
+		  try {
+			// Get ImageData.data of the image
+			MigrCanvas2.height = nh;
+			MigrCanvas2.width = nw;
+			MigrCtx2.drawImage(MigrImage, 0, 0);
+			let srcIDData = MigrCtx2.getImageData(0, 0, nw, nh).data;
 
-	  	    // Downscale into MigrImageData
-	        downscaleImg(srcIDData, MigrIDData, nh, nw);
+			// Downscale into MigrImageData
+			downscaleImg(srcIDData, MigrIDData, nh, nw);
 
-	  	    // Put MigrImageData into MigrCtx and get base64 uri
-	  	    MigrCtx.putImageData(MigrImageData, 0, 0);
-	  	    migratedUri = MigrCanvas.toDataURL();
-	      }
-	      catch (error) {
-	  	    console.log("migrateOnLoad error: "+error.type+" for "+migrUri+" - "+destBnId+" - "+destBn.title);
-	    	loop();
-	      }
-	  	}
-	  	else {
+			// Put MigrImageData into MigrCtx and get base64 uri
+			MigrCtx.putImageData(MigrImageData, 0, 0);
+			migratedUri = MigrCanvas.toDataURL();
+		  }
+		  catch (error) {
+			console.log("migrateOnLoad error: "+error.type+" for "+migrUri+" - "+destBnId+" - "+destBn.title);
+			loop();
+		  }
+		}
+		else {
 		  MigrCtx.clearRect(0, 0, 16, 16);
 		  MigrCtx.drawImage(MigrImage, 0, 0, 16, 16);
 		  migratedUri = MigrCanvas.toDataURL();
-	  	}
+		}
 
-	    // Save new favicon
+		// Save new favicon
 		curBNList[destBnId].faviconUri = migratedUri;
 		saveBNList();
 
@@ -1562,53 +1699,54 @@ function buildTree (BTN, level) {
   // with same bookmark is, supposed to be unique. 
   let BN = curBNList[BTN_id]; 
   if (BN != undefined) { // Already exists !!
-    let newId = "dup"+(countDuplicates++)+"-"+BTN_id;
-    trace("Duplicate BTN.id = "+BTN_id+" !! Re-id to : "+newId, true);
-    traceBTN(BTN);
-    BTN.id = BTN_id = newId;
-    trace("---------------", true);
-    trace("Duplicate with:", true);
-    BN_trace(BN);
-    trace("---------------", true);
+	let newId = "dup"+(countDuplicates++)+"-"+BTN_id;
+	trace("Duplicate BTN.id = "+BTN_id+" !! Re-id to : "+newId, true);
+	traceBTN(BTN);
+	BTN.id = BTN_id = newId;
+	trace("---------------", true);
+	trace("Duplicate with:", true);
+	BN_trace(BN);
+	trace("---------------", true);
   }
 */
 //  let node = curBNList[BTN_id] = BN_create(BTN, level, faviconWorker);
   let node = curBNList[BTN_id] = BN_create(BTN, level, faviconWorkerPostMessage);
 
-  // If there are children, recursively display them
+  // If there are children, recursively build them
   if (beforeFF57) {
 	if (node.type == "folder") {
 	  let btnChildren = BTN.children;
 	  if (btnChildren != undefined) {
-	    let children = node.children;
-	    let j = 0;
-	    let index, id;
-	    let node1;
-        for (let i of btnChildren) {
-    	  index = i.index; 
-    	  while (j < index) {
-    	    id = "separator" + countSeparators;
-    	    node1 = new BookmarkNode (id, "separator", level+1, BTN_id, 0,
-                                      ((countSeparators++ == 0) ? true : false)
-                                     );
-            children[j++] = node1;
-    	  }
-          children[j++] = buildTree(i, level+1);
-        }
+		let children = node.children;
+		let j = 0;
+		let index, id;
+		let i;
+		let len = btnChildren.length;
+		for (let k=0 ; k<len ; k++) {
+		  i = btnChildren[k];
+		  index = i.index; 
+		  while (j < index) {
+			id = "separator" + countSeparators;
+			children[j++] = new BookmarkNode (id, "separator", level+1, BTN_id, 0,
+											  ((countSeparators++ == 0) ? true : false)
+											 );
+		  }
+		  children[j++] = buildTree(i, level+1);
+		}
 	  }
-    }
+	}
   }
   else {
-   	if (node.type == "folder") {
-  	  let btnChildren = BTN.children;
+	if (node.type == "folder") {
+	  let btnChildren = BTN.children;
 	  if (btnChildren != undefined) {
-	    let children = node.children;
-	    let j = 0;
-        for (let i of btnChildren) {
-          children[j++] = buildTree(i, level+1);
-        }
+		let children = node.children; // Array of proper length was created by BN_create
+		let len = btnChildren.length;
+		for (let j=0 ; j<len ; j++) {
+		  children[j] = buildTree(btnChildren[j], level+1);
+		}
 	  }
-    }
+	}
   }
 
   return(node);
@@ -1676,9 +1814,13 @@ function bkmkCreatedHandler (id, BTN) {
   let BN = buildTree(BTN, parentBN.level+1);
   BN_insert(BN, parentBN, index);
 
+  // Record action
+  historyListAdd(curHNList, HNACTION_BKMKCREATE,
+	  			 id, BTN.type, BN_aPath(parentId), parentId, index,
+	  			 BTN.title, BN.faviconUri, BTN.url);
   // Save new current info
   saveBNList();
-  
+
   // Signal to sidebars to make them display it (must work with Private window sidebars
   // also, which have their own separate copy of curBNList).
   sendAddonMsgComplex({
@@ -1703,24 +1845,46 @@ function bkmkCreatedHandler (id, BTN) {
  *   }
  */
 function bkmkRemovedHandler (id, removeInfo) {
-//  trace("Remove event on: "+id+" title: <<"+removeInfo.node.title+">> type: "+removeInfo.node.type);
+  let parentId = removeInfo.parentId;
+//trace("Remove event on: "+id+" title: <<"+removeInfo.node.title+">> type: "+removeInfo.node.type);
   // Remove item and its children from curBNList
-  let bn = curBNList[id]; 
-  BN_delete(bn, removeInfo.parentId);
+  let BN = curBNList[id];
+  if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
+	// Record action sent to us at source of detecting the problem
+	let btn = removeInfo.node;
+	historyListAdd(curHNList, HNACTION_BKMKREMOVE_DESYNC,
+				   id, btn.type, BN_aPath(parentId), parentId, removeInfo.index,
+				   btn.title,
+				   historyListSearchFaviconUri(curHNList, id, btn),
+				   btn.url);
+	reloadFFAPI(true);
+  }
+  else {
+	// Record action
+	let type = BN.type;
+	historyListAdd(curHNList, HNACTION_BKMKREMOVE,
+				   id, type, BN_aPath(parentId), parentId, removeInfo.index,
+				   BN.title, BN.faviconUri, BN.url, BN_serialize(BN),
+				   undefined, undefined, undefined, undefined, undefined,
+				   (type == "folder") ? BN_childIds(BN) : undefined // To increase chances to find childIds in case of desynchro
+				  );
 
-  // Save new current info
-  saveBNList();
+	BN_delete(BN, parentId);
 
-  // Signal to sidebars to make them remove things from display (must work with Private window sidebars
-  // also, which have their own separate copy of curBNList).
-  sendAddonMsgComplex({
-	source: "background",
-	content: "bkmkRemoved",
-	bnId: id
-  });
+	// Save new current info
+	saveBNList();
 
-  // Refresh list of recent bookmarks
-  triggerRecentRefreshBkmks();
+	// Signal to sidebars to make them remove things from display (must work with Private window sidebars
+	// also, which have their own separate copy of curBNList).
+	sendAddonMsgComplex({
+	  source: "background",
+	  content: "bkmkRemoved",
+	  bnId: id
+	});
+
+	// Refresh list of recent bookmarks
+	triggerRecentRefreshBkmks();
+  }
 }
 
 /*
@@ -1733,54 +1897,87 @@ function bkmkRemovedHandler (id, removeInfo) {
  *   }
  */
 function bkmkChangedHandler (id, changeInfo) {
-//  trace("Change event on: "+id+" title: <<"+changeInfo.title+">> url: "+changeInfo.url);
+  let cTitle = changeInfo.title;
+  let cUrl = changeInfo.url;
+//trace("Change event on: "+id+" title: <<"+cTitle+">> url: "+cUrl);
   // Retrieve the real BookmarkNode for complete information
   let BN = curBNList[id];
-//  trace("Change event on: "+id+" title: <<"+changeInfo.title+">> url: <<"+changeInfo.url+">> isBookmark: "+isBookmark);
 
-  // Update BookmarkNode contents and fetch new favicon if needed
-  let cTitle = changeInfo.title;
-  if (cTitle != undefined) // Did change
-    BN.title = cTitle;
-  let cUrl = changeInfo.url;
-  let isSpecial;
-  if (cUrl != undefined) { // Did change, and is not a folder
-	BN.url = cUrl;
-    isSpecial = cUrl.startsWith("place:");
-    if (isSpecial) {
-      BN.faviconUri = "/icons/specfavicon.png";
-    }
-    else if (cUrl.startsWith("about:")) { // about: is protected - security error ..
-      // Set uri to nofavicon.png
-      BN.faviconUri = "/icons/nofavicon.png";
-    }
-    else if (disableFavicons_option) {
-  	  BN.faviconUri = undefined;
-    }
-    else {
-      // Trigger asynchronous favicon retrieval process in background
-	  BN.faviconUri = "/icons/nofavicontmp.png";
-	  countFetchFav++;
-      // This is a bookmark, so here no need for cloneBN(), there is no tree below
-//      faviconWorker.postMessage(["get2", id, cUrl, enableCookies_option]);
-      faviconWorkerPostMessage({data: ["get2", id, cUrl, enableCookies_option]});
-    }
+  if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
+	// Retrieve info we do not have anymore
+	browser.bookmarks.get(id)
+	.then(
+	  function (a_BTN) {
+		// Record action sent to us at source of detecting the problem
+		let BTN = a_BTN[0];
+		let parentId = BTN.parentId;
+		historyListAdd(curHNList, HNACTION_BKMKCHANGE_DESYNC,
+					   id, BTN.type, BN_aPath(parentId), parentId, BTN.index,
+					   // Can't know the old title and url values !!! Hopefully, they will be sooner in the past history
+					   historyListSearchTitle(curHNList, id),
+					   historyListSearchFaviconUri(curHNList, id, BTN),
+					   historyListSearchUrl(curHNList, id),
+					   undefined,
+					   undefined, undefined, undefined, cTitle, cUrl);
+		reloadFFAPI(true);
+	  }
+	);
   }
+  else {
+	let oTitle = BN.title;
+	let oUrl = BN.url;
+	// Update BookmarkNode contents and fetch new favicon if needed
+	if (cTitle != undefined) // Did change
+	  BN.title = cTitle;
+	let isSpecial;
+	if (cUrl != undefined) { // Did change, and is not a folder
+	  BN.url = cUrl;
+	  isSpecial = cUrl.startsWith("place:");
+	  if (isSpecial) {
+		BN.faviconUri = "/icons/specfavicon.png";
+	  }
+	  else if (cUrl.startsWith("about:")) { // about: is protected - security error ..
+		// Set uri to nofavicon.png
+		BN.faviconUri = "/icons/nofavicon.png";
+	  }
+	  else if (disableFavicons_option) {
+		BN.faviconUri = undefined;
+	  }
+	  else {
+		// Trigger asynchronous favicon retrieval process in background
+		BN.faviconUri = "/icons/nofavicontmp.png";
+		countFetchFav++;
+		// This is a bookmark, so here no need for cloneBN(), there is no tree below
+//		faviconWorker.postMessage(["get2", id, cUrl, enableCookies_option]);
+		faviconWorkerPostMessage({data: ["get2", id, cUrl, enableCookies_option]});
+	  }
+	}
 
-  // Save new values
-  saveBNList();
+	// Record action
+	let type = BN.type;
+	let uri = BN.faviconUri;
+	let parentId = BN.parentId;
+	historyListAdd(curHNList, HNACTION_BKMKCHANGE,
+				   id, type, BN_aPath(parentId), parentId, BN_getIndex(BN),
+				   oTitle, uri, oUrl, undefined,
+				   undefined, undefined, undefined, cTitle, cUrl,
+				   (type == "folder") ? BN_childIds(BN) : undefined // To increase chances to find childIds in case of desynchro
+				  );
+	// Save new values
+	saveBNList();
 
-  // Signal to sidebars to make them change things on display (must work with Private window sidebars
-  // also, which have their own separate copy of curBNList).
-  sendAddonMsgComplex({
-	source: "background",
-	content: "bkmkChanged",
-	bnId: id,
-	isBookmark: (BN.type == "bookmark"),
-	title: BN.title,
-	url: BN.url,
-	uri: BN.faviconUri
-  });
+	// Signal to sidebars to make them change things on display (must work with Private window sidebars
+	// also, which have their own separate copy of curBNList).
+	sendAddonMsgComplex({
+	  source: "background",
+	  content: "bkmkChanged",
+	  bnId: id,
+	  isBookmark: (BN.type == "bookmark"),
+	  title: BN.title,
+	  url: BN.url,
+	  uri: uri
+	});
+  }
 }
 
 /*
@@ -1795,34 +1992,62 @@ function bkmkChangedHandler (id, changeInfo) {
  *   }
  */
 function bkmkMovedHandler (id, moveInfo) {
-//trace("Move event on: "+id+" from: <<"+moveInfo.oldParentId+", "+moveInfo.oldIndex+">> to: <<"+moveInfo.parentId+", "+moveInfo.index+">>");
+  let curParentId = moveInfo.oldParentId;
+  let targetParentId = moveInfo.parentId;
+  let targetIndex = moveInfo.index;
+//trace("Move event on: "+id+" from: <<"+curParentId+", "+moveInfo.oldIndex+">> to: <<"+targetParentId+", "+targetIndex+">>");
 
   // Retrieve the real BookmarkNode and all its children, and its new parent
   let BN = curBNList[id];
-  let curParentId = moveInfo.oldParentId;
-  let targetParentId = moveInfo.parentId;
-  let targetParentBN = curBNList[targetParentId];
-  let targetIndex = moveInfo.index;
+  if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
+	// Retrieve info we do not have anymore
+	browser.bookmarks.get(id)
+	.then(
+	  function (a_BTN) {
+		// Record action sent to us at source of detecting the problem
+		let BTN = a_BTN[0];
+		historyListAdd(curHNList, HNACTION_BKMKMOVE_DESYNC,
+					   id, BTN.type, BN_aPath(curParentId), curParentId, moveInfo.oldIndex,
+					   BTN.title,
+					   historyListSearchFaviconUri(curHNList, id, BTN),
+					   BTN.url, undefined,
+					   BN_aPath(targetParentId), targetParentId, targetIndex
+					  );
+		reloadFFAPI(true);
+	  }
+	);
+  }
+  else {
+	let targetParentBN = curBNList[targetParentId];
 
-  // Remove item and its children from its current parent, but keep them in list
-  // as this is only a move.
-  BN_delete(BN, curParentId, false);
-  // Then insert it at new place, again not touching the list
-  BN_insert(BN, targetParentBN, targetIndex, false);
+	// Remove item and its children from its current parent, but keep them in list
+	// as this is only a move.
+	BN_delete(BN, curParentId, false);
+	// Then insert it at new place, again not touching the list
+	BN_insert(BN, targetParentBN, targetIndex, false);
 
-  // Save new values
-  saveBNList();
+	// Record action
+	let type = BN.type;
+	historyListAdd(curHNList, HNACTION_BKMKMOVE,
+				   id, type, BN_aPath(curParentId), curParentId, moveInfo.oldIndex,
+				   BN.title, BN.faviconUri, BN.url, undefined, // To increase chances to find last title or url in case of desynchro
+				   BN_aPath(targetParentId), targetParentId, targetIndex, undefined, undefined,
+				   (type == "folder") ? BN_childIds(BN) : undefined // To increase chances to find childIds in case of desynchro
+				  );
+	// Save new values
+	saveBNList();
 
-  // Signal to sidebars to make them change things on display (must work with Private window sidebars
-  // also, which have their own separate copy of curBNList).
-  sendAddonMsgComplex({
-	source: "background",
-	content: "bkmkMoved",
-	bnId: id,
-	curParentId: curParentId,
-	targetParentId: targetParentId,
-	targetIndex: targetIndex
-  });
+	// Signal to sidebars to make them change things on display (must work with Private window sidebars
+	// also, which have their own separate copy of curBNList).
+	sendAddonMsgComplex({
+	  source: "background",
+	  content: "bkmkMoved",
+	  bnId: id,
+	  curParentId: curParentId,
+	  targetParentId: targetParentId,
+	  targetIndex: targetIndex
+	});
+  }
 }
 
 /*
@@ -1833,37 +2058,74 @@ function bkmkMovedHandler (id, moveInfo) {
  *   {childIds: array of string. Array containing the IDs of all the bookmark items in this folder,
  *              in the order they now appear in the UI. 
  *   }
+ * recHistory = Boolean, true when called by handler (default value)
  */
-function bkmkReorderedHandler (id, reorderInfo) {
-//  trace("Reorder event on: "+id);
+function bkmkReorderedHandler (id, reorderInfo, recHistory = true) {
+  let childIds = reorderInfo.childIds;
+//trace("Reorder event on: "+id);
 
   // We need the BN to get real info
   let folderBN = curBNList[id];
 
-  // Delete all children of folderBN, if any (no cleanup)
-  let children = folderBN.children;
-  if (children != undefined) {
-	// Create a new array with all children of folderBN in new order
-	let len = children.length;
-	children = folderBN.children = new Array (len); // Start new list from scratch, discarding the old one
-	let j = 0;
-	let childIds = reorderInfo.childIds;
-   	for (let i of childIds) {
-   	  children[j++] = curBNList[i];
-   	}
+  if (folderBN == undefined) { // Desynchro !! => reload bookmarks from FF API
+	if (recHistory) {
+	  // Retrieve info we do not have anymore
+	  browser.bookmarks.get(id)
+	  .then(
+		function (a_BTN) {
+		  // Record action sent to us at source of detecting the problem
+		  let BTN = a_BTN[0];
+		  let parentId = BTN.parentId;
+		  historyListAdd(curHNList, HNACTION_BKMKMOVE_DESYNC,
+			  			 id, "folder", BN_aPath(parentId), parentId, BTN.index,
+			  			 BTN.title,
+			  			 historyListSearchFaviconUri(curHNList, id, BTN),
+			  			 undefined, undefined,
+			  			 undefined, undefined, undefined, undefined, undefined,
+			  			 // Can't know the old childIds value !!! Hopefully, it will be sooner in the past history
+			  			 historyListSearchChildIds(curHNList, id),
+			  			 childIds
+		  				);
+		  reloadFFAPI(true);
+		}
+	  );
+	}
+	else {
+	  reloadFFAPI(true);
+	}
+  }
+  else {
+	// Delete all children of folderBN, if any (no cleanup)
+	if (folderBN.children != undefined) {
+	  // Create a new array with all children of folderBN in new order
+	  let len = childIds.length;
+	  let children = folderBN.children = new Array (len); // Start new list from scratch, discarding the old one
+	  for (let i=0 ; i<len ; i++) {
+		children[i] = curBNList[childIds[i]];
+	  }
 
-   	// Save new values
-//folderBN.children = undefined;
-   	saveBNList();
+	  if (recHistory) {
+		// Record action
+		let parentId = folderBN.parentId;
+		historyListAdd(curHNList, HNACTION_BKMKREORDER,
+					   id, "folder", BN_aPath(parentId), parentId, BN_getIndex(folderBN),
+					   folderBN.title, folderBN.faviconUri, undefined, undefined, // To increase chances to find last title and favicon in history when searching for it
+					   undefined, undefined, undefined, undefined, undefined,
+					   BN_childIds(folderBN), childIds
+					  );
+	  }
+	  // Save new values
+	  saveBNList();
 
-   	// Signal to sidebars to make them change things on display (must work with Private window sidebars
-   	// also, which have their own separate copy of curBNList).
-   	sendAddonMsgComplex({
-   	  source: "background",
-   	  content: "bkmkReordered",
-   	  bnId: id,
-   	  reorderInfo: reorderInfo
-   	});
+	  // Signal to sidebars to make them change things on display (must work with Private window sidebars
+	  // also, which have their own separate copy of curBNList).
+	  sendAddonMsgComplex({
+		source: "background",
+		content: "bkmkReordered",
+		bnId: id,
+		reorderInfo: reorderInfo
+	  });
+	}
   }
 }
 
@@ -1878,60 +2140,78 @@ function tabModified (tabId, changeInfo, tabInfo) {
 /*
   trace('-------------------------------------');
   trace("A tab was updated.\r\n"
-       +"tabId: "+tabId+"\r\n"
-       +"changeInfo.favIconUrl: "+changeInfo.favIconUrl+"\r\n"
-       +"changeInfo.status: "+changeInfo.status+"\r\n"
-       +"changeInfo.title: "+changeInfo.title+"\r\n"
-       +"changeInfo.url: "+changeInfo.url+"\r\n"
-       +"tabInfo.favIconUrl: "+tabInfo.favIconUrl+"\r\n"
-       +"tabInfo.index: "+tabInfo.index+"\r\n"
-       +"tabInfo.status: "+tabInfo.status+"\r\n"
-       +"tabInfo.title: "+tabInfo.title+"\r\n"
-       +"tabInfo.url: "+tabInfo.url+"\r\n"
-       );
+	   +"tabId: "+tabId+"\r\n"
+	   +"changeInfo.favIconUrl: "+changeInfo.favIconUrl+"\r\n"
+	   +"changeInfo.status: "+changeInfo.status+"\r\n"
+	   +"changeInfo.title: "+changeInfo.title+"\r\n"
+	   +"changeInfo.url: "+changeInfo.url+"\r\n"
+	   +"tabInfo.favIconUrl: "+tabInfo.favIconUrl+"\r\n"
+	   +"tabInfo.index: "+tabInfo.index+"\r\n"
+	   +"tabInfo.status: "+tabInfo.status+"\r\n"
+	   +"tabInfo.title: "+tabInfo.title+"\r\n"
+	   +"tabInfo.url: "+tabInfo.url+"\r\n"
+	  );
 */
-  if (!disableFavicons_option				// Ignore if disableFavicons_option is set
-	  && !pauseFavicons_option				// Ignore if pauseFavicons_option is set
-	  && (tabInfo.status == "complete")) {
-    let tabUrl = tabInfo.url;
-    let tabFaviconUrl = tabInfo.favIconUrl;
+  if (tabInfo.status == "complete") {
+	let tabUrl = tabInfo.url;
 
-//    trace("A tab was updated - tabUrl: "+tabUrl+" tabFaviconUrl: "+tabFaviconUrl);
-    if ((tabUrl != undefined)
-    	&& (tabFaviconUrl != undefined)
-    	&& (!tabUrl.startsWith("moz-extension://"))
-    	&& (!tabUrl.startsWith("about:"))
-    	&& (!tabUrl.startsWith("data:"))
-    	&& (!tabUrl.startsWith("view-source:"))
-       ) {
-      // Look for a bookmark matching the url
-      if (tabUrl.startsWith("wyciwyg://")) { // Cached URL wyciwyg://x/....    Cf. https://en.wikipedia.org/wiki/WYCIWYG
-    	// Find start of real URL, which is after the first "/" after "wyciwyg://x"
-    	let pos = tabUrl.indexOf("/", 10) + 1;
-    	tabUrl = tabUrl.substring(pos);
-      }
-      // Do not (search for the bookmark and update favicon) if favicons are paused and this is not a data: URI
-      browser.bookmarks.search({url: tabUrl})
-      .then(
-    	function (a_BTN) { // An array of BookmarkTreeNode
-//          trace("Results: "+a_BTN.length);
-    	  for (let i of a_BTN) {
-//          trace("Matching BTN.id: "+i.id+" "+i.url);
-    		// Load the favicon as a data: URI
-    		if (tabFaviconUrl.startsWith("data:")) { // Cool, already in good format for us !
-    		  setFavicon(i.id, tabFaviconUrl);
-    		}
-    		else { // Fetch favicon
-    		  // Presumably a bookmark, so no need for cloneBTN(), there is no tree below
-    		  let bnId = i.id;
-//              faviconWorker.postMessage(["icon", bnId, tabFaviconUrl, enableCookies_option]);
-    		  faviconWorkerPostMessage({data: ["icon", bnId, tabFaviconUrl, enableCookies_option]});
-//              trace("Retrieval demand 2 sent for icon:"+tabFaviconUrl);
-    		}
-    	  }
-    	}
-      );
-    }
+//console.log("A tab was updated - tabUrl: "+tabUrl+" tabFaviconUrl: "+tabFaviconUrl);
+	if ((tabUrl != undefined)
+		&& (!tabUrl.startsWith("moz-extension://"))
+		&& (!tabUrl.startsWith("about:"))
+		&& (!tabUrl.startsWith("data:"))
+		&& (!tabUrl.startsWith("view-source:"))
+	   ) {
+	  // Look for a bookmark matching the url
+	  if (tabUrl.startsWith("wyciwyg://")) { // Cached URL wyciwyg://x/....    Cf. https://en.wikipedia.org/wiki/WYCIWYG
+		// Find start of real URL, which is after the first "/" after "wyciwyg://x"
+		let pos = tabUrl.indexOf("/", 10) + 1;
+		tabUrl = tabUrl.substring(pos);
+	  }
+	  browser.bookmarks.search({url: tabUrl})
+	  .then(
+		function (a_BTN) { // An array of BookmarkTreeNode
+		  let len = a_BTN.length;
+//console.log("Results: "+len);
+		  if (len > 0) { // This is a bookmarked tab
+			// Show a bookmarked BSP2 star for this tab
+			browser.browserAction.setIcon(
+			  {path: "icons/star2bkmked.png",
+			   tabId: tabId
+			  }
+			);
+			// If there is a favicon and we are collecting them, refresh BookmarkNode with it
+			let tabFaviconUrl = tabInfo.favIconUrl;
+			if (!disableFavicons_option				// Ignore if disableFavicons_option is set
+				&& !pauseFavicons_option				// Ignore if pauseFavicons_option is set
+				&& (tabFaviconUrl != undefined)
+			   ) {
+			  let bnId;
+			  for (let i=0 ; i<len ; i++) {
+				bnId = a_BTN[i].id;
+//console.log("Matching BTN.id: "+bnId+" "+a_BTN[i].url);
+				// Load the favicon as a data: URI
+				if (tabFaviconUrl.startsWith("data:")) { // Cool, already in good format for us !
+				  setFavicon(bnId, tabFaviconUrl);
+				}
+				else { // Fetch favicon
+				  // Presumably a bookmark, so no need for cloneBTN(), there is no tree below
+//				  faviconWorker.postMessage(["iconurl", bnId, tabFaviconUrl, enableCookies_option]);
+				  faviconWorkerPostMessage({data: ["iconurl", bnId, tabFaviconUrl, enableCookies_option]});
+//trace("Retrieval demand 2 sent for icon:"+tabFaviconUrl);
+				}
+			  }
+			}
+		  }
+		  else { // Reset to global BSP2 icon
+			browser.browserAction.setIcon(
+			  {tabId: tabId
+			  }
+			);
+		  }
+		}
+	  );
+	}
   }
 }
 
@@ -1949,32 +2229,268 @@ function onVisited(historyItem) {
 }
 
 /*
- * Update path submenu item with bookmark item path string
+ * Ask a particular BSP2 sidebar to show a particular bookmark
+ * 
+ * wId: id of window holding the open BSP2 sidebar
+ * tabd: id of bookmarked tab
+ * bnId: id of bookmark to show
+ */ 
+function panelShowBookmark (wId, tabId, bnId) {
+//console.log("Showing "+bnId+" in BSP2 sidebar "+wId+" for tab "+tabId);
+  if (isSidebarOpen[wId] == true) { // If open and ready, send message to show bnId
+	sendAddonMsgShowBkmk(wId, tabId, bnId);
+  }
+  else { // Else, wait it is fully open, in newSidebar() callback above, to send it
+	showInSidebarWId   = wId;
+	showInSidebarTabId = tabId;
+	showInSidebarBnId  = bnId;
+  }
+}
+
+/*
+ * Manage FF context menu integration - onShown event
+ * 
+ * info = menus.OnClickData object with addition of contexts and menuIds
+ * tab = tabs.Tab details of the tab where the click took place (or undefined if none)
  */
-function updateMenuItem(bnId) {
-  let BN = curBNList[bnId];
-  let path = BN_path(BN.parentId);
-  browser.menus.update(
-	subMenuPathId,
-	{title: path
-    }
-  );
-  browser.menus.refresh();
+let lastMenuInstanceId = 0;
+let nextMenuInstanceId = 1;
+let lastMenuBnId = undefined;
+function onShownContextMenuHandler (info, tab) {
+  let bnId = info.bookmarkId;
+  let contexts = info.contexts;
+  let is_onBkmk = false;
+  let is_onBSP2Icon = false;
+//  let is_inSidebar = (info.viewType == "sidebar"); // True if in any sidebar, except in natve Bookmark sidebar
+  let len = contexts.length;
+  let s;
+  for (let i=0 ; i<len ; i++) {
+	s = contexts[i];
+	if (s == "bookmark") {
+	  is_onBkmk = true;
+	}
+	else if (s == "browser_action") {
+	  is_onBSP2Icon = true;
+	}
+  }
+  let menuIds = info.menuIds;
+//console.log("menu shown on <"+bnId+"> with contexts=["+contexts+"] menuIds=["+menuIds+"]"
+//			+"\n menuItemId="+info.menuItemId+" pageUrl="+info.pageUrl+" targetElementId="+info.targetElementId+" viewType="+info.viewType
+//			+"\n tab="+tab);
+
+  if (is_onBkmk && (bnId != undefined) && (bnId.length > 0)) {
+	// Check if we are in BSP2 sidebar or not
+	let is_inBSP2Sidebar = false;
+	len = menuIds.length;
+	for (let i=0 ; i<len ; i++) {
+	  if (menuIds[i].includes("bsp2")) {
+		is_inBSP2Sidebar = true;
+		break;
+	  }
+	}
+	if (is_inBSP2Sidebar) { // Bookmark context menu inside BSP2 sidebar, make our Path menu invisible
+	  						// Rest of the menu is taken care of by the panel code
+	  hideFFContextMenu();
+	}
+	else { // Show Bookmark context menu outside of our sidebar
+	  showFFContextMenu(bnId);
+	}
+  }
+  else if (is_onBSP2Icon) { // Check if we should enable the "Show bookmark in sidebar.." submenu
+	// Submenu disabled by default
+	disableBAShowBkmk();
+
+	let tabUrl = tab.url;
+	if ((tabUrl != undefined)
+		&& (!tabUrl.startsWith("moz-extension://"))
+		&& (!tabUrl.startsWith("about:"))
+		&& (!tabUrl.startsWith("data:"))
+		&& (!tabUrl.startsWith("view-source:"))
+	   ) {
+	  // Look for a bookmark matching the url
+	  if (tabUrl.startsWith("wyciwyg://")) { // Cached URL wyciwyg://x/....    Cf. https://en.wikipedia.org/wiki/WYCIWYG
+		// Find start of real URL, which is after the first "/" after "wyciwyg://x"
+		let pos = tabUrl.indexOf("/", 10) + 1;
+		tabUrl = tabUrl.substring(pos);
+	  }
+	  // Detect if menu was closed or even reopened during the search
+	  let menuInstanceId = lastMenuInstanceId = nextMenuInstanceId++;
+	  browser.bookmarks.search({url: tabUrl})
+	  .then(
+		function (a_BTN) { // An array of BookmarkTreeNode
+		  let len = a_BTN.length;
+//console.log("Results: "+len);
+		  if ((len > 0)
+			  && (menuInstanceId == lastMenuInstanceId) // Menu was not closed and we are still in the same menu instance
+		     ) { // Show submenu
+			// Take only the first one if there are multiple
+			let bnId = a_BTN[0].id;
+			let BN = curBNList[bnId];
+			if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
+			  reloadFFAPI(true);
+			}
+			else { // enable the submenu, and remember the bnId for it
+			  lastMenuBnId = bnId;
+			  enableBAShowBkmk();
+			}
+		  }
+		}
+	  );
+	}
+  }
+}
+
+/*
+ * Manage FF context menu integration - onHidden event
+ */ 
+function onHiddenContextMenuHandler () {
+  // Reset last instance id and remembered bnId if any
+  lastMenuInstanceId = 0;
+  lastMenuBnId = undefined;
+}
+
+/*
+ * Manage FF context menu integration - onClicked event
+ * 
+ * info = menus.OnClickData object
+ * tab = tabs.Tab details of the tab where the click took place (or undefined if none)
+ */
+function onClickedContextMenuHandler (info, tab) {
+  let menuItemId = info.menuItemId;
+//console.log("menuItemId = "+menuItemId);
+//  if (menuItemId == SubMenuPathId) {
+//console.log("SubMenuPathId clicked");
+//  }
+//  else
+  if (menuItemId == BAOpenTabId) {
+//console.log("BAOpenTabId clicked, tab id = "+tab.id);
+	// Open in new tab, referred by this tab to come back to it when closing
+	// Get current active tab as opener id to come back to it when closing the new tab
+	let href = SelfURL;
+	if (beforeFF57)
+	  browser.tabs.create({url: href});
+	else
+	  browser.tabs.create({url: href, openerTabId: tab.id});
+  }
+  else if (menuItemId == BAShowInSidebar) {
+//console.log("Show "+lastMenuBnId+" in BSP2 sidebar");
+	if (lastMenuBnId != undefined) {
+	  let windowId = tab.windowId;
+	  // Can't use browser.sidebarAction.isOpen() here, as this is waiting for a Promise,
+	  // and so when it arrives we are not anymore in the code flow of a user action, so
+	  // the browser.sidebarAction.close() and browser.sidebarAction.open() are not working :-(
+	  // => Have to track state through other mechanisms to not rely on Promises ...
+	  if (isSidebarOpen[windowId] == true) { // Already open
+		panelShowBookmark(windowId, tab.id, lastMenuBnId);
+	  }
+	  else {
+		browser.sidebarAction.open()
+		.then(panelShowBookmark(windowId, tab.id, lastMenuBnId));
+	  }
+	}
+  }
+  else if (menuItemId == BAHistory) {
+	// Open Bookmark history window
+	let href = HistoryURL;
+	// Open in new window, like Properties popup
+	// Open popup window where it was last. If it was in another screen than
+	// our current screen, then center it.
+	// This avoids having the popup out of screen and unreachable, in case
+	// the previous screen went off, or display resolution changed.
+/*
+	let top = res.historytop_option;
+	let left = res.historyleft_option;
+	let scr = window.screen;
+	let adjust = false;
+	if ((left < scr.availLeft) || (left >= scr.availLeft + scr.availWidth)) {
+	  adjust = true;
+	  left = scr.availLeft + Math.floor((scr.availWidth - PopupWidth) / 2);
+	}
+	if ((top < scr.availTop) || (top >= scr.availTop + scr.availHeight)) {
+	  adjust = true;
+	  top = scr.availTop + Math.floor((scr.availHeight - PopupHeight) / 2);
+	}
+	if (adjust) { // Save new values
+	  browser.storage.local.set({
+		historytop_option: top,
+		historyleft_option: left
+	  });
+	}
+*/
+	// Open Bookmark history window if not already open, else just focus on it
+	browser.windows.getAll({populate: true, windowTypes: ["popup"]})
+	.then(
+	  function (a_Windowinfo) {
+		let wi, openedWi;
+		let wTitle = "("+selfName+") - Bookmark history -";
+		for (wi of a_Windowinfo) {
+		  if (wi.title.includes(wTitle)) {
+			openedWi = wi; 
+		  }
+		}
+		if (openedWi != undefined) {
+		  browser.windows.update(openedWi.id, {focused: true});
+		}
+		else {
+		  browser.windows.create(
+			{titlePreface: "Bookmark history",
+			 type: "popup",
+			 url: href,
+			 //----- Workaround for top and left position parameters being ignored for panels -----
+			 //Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
+			 //Make the start size as small as possible so that it briefly flashes in its initial
+			 //position in the least conspicuous way.
+			 //Note: 1,1 does not work, this sets the window in a state reduced to the bar, and no
+			 //internal resize seems to work after that.
+			 //Also tried to start minimized, but the window pops in a big size first before being minimized,
+			 //even less pretty.			   .
+			 //=> .. FF does not seem very clean on all this .. :-( 
+//			 height: PopupHeight,
+//			 width: PopupWidth,
+			 height: 800,
+			 width: 800,
+//			 left: left,
+//			 top: top,
+			 //----- End of position ignored workaround -----
+			 allowScriptsToClose: true
+			}
+		  );
+		}
+	  }
+	);
+  }
+  else if (menuItemId == BAOptionsId) {
+	// Open BSP2 options
+	browser.runtime.openOptionsPage();
+  }
 }
 
 /*
  * Complete load of bookmarks table
  */
+const SelfURL = browser.extension.getURL("sidebar/panel.html");
+const HistoryURL = browser.extension.getURL("sidebar/history.html");
 function completeBookmarks () {
   // Remove the faviconworker delay at start if nothing queued
-//  faviconWorker.postMessage(["nohysteresis"]);
+//faviconWorker.postMessage(["nohysteresis"]);
   faviconWorkerPostMessage({data: ["nohysteresis"]});
 
-  if (ready) { // If already ready, that means we were told to reload the tree from FF API
+  // Get trimmed history
+  if (savedHNList == undefined) {
+	curHNList = new HistoryList ();
+  }
+  else {
+	curHNList = savedHNList;
+  }
+
+  if (ready) { // If already ready, that means we were reloading the tree from FF API
 	// Tell all sidebars to reload
 	sendAddonMessage("reload");
   }
-  else {
+  else { // BSP2 start
+	// Record start action
+	historyListAdd(curHNList, HNACTION_BSP2START);
+
 	// Setup event handlers for bookmark modifications
 	browser.bookmarks.onCreated.addListener(bkmkCreatedHandler);
 	browser.bookmarks.onRemoved.addListener(bkmkRemovedHandler);
@@ -2001,6 +2517,23 @@ function completeBookmarks () {
 
 	// If we got so far, we can remove the backup version now, the next save will be on primary
 	browser.storage.local.remove(["savedBNListBak", "fTimeBak"]);
+
+	// Add BSP2 specific context menu / submenu on bookmarks, on sidebar and on browser action
+	if (!beforeFF62) {
+	  createFFContextMenu();
+	  if (!beforeFF64) {
+		createBSP2ContextMenu();
+	  }
+	  createBAContextMenu();
+
+	  // Note: this is called each time the context menu is appearing, not only on bookmarks.
+	  //       Note however that it is not called at all when in bookmark sidebar or in library window before FF66
+	  browser.menus.onShown.addListener(onShownContextMenuHandler);
+	  browser.menus.onHidden.addListener(onHiddenContextMenuHandler);
+		  
+	  // Act on menu item clicked
+	  browser.menus.onClicked.addListener(onClickedContextMenuHandler);
+	}
   }
 
   // Save current info
@@ -2027,35 +2560,6 @@ function completeBookmarks () {
   // Get latest topsites and recent bookmarks
   triggerRefreshMostVisited();
   triggerRecentRefreshBkmks();
-
-  // Add BSP2 specific context menu / submenu on bookmarks 
-  browser.menus.create({ // Main menu
-    id: mainMenuId,
-    title: "BSP2 Path to &bookmark item",
-    contexts: ["bookmark"]
-  });
-  browser.menus.create({ // Sub menu 1
-	parentId: mainMenuId,
-	id:       subMenuPathId,
-	title:    "path" // To be updated on menu shown
-  });
-
-  // Note: this is called each time the context menu is appearing, not only on bookmarks,
-  //       however, it is not called at all for bookmark sidebar and library window items :-(
-  browser.menus.onShown.addListener(info => {
-	let bnId = info.bookmarkId;
-//trace("menu shown on <"+bnId+">");
-    if ((bnId != undefined) && (bnId.length > 0)) {
-      updateMenuItem(bnId);
-    }
-  });
-
-  browser.menus.onClicked.addListener((info, tab) => {
-	let menuItemId = info.menuItemId;
-	if (menuItemId == subMenuPathId) {
-//trace("subMenuPathId clicked");
-    }
-  });
 }
 
 /*
@@ -2071,13 +2575,16 @@ function completeBookmarks () {
  */
 function buildBookmarkId (a_BTN, id, level, force = true) {
   let node;
-  for (let i of a_BTN) {
-    if (i.id == id) {
-      if ((i.children.length > 0) || force) {
-        node = buildTree(i, level);
-      }
-      break;
-    }
+  let i;
+  let len = a_BTN.length;
+  for (let j=0 ; j<len ; j++) {
+	i = a_BTN[j];
+	if (i.id == id) {
+	  if ((i.children.length > 0) || force) {
+		node = buildTree(i, level);
+	  }
+	  break;
+	}
   }
 
   return(node);
@@ -2238,10 +2745,10 @@ browser.runtime.onMessage.addListener(handleAddonMessage);
 browser.management.getSelf()
 .then(
   function (extensionInfo) {
-	let name = extensionInfo.name;
+	selfName = extensionInfo.name;
 	let version = extensionInfo.version;
-//	let title1 = name;
-	let title2 = name + "\nv" +version;
+//	let title1 = selfName;
+	let title2 = selfName + "\nv" +version;
 
 	// Disable the toolbar button in FF56, it is useless ..
 	if (beforeFF57) {
@@ -2289,9 +2796,9 @@ readFullLStore(false, trace)
 	  if (proto == "String") { // New jsonified method
 		trace("jsonified save method", true);
 		let json = savedBNList;
-		if (json.length < 20) { // Bad save last time .. look at the other one
+		if ((json != "{}") && (json.length < 20)) { // Bad save last time .. look at the other one
 		  json = savedBNListBak;
-		  if ((json != undefined) && (json.length < 20)) { // Not here or bad save again :-(
+		  if ((json != undefined) && (json != "{}") && (json.length < 20)) { // Not here or bad save again :-(
 			json = undefined;
 		  }
 		}
@@ -2304,10 +2811,7 @@ readFullLStore(false, trace)
 		else {
 		  savedBNList = {};
 		  let rc = rebuildBNList(savedBNList, rootBN);
-		  if (rc) {
-			savedBNList[0] = rootBN;
-		  }
-		  else { // Got an error somewhere in the jsonified save, reload the full tree from FF
+		  if (!rc) { // Got an error somewhere in the jsonified save, reload the full tree from FF
 			trace("jsonified save was apparently corrupted, got false from rebuildBNList() - Reloadding tree from FF API", true);
 			savedBNList = undefined;
 		  }
@@ -2318,6 +2822,23 @@ readFullLStore(false, trace)
 	  }
 	}
   
+	// If we got savedHNList, read and trim it
+	if (savedHNList != undefined) {
+	  let json = savedHNList;
+	  if ((json != "[]") && (json.length < 20)) { // Bad save last time .. we lost the history
+		json = undefined;
+	  }
+	  // Read the full savedHNList object
+	  savedHNList = historyListDeserialize(json);
+	  if (savedHNList == null) { // For some reason, we could not deserialize
+		trace("jsonified save was apparently corrupted, got null savedHNList - Lost history", true);
+		savedHNList = undefined;
+	  }
+	  else {
+		historyListTrim(savedHNList, historyNodeRetention * 24 * 3600000);
+	  }
+	}
+
 	trace("structureVersion: "+structureVersion, true);
 	trace("disableFavicons_option: "+disableFavicons_option, true);
 	trace("pauseFavicons_option: "+pauseFavicons_option, true);
@@ -2368,15 +2889,15 @@ readFullLStore(false, trace)
 /*
 let count = 20;
 function test() {
-  const Root = "root________";
   let endLoadTime = new Date();
   browser.bookmarks.get(Root)
   .then(
-    function (BTN) {
+    function (a_BTN) {
 	  let t2 = new Date();
 	  console.log("Root get duration: "+(t2.getTime() - endLoadTime.getTime())+" ms");
-	  console.log("      Root.children: "+BTN.children);
- 	  browser.bookmarks.getChildren(Root)
+	  console.log("      Root.id      : "+a_BTN[0].id);
+	  console.log("      Root.children: "+a_BTN[0].children);
+	  browser.bookmarks.getChildren(Root)
  	  .then(
  	    function (a_BTN1) {
  		  let t3 = new Date();
