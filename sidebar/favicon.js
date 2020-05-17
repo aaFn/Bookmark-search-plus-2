@@ -60,7 +60,7 @@ function answerBack (bnId, uri) {
   if (uri != "starting:") {
 	reqQueue.shift(); // Remove the element in queue we just processed (= first one)
 	if (reqQueue.length > 0) { // Still work in reqQueue, continue the cadence process
-//      console.log("Still work in queue: "+reqQueue.length+" - redispatching");
+//console.log("Still work in queue: "+reqQueue.length+" - redispatching");
 	  requestTimerID = setTimeout(handleRequest, hysteresis);
 	}
 	else {
@@ -73,8 +73,17 @@ function answerBack (bnId, uri) {
  * Global object to read URI encoded contents of blob and send back to main thread 
  */
 let readerBNId; // Id of BookmarkNode on which is the URI 
-function readerLoad () {
-  answerBack(readerBNId, FReader.result);
+let freader_resolve;
+let freader_reject;
+function readerLoad () { // Called when interpretation of a Blob as data uri is complete
+  // Return the result String
+//console.log("Read blob as: "+FReader.result);
+  freader_resolve(FReader.result);
+}
+function readerError () { // Called when interpretation of a Blob as data uri fails
+  // Return the result String
+//console.log("Error reading blob as data");
+  freader_reject(new Error ("Error converting Blob to Data"));
 }
 
 /*
@@ -110,168 +119,265 @@ const MyInitFF57 = {
  * bnId = Id of BookmarkNode
  * url = URL string
  * enableCookies = a Boolean to "omit" (false) or "include" (true)
+ * 
+ * Returns undefined if error, or the URI string
  */
-function getUri (bnId, url, enableCookies) {
-//  console.log("Getting favicon contents from "+url);
+//const PatternHtmlText = /text\/html\;\s*charset\=/i; // Detect things like "text/html; charset="
+const PatternHtmlText = /text\/html/i; // Detect things like "text/html
+async function getUri (url, enableCookies) {
+  //console.log("Getting favicon contents from "+url);
   // Need to recreate the AbortController each time, or else all requests after
   // an abort will abort .. and there appears to be no way to remove / clear the abort signal
   // from the AbortController.
   try { // Only supported as of FF 57
-    fetchController = new AbortController();
+	fetchController = new AbortController();
   }
   catch (error) {
-    console.log("getUri error: "+error);
+	console.log("getUri error: "+error);
   }
   let myInit;
   if (fetchController == null) { // we are below FF 57
-    myInit = MyInitFF56;
+	myInit = MyInitFF56;
   }
   else {
-    myInit = MyInitFF57;
-    let fetchSignal = fetchController.signal;
-    myInit.signal = fetchSignal;
+	myInit = MyInitFF57;
+	let fetchSignal = fetchController.signal;
+	myInit.signal = fetchSignal;
   }
   myInit.credentials = (enableCookies ? "include" : "omit");
-  fetch(url, myInit)
-  .then(
-    function (response) { // This is a Response object 
-      // Remove fetch timeout
-      clearTimeout(fetchTimerID);
-      fetchTimerID = null;
-//      console.log("Status: "+response.status+"'for url: "+url);
-      if (response.status == 200) { // If ok, get contents as blob
-        response.blob()
-        .then(
-          function (blob) { // blob is a Blob ..
-//            console.log("Contents: "+blob);
-            readerBNId = bnId;
-   	        FReader.readAsDataURL(blob);
-          }
-   	    )
-   	    .catch( // Asynchronous also, like .then
-   	      function (err) {
-   	    	let msg = "Response.blob Error :-S "+err;
-   	    	console.log(msg, url);
-   	    	if (err != undefined) {
-   	    	  console.log("lineNumber: "+err.lineNumber);
-   	    	  console.log("fileName:   "+err.fileName);
-   	    	}
-   	    	answerBack(bnId, "error: "+msg);
-   	      }
-   	    );
-      }
-      else {
-    	let msg = "error: Looks like there was a URL fetch problem. Status Code: "+response.status;
-        console.log(msg+" url: "+url);
-        answerBack(bnId, msg+"\r\n"
-                       +"Full text: "+response.statusText);
-      }
-    }
-  )
-  .catch( // Asynchronous also, like .then
-    function (err) {
-      // Remove fetch timeout
-      if (fetchTimerID != null) {
-    	clearTimeout(fetchTimerID);
-    	fetchTimerID = null;
-      }
-      let msg = "Favicon fetch Error :-S "+err;
-      console.log(msg, url);
-      answerBack(bnId, "error: "+msg);
-    }
-  );
 
+  let uri;
   // Set timeout on fetch
   fetchTimerID = setTimeout(fetchTimeoutHandler, FetchTimeout);
+  try {
+	let response = await fetch(url, myInit); // A Response object
+	// Remove fetch timeout
+	clearTimeout(fetchTimerID);
+	fetchTimerID = null;
+
+//console.log("Status: "+response.status+"'for url: "+url);
+	if (response.status == 200) { // If ok, get contents as blob
+	  try {
+		let blob = await response.blob(); // a Blob ..
+//console.log("Contents: "+blob);
+		if (blob.type.search(PatternHtmlText) >= 0) { // We are not getting a favicon !
+		  console.log("Got HTML response with no favicon at "+url);
+		}
+		else {
+		  let getData = new Promise (
+			(resolve, reject) => {
+			  // Externalise the resolve and reject functions
+			  freader_resolve = resolve;
+			  freader_reject = reject;
+			}
+		  );
+		  FReader.readAsDataURL(blob);
+		  uri = await getData;
+		}
+	  }
+	  catch (err) {
+		let msg = "Response.blob Error :-S "+err;
+		console.log(msg, url);
+		if (err != undefined) {
+		  console.log("lineNumber: "+err.lineNumber);
+		  console.log("fileName:   "+err.fileName);
+		}
+	  }
+	}
+	else {
+	  let msg = "error: Looks like there was a URL fetch problem. Status Code: "+response.status;
+	  console.log(msg+" url: "+url);
+	}
+  }
+  catch (err) {
+	// Remove fetch timeout
+	if (fetchTimerID != null) {
+	  clearTimeout(fetchTimerID);
+	  fetchTimerID = null;
+	}
+	let msg = "Favicon fetch Error :-S "+err;
+	console.log(msg, url);
+  }
+
+//console.log(url+" : "+uri);
+  return(uri);
 }
 
 /*
- * Parse relative to position index to retrieve "href=\"" around,
- * and within limits of '<' and '>' on left and right, and then
- * get the text between the two '\"'.
- * 
- * lctext is a lower case version of the HTML document string
- * text is the original HTML document string
- * pos is the position in both from where to search
- * token is a string describing the HTML <token> to search for. E.g. "link", "base", ..
- */
-const PatternCheckLink = /^<\s*link\s/;
-const PatternHref2 = /href\s*=\s*\"/;
-const PatternHref2b = /href\s*=\s*\'/;
-const PatternHref2c = /href\s*=\S/;
-const PatternHref3 = /^\S+/;
-let glob_lctext;
-function retrieveHref (text, pos, searchLinkToken = false) {
-  let faviconUrl;
-
-  // Find enclosing brackets
-  let posStart = glob_lctext.lastIndexOf("<", pos); // Search left starting from pos included
-  let posEnd = glob_lctext.indexOf(">", pos);
-  if ((posStart < 0) || (posEnd < 0))
-    return(null); // Not found
-  let extract = glob_lctext.slice(posStart, posEnd); // Warning, last char '>' not included
-
-  if (searchLinkToken // Verify this is a <link>
-      && (extract.search(PatternCheckLink) < 0)
-     ) {
-    return(null); // Not found
-  }
-
-  // Looks good so far, let's find the href string
-  let isDoubleQuote = true;
-  let isNoQuote = false;
-  let a_href = extract.match(PatternHref2);
+* Parse to retrieve "href=\"" and then get the text between the two '\"'.
+* 
+* text is the original <link ...> HTML document String
+*/
+const PatternHrefa = /href\s*=\s*\"([^\"]+)/i;
+const PatternHrefb = /href\s*=\s*\'([^\']+)/i;
+const PatternHrefc = /href\s*=([^\s\>]+)/i;
+function retrieveHref (text) {
+  // Let's find the href string
+  let a_href = text.match(PatternHrefa);
   // See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/match
   // for format of the return value of match()
   if (a_href == null) {
-	a_href = extract.match(PatternHref2b);
+	a_href = text.match(PatternHrefb);
 	if (a_href == null) {
-      a_href = extract.match(PatternHref2c);
+    a_href = text.match(PatternHrefc);
 	  if (a_href == null) {
 	    return(null); // Not found
 	  }
-	  isNoQuote = true;
 	}
-	isDoubleQuote = false;
   }
 
-  // Found something, let's find the end of it
-  let posStartQuote = a_href.index + a_href[0].length;
-  let posEndQuote;
-  if (isNoQuote) {
-	posStartQuote--; // Include the first non-space character at end, just after =
-	// End = first blank or end of string
-	let rest = extract.slice(posStartQuote);
-	a_href = rest.match(PatternHref3);
-    posEndQuote = posStartQuote + a_href[0].length;
-  }
-  else {
-	posEndQuote = extract.indexOf((isDoubleQuote ? "\"" : "\'"),
-                                  posStartQuote);
-  }
-  if (posEndQuote < 0) // We were so close :-(
-    return(null); // Not found
+  // Get the value with current Caps and lower case mix, and return it
+  // Indeed, /i is only used for matching, but the result and groups still contain upper cases if there are 
+  let faviconUrl = a_href[1];
 
-  // Get the value with corrent Caps and lower case mix, and return it
-  faviconUrl = text.slice(posStart+posStartQuote, posStart+posEndQuote);
-  
   return(faviconUrl);
 }
 
 /*
- * Parse the page HTML to retrieve a base URL and return it.
- * Could use a DOMParser, that would surely be the most complete method ..
- * however this can be an heavy process, so trying first with some basic string searches.
- * If success rate is not high, will revert to that higher demanding process.
- * 
- * (Also, not sure at this stage that a DOMParser can run in a worker ..
- *  For sure, XMLHttpRequest.responseXML() is not available to Workers
- *  cf. https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest)
- *  
- *  text is an HTML document string
- *  lctext is the same, but in lowercase
- */
-const PatternBase = /<\s*base\s/;
+* Parse to retrieve "sizes=\"" and then * get the lowest width x height between the two '\"'.
+* Cf. https://html.spec.whatwg.org/multipage/links.html#rel-icon
+* 
+* text is the original <link ...> HTML document String
+* Returns an array with width first, then height, or null if not found or if "any"
+*/
+const PatternSizesa = /sizes\s*=\s*\"([^\"]+)\"/i;
+const PatternSizesb = /sizes\s*=\s*\'([^\']+)\'/i;
+const PatternWxH = /(\d*)x(\d*)\s*/iy;
+function retrieveSizes (text) {
+  let a_size = null;
+
+  // Let's find the sizes string
+  let a_sizes = text.match(PatternSizesa);
+  // See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/match
+  // for format of the return value of match()
+  if (a_sizes == null) {
+	a_sizes = text.match(PatternSizesb);
+	if (a_sizes == null) {
+	  return(null); // Not found
+	}
+  }
+
+  // Get the values, and keep lowest one
+//console.log("a_sizes = "+a_sizes);
+  let sizes = a_sizes[1];
+  let a_wxh;
+  let width = undefined;
+  let height = undefined;
+  let w, h;
+  while ((a_wxh = sizes.match(PatternWxH)) != null) {
+	w = parseInt(a_wxh[1], 10);
+	h = parseInt(a_wxh[2], 10);
+	if ((width == undefined) || (w < width) || (h < height)) {
+	  width = w;
+	  height = h;
+	}
+  }
+
+  if ((width != undefined)) {
+	a_size = [width, height];
+  }
+  return(a_size);
+}
+
+/*
+* Parse the page HTML to retrieve a favicon URL of closest size to 16x16 and return an
+* array of all of them ordered by increasing size.
+* 
+* Could use a DOMParser, that would surely be the most complete method ..
+* however this can be an heavy process, so trying first with some basic string searches.
+* If success rate is not high, will revert to that higher demanding process.
+* 
+* (Also, not sure at this stage that a DOMParser can run in a worker ..
+*  For sure, XMLHttpRequest.responseXML() is not available to Workers
+*  cf. https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest)
+*  
+* text is an HTML document string
+* Returns an Array of favicon URL strings
+*/
+//const PatternLinkRelIcon = /<\s*link\s[^\>]*rel\s*=[^\>-]+icon[^\>]+\>/gi; // Don't take things like "apple-touch-icon"
+const PatternLinkRelIcon = /<\s*link\s[^\>]*rel\s*=\s*(?:icon|[\"\'][^\>\-i]*icon[\"\'])[^\>]*\>/gi; // Don't take things like "apple-touch-icon"
+const PatternShortcutIcon1  = /rel\s*=\s*\"shortcut icon\"/i; // Not to be used anymore per standard,
+const PatternShortcutIcon1b = /rel\s*=\s*\'shortcut icon\'/i; // but a lot of sites still use it
+function retrieveFaviconUrl (text) {
+  let a_faviconUrl = null; // Result URL closest to 16x16
+  let a_width = undefined;  // Corresponding width
+  let a_height = undefined; // Corresponding height
+
+  // Search for all possible instances, and then select the one with closest size to 16x16
+  let a_linkrel = text.match(PatternLinkRelIcon);
+  let is_shortcutIcon;
+  let href;
+  let a_size;
+  let w, h;
+  if (a_linkrel != null) {
+	let linkrel;
+	let len = a_linkrel.length;
+	for (let i=0 ; i<len ; i++) {
+	  linkrel = a_linkrel[i];
+//console.log(linkrel);
+	  // Detect if we are on a shortcut icon link
+	  if ((linkrel.search(PatternShortcutIcon1) >= 0) || (linkrel.search(PatternShortcutIcon1b) >= 0)) {
+		is_shortcutIcon = true;
+	  }
+	  else {
+		is_shortcutIcon = false;
+	  }
+//console.log("is_shortcutIcon = "+is_shortcutIcon);
+	  // Get the href content
+	  href = retrieveHref(linkrel);
+//console.log("href = "+href);
+	  // Get the sizes, keeping the lowest (if "any", or no size, then a_size is null)
+	  a_size = retrieveSizes(linkrel);
+//console.log("a_size = "+a_size);
+	  if (a_size == null) {
+		w = 17; // Prefer an icon which is 16x16, but prefer an unsized icon to any other bigger
+		h = 17;
+	  }
+	  else {
+		w = a_size[0];
+		h = a_size[1];
+	  }
+	  if (a_faviconUrl == null) {
+		a_faviconUrl = [href];
+		a_width = [w];
+		a_height = [h];
+	  }
+	  else if ((w >= 16) && (h >= 16)) {
+		let i = 0;
+		let l = a_width.length;
+		while ((i < l)
+			   && ((is_shortcutIcon && ((w >= a_width[i]) || (h >= a_height[i])))
+				   || (!is_shortcutIcon && ((w > a_width[i]) || (h > a_height[i])))
+				  )
+			  ) {
+		  i++;
+		}
+		// Insert the new element at i
+		a_faviconUrl.splice(i, 0, href);
+		a_width.splice(i, 0, w);
+		a_height.splice(i, 0, h);
+	  }
+	}
+  }
+//console.log("a-width = "+a_width+" - a_height = "+a_height+" - a_faviconUrl = "+a_faviconUrl);
+//console.log("-----------------------------------------------------------------");
+
+  return(a_faviconUrl);
+}
+
+/*
+* Parse the page HTML to retrieve a base URL and return it.
+* Could use a DOMParser, that would surely be the most complete method ..
+* however this can be an heavy process, so trying first with some basic string searches.
+* If success rate is not high, will revert to that higher demanding process.
+* 
+* (Also, not sure at this stage that a DOMParser can run in a worker ..
+*  For sure, XMLHttpRequest.responseXML() is not available to Workers
+*  cf. https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest)
+*  
+*  text is an HTML document string
+*/
+const PatternBase = /<\s*base\s[^\>]+\>/i;
 function retrieveBaseUrl (text) {
   let baseUrl = null;
 
@@ -279,65 +385,31 @@ function retrieveBaseUrl (text) {
   // (see https://superuser.com/questions/157925/how-to-download-favicon-from-website
   //      https://stackoverflow.com/questions/1990475/how-can-i-retrieve-the-favicon-of-a-website
   //      https://stackoverflow.com/questions/5119041/how-can-i-get-a-web-sites-favicon
-  let pos = glob_lctext.search(PatternBase);
-  if (pos >= 0) { // Found a candidate, then search for the href piece ..
-	baseUrl = retrieveHref(text, pos);
+  let a_base = text.match(PatternBase);
+  if (a_base != null) { // Found a candidate, then search for the href piece ..
+	baseUrl = retrieveHref(a_base[0]);
   }
 
   return(baseUrl);
 }
 
 /*
- * Parse the page HTML to retrieve a favicon URL and return it.
- * Could use a DOMParser, that would surely be the most complete method ..
- * however this can be an heavy process, so trying first with some basic string searches.
- * If success rate is not high, will revert to that higher demanding process.
- * 
- * (Also, not sure at this stage that a DOMParser can run in a worker ..
- *  For sure, XMLHttpRequest.responseXML() is not available to Workers
- *  cf. https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest)
- *  
- *  text is an HTML document string
- *  lctext is the same, but in lowercase
+ * Handle decoding of HTML entities (&xxx; or &#nnn; sequences) for retrieving favicon links.
+ *         https://developer.mozilla.org/en-US/docs/Glossary/Entity
+ * HTML entities decode
+ * Cf. https://gist.github.com/yidas/797c9e6d5c856158cffd685b8a8b4ee4
+ *
+ * @param {string} str Input text
+ * @return {string} Filtered text
  */
-const PatternFavicon1 = /rel\s*=\s*\"shortcut icon\"/; // Not to be used anymore per standard,
-                                                       // but a lot of sites still use it, and Firefox
-                                                       // still appears to give preference to this one ...
-const PatternFavicon1b = /rel\s*=\s*\'shortcut icon\'/;
-const PatternFavicon2 = /rel\s*=\s*\"icon\"/;
-const PatternFavicon2b = /rel\s*=\s*\'icon\'/;
-function retrieveFaviconUrl (text) {
-  let faviconUrl = null;
+/*
+function htmldecode (str) {
 
-  // First, search for "rel=\"shortcut icon\""
-  // (see https://superuser.com/questions/157925/how-to-download-favicon-from-website
-  //      https://stackoverflow.com/questions/1990475/how-can-i-retrieve-the-favicon-of-a-website
-  //      https://stackoverflow.com/questions/5119041/how-can-i-get-a-web-sites-favicon
-  let pos = glob_lctext.search(PatternFavicon1);
-  if (pos >= 0) { // Found a candidate, then search for the href piece ..
-    faviconUrl = retrieveHref(text, pos, true);
-  }
-  if (faviconUrl == null) { // Not yet found
-    pos = glob_lctext.search(PatternFavicon1b);
-    if (pos >= 0) { // Found a candidate, then search for the href piece ..
-      faviconUrl = retrieveHref(text, pos, true);
-    }
-  }
-  if (faviconUrl == null) { // Not yet found
-    pos = glob_lctext.search(PatternFavicon2);
-    if (pos >= 0) { // Found a candidate, then search for the href piece ..
-      faviconUrl = retrieveHref(text, pos, true);
-    }
-  }
-  if (faviconUrl == null) { // Not yet found
-    pos = glob_lctext.search(PatternFavicon2b);
-    if (pos >= 0) { // Found a candidate, then search for the href piece ..
-      faviconUrl = retrieveHref(text, pos, true);
-    }
-  }
-
-  return(faviconUrl);
+  let txt = document.createElement("textarea");
+  txt.// innerHTML = str;  // Setting this generates a security vioalation warning on AMO
+  return(txt.value);
 }
+*/
 
 /*
  * Fetch favicon, and then get its URI
@@ -346,16 +418,18 @@ function retrieveFaviconUrl (text) {
  * bnUrl = URL string
  * myInit = fetch parameters
  * enableCookies = a Boolean to "omit" (false) or "include" (true)
+ * 
+ * Returns undefoined if error, or favicon uri String to set in BookmarkNode
  */
-function fetchFavicon (bnId, bnUrl, enableCookies) {
+async function fetchFavicon (bnUrl, enableCookies) {
   // Need to recreate the AbortController each time, or else all requests after
   // an abort will abort .. and there appears to be no way to remove / clear the abort signal
   // from the AbortController.
   try { // Only supported as of FF 57
     fetchController = new AbortController();
   }
-  catch (error) {
-    console.log("handleRequest error: "+error);
+  catch (err) {
+    console.log("handleRequest error: "+err);
   }
   let myInit;
   if (fetchController == null) { // we are below FF 57
@@ -367,171 +441,186 @@ function fetchFavicon (bnId, bnUrl, enableCookies) {
     myInit.signal = fetchSignal;
   }
   myInit.credentials = (enableCookies ? "include" : "omit");
-  fetch(bnUrl, myInit)
-  .then(
-	function (response) { // response is a Response object
-//      console.log("response");
-	  // Remove fetch timeout
-	  clearTimeout(fetchTimerID);
-	  fetchTimerID = null;
-//      console.log("Status: "+response.status);
-	  // Some errors return a page with a favicon, when the site implements a proper error page
-	  //if (response.status == 200) { // If ok, get contents as a string
-	    response.text()
-	    .then(
-	  	  function (text) { // text is a USVString returned by Response.text()
-//			  console.log("Got text");
-//			  console.log("Contents: "+text.substr(0,5000));
-	  	   	glob_lctext = text.toLowerCase(); // Avoid getting lost because of Caps ...
-	        let faviconUrl = retrieveFaviconUrl(text);
-//			  console.log("faviconUrl 1: <<"+faviconUrl+">>");
 
-			if (faviconUrl == null) { // If not found, try the old root/favicon.ico method
-			  let urlObj = new URL (response.url); // Use the URL of response in case
-			                                       // we were redirected ..
-			  faviconUrl = urlObj.origin + "/favicon.ico";
-//				console.log("faviconUrl 2: <<"+faviconUrl+">>");
-//			  URL.revokeObjectURL(urlObj);
-			  urlObj = undefined;
-			  getUri(bnId, faviconUrl, enableCookies);
-			}
-			else if (faviconUrl.startsWith("data:")) { // Cool, it is already a self contained piece ..
-//				console.log("Got it directly !");
-			  answerBack(bnId, faviconUrl);
-			}
-			else if (!faviconUrl.startsWith("http")) { // Not an absolute URL, make it absolute
-			  let urlObj = new URL (response.url); // Use the URL of response in case
-			                                       // we were redirected ..
-			  if (faviconUrl.startsWith("//")) { // Scheme (protocol, e.g. https:) relative URL
-			    faviconUrl = urlObj.protocol + faviconUrl;
-			  }
-			  else if (faviconUrl.charAt(0) == '/') { // Root relative URL
-			    // Verify if there is a <base href=..> tag
-			    let baseUrl = retrieveBaseUrl(text);
-//				  console.log("baseUrl 1: <<"+baseUrl+">>");
-			    if ((baseUrl != null) && (baseUrl.includes("://"))) {
-//			      URL.revokeObjectURL(urlObj);
-			      urlObj = new URL (baseUrl);
-			    }
-			    faviconUrl = urlObj.origin + faviconUrl;
-			  }
-			  else { // Just relative URL ...
-			         // Verify if there is a <base href=..> tag
-			    let baseUrl = retrieveBaseUrl(text);
-//				  console.log("baseUrl 2: <<"+baseUrl+">>");
-			    if (baseUrl != null) {
-			      if (baseUrl.includes("://"))
-			        faviconUrl = baseUrl + faviconUrl;
-			      else
-			    	faviconUrl = urlObj.origin + baseUrl + faviconUrl;
-			    }
-			    else {
-			      // Need to get back to closest '/' from end of path, removing all
-			      //  ?xxx=yy and other stuff
-			      let temp = urlObj.origin + urlObj.pathname
-			      let pos = temp.lastIndexOf("/");
-			      faviconUrl = temp.slice(0, pos+1) + faviconUrl;
-			    }
-			  }
-//		      URL.revokeObjectURL(urlObj);
-			  urlObj = undefined;
-//				console.log("faviconUrl 3: <<"+faviconUrl+">>");
-			  getUri(bnId, faviconUrl, enableCookies);
-			}
-			else { // Absolute URL
-//				console.log("faviconUrl 4: <<"+faviconUrl+">>");
-			  getUri(bnId, faviconUrl, enableCookies);
-			}
-		  }
-		)
-		.catch( // Asynchronous, like .then
-		  function (err) {
-			let msg = "Error on loading from local storage : "+err;
-			console.log(msg);
-			if (err != undefined) {
-			  console.log("lineNumber: "+err.lineNumber);
-			  console.log("fileName:   "+err.fileName);
-			}
-			answerBack(bnId, "error: "+msg);
-		  }
-		);
-/*      }
-	  else {
-    	let msg = "error: Looks like there was a page fetch problem. Status Code: "+response.status;
-	    console.log(msg+" url: "+bnUrl);
-	    console.log(response.statusText);
-	    answerBack(BN, msg+"\r\n"
-	                   +"Full text: "+response.statusText);
-	  }
-*/
-	}
-  )
-  .catch( // Asynchronous, like .then
-	function pageFetchError (err) {
-	  // Remove fetch timeout
-      if (fetchTimerID != null) {
-    	clearTimeout(fetchTimerID);
-    	fetchTimerID = null;
-      }
-	  let msg = "Page fetch Error :-S "+err;
-	  console.log(msg, bnUrl);
-	  if (err != undefined) {
-		console.log("lineNumber: "+err.lineNumber);
-		console.log("fileName:   "+err.fileName);
-	  }
-	  answerBack(bnId, "error: "+msg);
-	}
-  );
-
+  let uri;
   // Set timeout on fetch
   fetchTimerID = setTimeout(fetchTimeoutHandler, FetchTimeout);
+  try {
+	let response = await fetch(bnUrl, myInit); // A Response object
+ 
+	// Interpret HTML response on the bookmark URL fetch from fetchFavicon, to find favicon
+//console.log("response");
+	// Remove fetch timeout
+	clearTimeout(fetchTimerID);
+	fetchTimerID = null;
+
+//console.log("Status: "+response.status);
+	// Some errors return a page with a favicon, when the site implements a proper error page
+	//if (response.status == 200) { // If ok, get contents as a string
+	  try {
+		let text = await response.text();
+		// text is a USVString returned by Response.text()
+//		text = htmldecode(text);
+//console.log("Got text");
+//console.log("Contents: "+text.substr(0,5000));
+		let a_faviconUrl = retrieveFaviconUrl(text);
+		let faviconUrl;
+
+		if (a_faviconUrl != null) {
+		  for (faviconUrl of a_faviconUrl) {
+			if (faviconUrl.startsWith("data:")) { // Cool, it is already a self contained piece ..
+//console.log("Got it directly !");
+			  uri = faviconUrl;
+			  break;
+			}
+			else {
+			  if (!faviconUrl.startsWith("http")) { // Not an absolute URL, make it absolute
+				let urlObj = new URL (response.url); // Use the URL of response in case
+													 // we were redirected ..
+				if (faviconUrl.startsWith("//")) { // Scheme (protocol, e.g. https:) relative URL
+				  faviconUrl = urlObj.protocol + faviconUrl;
+				}
+				else if (faviconUrl.charAt(0) == '/') { // Root relative URL
+				  // Verify if there is a <base href=..> tag
+				  let baseUrl = retrieveBaseUrl(text);
+//console.log("baseUrl 1: <<"+baseUrl+">>");
+				  if ((baseUrl != null) && (baseUrl.includes("://"))) {
+//					URL.revokeObjectURL(urlObj);
+					urlObj = new URL (baseUrl);
+				  }
+				  faviconUrl = urlObj.origin + faviconUrl;
+				}
+				else { // Just relative URL ...
+				  // Verify if there is a <base href=..> tag
+				  let baseUrl = retrieveBaseUrl(text);
+//console.log("baseUrl 2: <<"+baseUrl+">>");
+				  if (baseUrl != null) {
+					if (baseUrl.includes("://"))
+					  faviconUrl = baseUrl + faviconUrl;
+					else
+					  faviconUrl = urlObj.origin + baseUrl + faviconUrl;
+				  }
+				  else {
+					// Need to get back to closest '/' from end of path, removing all
+					// ?xxx=yy and other stuff
+					let temp = urlObj.origin + urlObj.pathname
+					let pos = temp.lastIndexOf("/");
+					faviconUrl = temp.slice(0, pos+1) + faviconUrl;
+				  }
+				}
+//				URL.revokeObjectURL(urlObj);
+				urlObj = undefined;
+			  }
+			  // We have an absolute URL
+//console.log("faviconUrl 4: <<"+faviconUrl+">>");
+			  uri = await getUri(faviconUrl, enableCookies);
+			  if (uri != undefined) {
+				break;
+			  }
+			}
+		  }
+		}
+
+		if (uri == undefined) { // If not found, try the old root/favicon.ico method
+		  let urlObj = new URL (response.url); // Use the URL of response in case
+											   // we were redirected ..
+		  faviconUrl = urlObj.origin + "/favicon.ico";
+//console.log("faviconUrl 2: <<"+faviconUrl+">>");
+//		  URL.revokeObjectURL(urlObj);
+		  urlObj = undefined;
+		  uri = await getUri(faviconUrl, enableCookies);
+		}
+
+		if (uri == undefined) {
+		  console.log("Error could not get any favicon for: "+bnUrl);
+		}
+	  }
+	  catch (err) {
+		let msg = "Error on getting favison URL : "+err;
+		console.log(msg);
+		if (err != undefined) {
+		  console.log("lineNumber: "+err.lineNumber);
+		  console.log("fileName:   "+err.fileName);
+		}
+	  }
+/*
+	}
+	else {
+	  let msg = "error: Looks like there was a page fetch problem. Status Code: "+response.status;
+	  console.log(msg+" url: "+bnUrl);
+	  console.log(response.statusText);
+	  answerBack(BN, msg+"\r\n"
+		             +"Full text: "+response.statusText);
+	}
+*/
+  }
+  catch (err) {
+	// Remove fetch timeout
+	if (fetchTimerID != null) {
+	  clearTimeout(fetchTimerID);
+	  fetchTimerID = null;
+	}
+	let msg = "Page fetch Error :-S "+err;
+	console.log(msg, bnUrl);
+	if (err != undefined) {
+	  console.log("lineNumber: "+err.lineNumber);
+	  console.log("fileName:   "+err.fileName);
+	}
+  }
+
+  return(uri);
 }
 
 /*
  * Dequeue a request and process it.
  * Then re-dispatch itself if more work, after <cadence> milliseconds delay
  */
-function handleRequest () {
+async function handleRequest () {
   hysteresis = Cadence; // Hysteresis is a one shot only thing, for the first fetch of massive load,
-                        // so now reset to default.
+  						// so now reset to default.
   let request = reqQueue[0]; // This is [action, BN, enableCookies], with:
-                             //
-                             // action = a string, either "get" or "icon:<url>"
-                             // bnId = Id of a BookmarkNode of type "bookmark"
-                             // bnUrl = url of page ("get" & "get2") or of favicon ("icon")
-                             // enableCookies = a Boolean to "omit" (false) or "include" (true)
-                             //   cookies info chen getting favicon. Drawback = user/pwd prompts
-                             //   on some sites.
+  							 //
+  							 // action = a string, either "get" or "icon:<url>"
+  							 // bnId = Id of a BookmarkNode of type "bookmark"
+  							 // bnUrl = url of page ("get" & "get2") or of favicon ("iconurl")
+  							 // enableCookies = a Boolean to "omit" (false) or "include" (true)
+  							 //   cookies info chen getting favicon. Drawback = user/pwd prompts
+  							 //   on some sites.
   let action        = request[0];
   let bnId          = request[1];
   let bnUrl         = request[2];
   let enableCookies = request[3];
-//  console.log("Dequeued request action: "+action);
+//console.log("Dequeued request action: "+action);
   if (bnId != undefined) { // Protect against too many redispatch events 
-//    console.log("Dequeued request action: "+action+" BN.id: "+BN.id+" url: "+bnUrl+" remains: "+reqQueue.length);
+//console.log("Dequeued request action: "+action+" BN.id: "+bnId+" url: "+bnUrl+" remains: "+reqQueue.length);
+	let uri;
 	if (bnUrl.startsWith("ftp:")) {
-	  answerBack(bnId, "/icons/ftpfavicon.png");
+	  uri = "/icons/ftpfavicon.png";
 	}
-	else if (action == "icon") { // We already got the favicon URL (e.g. tab refresh)
-		                         // so simply get it.
-//      console.log("faviconUrl: <<"+action.slice(5)+">> 2");
+	else if (action == "iconurl") { // We already got the favicon URL (e.g. tab refresh)
+	  								// so simply get it.
+//console.log("faviconUrl: <<"+action.slice(5)+">> 2");
 	  // In case we get the icon directly, this is on updated tab .. let's not remove the previous favicon
 	  // to leave a chance to detect this is the same and to not do massive favicon saves when doing
 	  // History -> Restore previous session
 	  //answerBack(bnId, "starting:"); // Signal we are starting to retrieve favicon for that BN
-	  getUri(bnId, bnUrl, enableCookies);
+	  uri = await getUri(bnUrl, enableCookies); // async function !!
 	}
 	else { // Normal get process
 	  answerBack(bnId, "starting:"); // Signal we are starting to retrieve favicon for that BN
-      // This requires the "<all_urls>" permission in manifest.json
-      // Get the page at bookmarked URL, following redirections,
+	  // This requires the "<all_urls>" permission in manifest.json
+	  // Get the page at bookmarked URL, following redirections,
 	  // and attempt to retrieve the favicon URL
 
-//      console.log("Fetching: "+bnUrl);
-	  fetchFavicon(bnId, bnUrl, enableCookies);
-
-//      console.log("Finished sending request "+fetchTimerID);
-    }
+//console.log("Fetching: "+bnUrl);
+	  uri = await fetchFavicon(bnUrl, enableCookies);
+	}
+	if (uri == undefined) {
+	  answerBack(bnId, "error: could not get any valid favicon uri");
+	}
+	else {
+	  answerBack(bnId, uri);
+	}
   }
 }
 
@@ -545,23 +634,23 @@ function handleRequest () {
 function faviconWorkerPostMessage (e) { // e is of type MessageEvent,
   // and its data contains [action, bnId, url, enableCookies], with:
   //
-  // action = a string, either "get", "get2", "icon", "hysteresis" or "nohysteresis"
+  // action = a string, either "get", "get2", "iconurl", "hysteresis" or "nohysteresis"
   // bnId = Id of a BookmarkNode of type "bookmark"
-  // bnUrl = url of page ("get" & "get2") or of favicon ("icon")
+  // bnUrl = url of page ("get" & "get2") or of favicon ("iconurl")
   // enableCookies = a Boolean to "omit" (false) or "include" (true)
   //   cookies info chen getting favicon. Drawback = user/pwd prompts
   //   on some sites when true.
-// Cannot use the browser.bookmarks interface from within the worker ...
+  // Cannot use the browser.bookmarks interface from within the worker ...
   let data = e.data;
   let action = data[0];
   if (action == "hysteresis") { // Next shot due to a bookmark create or an initial massive load
-                                // request will wait for Hysteresis time before really starting.
-//    console.log("Hysteresis");
+								// request will wait for Hysteresis time before really starting.
+//console.log("Hysteresis");
 	hysteresis = Hysteresis;
   }
   else if (action == "nohysteresis") { // Remove the hysteresis now if nothing is scheduled,
-	                                   // else it will be naturally reset when the handler runs
-//    console.log("Remove Hysteresis");
+									   // else it will be naturally reset when the handler runs
+//console.log("Remove Hysteresis");
 	if (requestTimerID == undefined) {
 	  hysteresis = Cadence;
 	}
@@ -579,7 +668,7 @@ function faviconWorkerPostMessage (e) { // e is of type MessageEvent,
 	  						// normal Cadence value.
 	  						// This will make it process immediately, or just after the current
 	  						// ongoing one if there is.
-//      console.log("Manual triggered fetch");
+//console.log("Manual triggered fetch");
 	  if (hysteresis == Hysteresis) { // Reset hysteresis if there was one, we are accelerating
 		hysteresis = Cadence;
 		if (requestTimerID != undefined) { // A request is scheduled with Hysteresis
@@ -590,16 +679,15 @@ function faviconWorkerPostMessage (e) { // e is of type MessageEvent,
 	  reqQueue.unshift(data); // Add new request at beginning
 	}
 	else {
-//      if (((nbBN >= nbBNmin) && (nbBN < nbBNmax)) || e.data[0].startsWith("icon:") || e.data[0].startsWith("get2")) {
+//	  if (((nbBN >= nbBNmin) && (nbBN < nbBNmax)) || e.data[0].startsWith("icon:") || e.data[0].startsWith("get2")) {
 	  reqQueue.push(data); // Add new request at end
 	}
 	if (requestTimerID == undefined) { // No cadence process already running, start it
-//      console.log("There was no work in queue: "+reqQueue.length+" - dispatching");
+//console.log("There was no work in queue: "+reqQueue.length+" - dispatching");
 	  requestTimerID = setTimeout(handleRequest, hysteresis);
 	}
   }
-//    let BN = data[1];
-//    console.log("Finished queueing request "+data[0]+" for BN.id: "+BN.id+" url: "+BN.url+" Queue length: "+reqQueue.length);
+//console.log("Finished queueing request "+action+" for BN.id: "+data[1]+" url: "+data[2]+" Queue length: "+reqQueue.length);
 //  }
 //  nbBN++;
 }
@@ -611,5 +699,7 @@ function faviconWorkerPostMessage (e) { // e is of type MessageEvent,
 */
 // Set up final structure for URI conversion
 FReader.addEventListener("load", readerLoad);
+FReader.addEventListener("abort", readerError);
+FReader.addEventListener("error", readerError);
 
 //onmessage = faviconWorkerPostMessage;

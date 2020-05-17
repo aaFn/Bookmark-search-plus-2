@@ -16,15 +16,15 @@
     <img src="/icons/waiting.gif" height="20px" id="waitingsearch">
 <!--
     <table><tbody>
-      <tr data-id=".."><td class="brow" tabindex="0" draggable="false">
-        <div class="bkmkitem_b" href=".." draggable="false">
+      <tr data-id=".." data-type="bookmark"><td class="brow" tabindex="0" draggable="false">
+        <div class="rbkmkitem_b" href=".." draggable="false">
           <img src="/icons/nofavicon.png" class="favicon" draggable="false">
           <span class="favtext" draggable="false">aa</span>
         </div>
       </td></tr>
-      <tr data-id=".."><td class="brow" tabindex="0" draggable="false">
-        <div class="twistieac" draggable="false"></div>
-        <div class="bkmkitem_f" draggable="false">
+      <tr data-id=".." data-type="folder"><td class="brow" tabindex="0" draggable="false">
+        <div class="rtwistieac" draggable="false"></div>
+        <div class="rbkmkitem_f" draggable="false">
           <img src="/icons/folder.png" class="favicon" draggable="false">
           <span class="favtext" draggable="false">aaaaaa</span>
         </div>
@@ -40,45 +40,45 @@
     </div>
 <!--
     <table><tbody>
-      <tr data-level="0" data-id=".."><td class="brow" tabindex="0" draggable="true">
+      <tr data-level="0" data-id=".." data-type="bookmark"><td class="brow" tabindex="0" draggable="true">
         <div class="bkmkitem_b" href=".." draggable="false">
           <img src="/icons/nofavicon.png" class="favicon" draggable="false">
           <span class="favtext" draggable="false">bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb</span>
         </div>
       </td></tr>
-      <tr data-level="0" data-id=".."><td class="brow" tabindex="0" draggable="true">
+      <tr data-level="0" data-id=".." data-type="separator"><td class="brow" tabindex="0" draggable="true">
         <div class="bkmkitem_s" draggable="false">
           <div class="favseparator" draggable="false"></div>
           <div class="favseparatorend" draggable="false"></div>
         </div>
       </td></tr>
-      <tr data-level="1" data-id=".."><td class="brow" tabindex="0" draggable="true">
+      <tr data-level="1" data-id=".." data-type="folder"><td class="brow" tabindex="0" draggable="true">
         <div class="twistieao" draggable="false"></div>
         <div class="bkmkitem_f" draggable="false">
           <img src="/icons/folder.png" class="favicon" draggable="false">
           <span class="favtext" draggable="false">bbbbb</span>
         </div>
       </td></tr>
-      <tr data-level="1" data-id=".."><td class="brow" tabindex="0" draggable="true">
+      <tr data-level="1" data-id=".." data-type="bookmark"><td class="brow" tabindex="0" draggable="true">
         <div class="bkmkitem_b" href=".." draggable="false">
           <img src="/icons/nofavicon.png" class="favicon" draggable="false">
           <span class="favtext" draggable="false">bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb</span>
         </div>
       </td></tr>
-      <tr data-level="0" data-id=".."><td class="brow" tabindex="0" draggable="true">
+      <tr data-level="0" data-id=".." data-type="folder"><td class="brow" tabindex="0" draggable="true">
         <div class="twistieac"></div>
         <div class="bkmkitem_f" draggable="false">
           <img src="/icons/folder.png" class="favicon" draggable="false">
           <span class="favtext" draggable="false">bbbbbbb</span>
         </div>
       </td></tr>
-      <tr data-level="0" data-id=".."><td class="brow" tabindex="0" draggable="true">
+      <tr data-level="0" data-id=".." data-type="bookmark"><td class="brow" tabindex="0" draggable="true">
         <div class="bkmkitem_b" href=".." draggable="false">
           <img src="/icons/nofavicon.png" class="favicon" draggable="false">
           <span class="favtext" draggable="false">bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb</span>
         </div>
       </td></tr>
-      <tr data-level="0" data-id=".."><td class="brow" tabindex="0" draggable="true">
+      <tr data-level="0" data-id=".." data-type="folder"><td class="brow" tabindex="0" draggable="true">
         <div class="twistiena" draggable="false"></div>
         <div class="bkmkitem_f" draggable="false">
           <img src="/icons/folder.png" class="favicon" draggable="false">
@@ -93,19 +93,19 @@
     <div class="menuopentab">Open in new tab</div>
     <div class="menuopenwin">Open in new window</div>
     <div class="menuopenpriv">Open in private window</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menugoparent">Go parent folder</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menunewb">New bookmark..</div>
     <div class="menunewf">New folder..</div>
     <div class="menunews">New separator</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menucut">Cut</div>
     <div class="menucopy">Copy</div>
     <div class="menudisabled" id="mybbkmkmenupaste">Paste before</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menudel">Delete</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menurefreshfav" id="mybbkmkmenufavicon">Refresh favicon</div>
     <div class="menuprop">Properties..</div>
   </div>
@@ -114,71 +114,75 @@
     <div class="menuopentab">Open in new tab</div>
     <div class="menuopenwin">Open in new window</div>
     <div class="menuopenpriv">Open in private window</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menuopentree">Open parent folder(s)</div>
     <div class="menugoparent">Go parent folder</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menunewb">New bookmark..</div>
     <div class="menunewf">New folder..</div>
     <div class="menunews">New separator</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menucut">Cut</div>
     <div class="menucopy">Copy</div>
     <div class="menudisabled" id="mybresbkmkmenupaste">Paste before</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menudel">Delete</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menurefreshfav" id="mybresbkmkmenufavicon">Refresh favicon</div>
     <div class="menuprop">Properties..</div>
   </div>
   <div id="mybfldrmenu" class="mymenu" data-type="folder">
+    <div class="menugoparent">Go parent folder</div>
+    <hr class="menuhr">
+    <div class="menuopenall">Open all in tabs</div>
+    <hr class="menuhr">
     <div class="menunewb">New bookmark..</div>
     <div class="menunewf">New folder..</div>
     <div class="menunews">New separator</div>
-    <hr>
-    <div class="menugoparent">Go parent folder</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menucut">Cut</div>
     <div class="menucopy">Copy</div>
     <div class="menudisabled" id="mybfldrmenupaste">Paste before</div>
     <div class="menudisabled" id="mybfldrmenupasteinto">Paste into</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menudel">Delete</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menusort">Sort by Name</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menuprop">Properties..</div>
   </div>
   <div id="mybresfldrmenu" class="mymenu" data-type="folder">
+    <div class="menuopentree">Open parent folder(s)</div>
+    <div class="menugoparent">Go parent folder</div>
+    <hr class="menuhr">
+    <div class="menuopenall">Open all in tabs</div>
+    <hr class="menuhr">
     <div class="menunewb">New bookmark..</div>
     <div class="menunewf">New folder..</div>
     <div class="menunews">New separator</div>
-    <hr>
-    <div class="menuopentree">Open parent folder(s)</div>
-    <div class="menugoparent">Go parent folder</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menucut">Cut</div>
     <div class="menucopy">Copy</div>
     <div class="menudisabled" id="mybresfldrmenupaste">Paste before</div>
     <div class="menudisabled" id="mybresfldrmenupasteinto">Paste into</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menudel">Delete</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menusort">Sort by Name</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menuprop">Properties..</div>
   </div>
   <div id="mybsepmenu" class="mymenu" data-type="separator">
+    <div class="menugoparent">Go parent folder</div>
+    <hr class="menuhr">
     <div class="menunewb">New bookmark..</div>
     <div class="menunewf">New folder..</div>
     <div class="menunews">New separator</div>
-    <hr>
-    <div class="menugoparent">Go parent folder</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menucut">Cut</div>
     <div class="menucopy">Copy</div>
     <div class="menudisabled" id="mybsepmenupaste">Paste before</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menudel">Delete</div>
   </div>
   <div id="mybprotmenu" class="mymenu" data-type="protected">
@@ -186,14 +190,16 @@
     <div class="menuopentab">Open in new tab</div>
     <div class="menuopenwin">Open in new window</div>
     <div class="menuopenpriv">Open in private window</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menugoparent">Go parent folder</div>
   </div>
   <div id="mybprotfmenu" class="mymenu" data-type="fprotected">
+    <div class="menuopenall">Open all in tabs</div>
+    <hr class="menuhr">
     <div class="menunewb">New bookmark..</div>
     <div class="menunewf">New folder..</div>
     <div class="menunews">New separator</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menudisabled" id="mybprotfmenupasteinto">Paste into</div>
   </div>
   <div id="myrbkmkmenu" class="mymenu" data-type="bookmark">
@@ -201,69 +207,91 @@
     <div class="menuopentab">Open in new tab</div>
     <div class="menuopenwin">Open in new window</div>
     <div class="menuopenpriv">Open in private window</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menushow">Show bookmark</div>
     <div class="menugoparent">Go parent folder</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menucut">Cut</div>
     <div class="menucopy">Copy</div>
+    <hr class="menuhr">
+    <div class="menuprop">Properties..</div>
   </div>
   <div id="myrshowbkmkmenu" class="mymenu" data-type="bookmark">
     <div class="menushow menudefault">Show bookmark</div>
     <div class="menugoparent">Go parent folder</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menuopen">Open</div>
     <div class="menuopentab">Open in new tab</div>
     <div class="menuopenwin">Open in new window</div>
     <div class="menuopenpriv">Open in private window</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menucut">Cut</div>
     <div class="menucopy">Copy</div>
+    <hr class="menuhr">
+    <div class="menuprop">Properties..</div>
   </div>
   <div id="myrfldrmenu" class="mymenu" data-type="folder">
     <div class="menushow menudefault">Show folder</div>
     <div class="menugoparent" id="myrfldrmenugoparent">Go parent folder</div>
-    <hr>
+    <hr class="menuhr">
+    <div class="menuopenall">Open all in tabs</div>
+    <hr class="menuhr">
     <div class="menucut">Cut</div>
     <div class="menucopy">Copy</div>
+    <hr class="menuhr">
+    <div class="menuprop">Properties..</div>
   </div>
   <div id="mymglassmenu" class="mymenu" data-type="default">
     <div class="menusfboth">
-  	  <input type="radio" class="inputradio" name="searchfields" id="titleurl" checked>
-  	  <label for="titleurl">Title + URL (default)</label>
+  	  <input type="radio" class="menuinputradio" name="searchfields" id="titleurl" checked>
+  	  <label for="titleurl" class="menulabel">Title + URL (default)</label>
 	</div>
     <div class="menusftitle">
-  	  <input type="radio" class="inputradio" name="searchfields" id="titleonly">
-  	  <label for="titleonly">Title only</label>
+  	  <input type="radio" class="menuinputradio" name="searchfields" id="titleonly">
+  	  <label for="titleonly" class="menulabel">Title only</label>
 	</div>
     <div class="menusfurl">
-  	  <input type="radio" class="inputradio" name="searchfields" id="urlonly">
-  	  <label for="urlonly">URL only</label>
+  	  <input type="radio" class="menuinputradio" name="searchfields" id="urlonly">
+  	  <label for="urlonly" class="menulabel">URL only</label>
 	</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menussall">
-  	  <input type="radio" class="inputradio" name="searchscope" id="all" checked>
-  	  <label for="all">Search all (default)</label>
+  	  <input type="radio" class="menuinputradio" name="searchscope" id="all" checked>
+  	  <label for="all" class="menulabel">Search all (default)</label>
 	</div>
     <div class="menusssubfolder">
-  	  <input type="radio" class="inputradio" name="searchscope" id="subfolder">
-  	  <label for="subfolder">Inside current folder</label>
+  	  <input type="radio" class="menuinputradio" name="searchscope" id="subfolder">
+  	  <label for="subfolder" class="menulabel">Inside current folder</label>
 	</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menusmwords">
-  	  <input type="radio" class="inputradio" name="matchmethod" id="words" checked>
-  	  <label for="words">Match words (default)</label>
+  	  <input type="radio" class="menuinputradio" name="matchmethod" id="words" checked>
+  	  <label for="words" class="menulabel">Match words (default)</label>
 	</div>
     <div class="menusmregexp">
-  	  <input type="radio" class="inputradio" name="matchmethod" id="regexp">
-  	  <label for="regexp">Use regex</label>
+  	  <input type="radio" class="menuinputradio" name="matchmethod" id="regexp">
+  	  <label for="regexp" class="menulabel">Use regex</label>
 	</div>
-    <hr>
+    <hr class="menuhr">
     <div class="menuopenbsp2">Open BSP2 in a tab</div>
+    <div class="menuhistory">Bookmark history..</div>
+  </div>
+  <div id="notifreload" class="notif">
+    <div class="dialog">
+      <p id="reloadmsg" style="text-align: center;">BSP2 is reloading bookmarks from FF API. Please wait ...</p>
+	  <img src="/icons/waiting.gif" height="20px"/>
+	</div>
+  </div>
+  <div id="notifautoreload" class="notif">
+    <div class="dialog">
+      <p id="autoreloadmsg" style="text-align: center;">BSP2 detected a desynchronization and is reloading bookmarks from FF API. Please wait ...</p>
+	  <img src="/icons/waiting.gif" height="20px"/>
+	</div>
   </div>
   <script src="libstore.js"></script>
   <script src="BookmarkNode.js"></script>
   <script src="panel.js"></script>
+  <script src="contextmenu.js"></script>
 </body>
 
 </html>

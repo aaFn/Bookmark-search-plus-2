@@ -9,6 +9,8 @@ const VersionBNList = "-bnlist"; // Signal that we are in BookmarkNode tree form
 const VersionSpecialFldr = "-spfldr"; // Signal that we are in Special Folder tree format
 const DfltFontSize = 12; // 12px default
 const DfltSpaceSize = 0; // 0px default
+const DfltTextColor = "#222426"; // Default text color
+const DfltBckgndColor = "#ffffff"; // Default background color
 
 
 /*
@@ -19,6 +21,7 @@ var disableFavicons_option; // Boolean
 var enableCookies_option; // Boolean
 var enableFlipFlop_option; // Boolean
 var advancedClick_option; // Boolean
+var showPath_option; // Boolean
 var closeSearch_option; // Boolean
 var openTree_option; // Boolean
 var immediateFavDisplay_option; // Boolean
@@ -31,6 +34,12 @@ var setFontSize_option; // Boolean
 var fontSize_option; // Integer
 var setSpaceSize_option; // Boolean
 var spaceSize_option; // Integer
+var matchTheme_option; // Boolean
+var setColors_option; // Boolean
+var textColor_option; // DOMString
+var bckgndColor_option; // DOMString
+var altFldrImg_option; // String (data: URI)
+var useAltFldr_option; // Boolean
 var lastcurbnid_option; // String
 var sidebarCommand_option; // String
 var traceEnabled_option; // Boolean
@@ -40,12 +49,15 @@ var searchMatch_option; // String
 var savedBkmkUriList; // Used to receive the favicon uri saved in storage - Will be deleted at end
 var savedBNList; // Used to receive the BookmarkNodes saved in storage - Will be deleted at end
 var savedBNListBak; // Used to receive the second BookmarkNodes saved in storage if any - Will be deleted at end
+var savedHNList; // Used to receive the HistoryNodes saved in storage - Will be deleted at end
+var savedHNListBak; // Used to receive the second HistoryNodes saved in storage if any - Will be deleted at end
 var structureVersion = ""; // String signalling which migrations are done / current state
 var pauseFavicons_option_file; // Boolean
 var disableFavicons_option_file; // Boolean
 var enableCookies_option_file; // Boolean
 var enableFlipFlop_option_file; // Boolean
 var advancedClick_option_file; // Boolean
+var showPath_option_file; // Boolean
 var closeSearch_option_file; // Boolean
 var openTree_option_file; // Boolean
 var immediateFavDisplay_option_file; // Boolean
@@ -58,6 +70,12 @@ var setFontSize_option_file; // Boolean
 var fontSize_option_file; // Integer
 var setSpaceSize_option_file; // Boolean
 var spaceSize_option_file; // Integer
+var matchTheme_option_file; // Boolean
+var setColors_option_file; // Boolean
+var textColor_option_file; // DOMString
+var bckgndColor_option_file; // DOMString
+var altFldrImg_option_file; // String (data: URI)
+var useAltFldr_option_file; // Boolean
 var lastcurbnid_option_file; // String
 var sidebarCommand_option_file; // String
 var traceEnabled_option_file; // Boolean
@@ -96,20 +114,22 @@ function refreshOptionsBgnd (backgroundPage) {
 	enableCookies_option = false;
   }
   else {
-    enableCookies_option = backgroundPage.enableCookies_option;
+	enableCookies_option = backgroundPage.enableCookies_option;
   }
   enableFlipFlop_option_file = backgroundPage.enableFlipFlop_option_file;
   enableFlipFlop_option = backgroundPage.enableFlipFlop_option;
   advancedClick_option_file = backgroundPage.advancedClick_option_file;
   advancedClick_option = backgroundPage.advancedClick_option;
+  showPath_option_file = backgroundPage.showPath_option_file;
+  showPath_option = backgroundPage.showPath_option;
   closeSearch_option_file = backgroundPage.closeSearch_option_file;
   closeSearch_option = backgroundPage.closeSearch_option;
   openTree_option_file = backgroundPage.openTree_option_file;
   if (closeSearch_option) { // Force openTree_option
- 	openTree_option = true;
+	openTree_option = true;
   }
   else {
-    openTree_option = backgroundPage.openTree_option;
+	openTree_option = backgroundPage.openTree_option;
   }
   immediateFavDisplay_option_file = backgroundPage.immediateFavDisplay_option_file;
   immediateFavDisplay_option = backgroundPage.immediateFavDisplay_option;
@@ -131,6 +151,18 @@ delayLoad_option = false; // Disabled for now
   setSpaceSize_option = backgroundPage.setSpaceSize_option;
   spaceSize_option_file = backgroundPage.spaceSize_option_file;
   spaceSize_option = backgroundPage.spaceSize_option;
+  matchTheme_option_file = backgroundPage.matchTheme_option_file;
+  matchTheme_option = backgroundPage.matchTheme_option;
+  setColors_option_file = backgroundPage.setColors_option_file;
+  setColors_option = backgroundPage.setColors_option;
+  textColor_option_file = backgroundPage.textColor_option_file;
+  textColor_option = backgroundPage.textColor_option;
+  bckgndColor_option_file = backgroundPage.bckgndColor_option_file;
+  bckgndColor_option = backgroundPage.bckgndColor_option;
+  altFldrImg_option_file = backgroundPage.altFldrImg_option_file;
+  altFldrImg_option = backgroundPage.altFldrImg_option;
+  useAltFldr_option_file = backgroundPage.useAltFldr_option_file;
+  useAltFldr_option = backgroundPage.useAltFldr_option;
   lastcurbnid_option_file = backgroundPage.lastcurbnid_option_file;
   lastcurbnid_option = backgroundPage.lastcurbnid_option;
   sidebarCommand_option_file = backgroundPage.sidebarCommand_option_file;
@@ -153,116 +185,130 @@ delayLoad_option = false; // Disabled for now
  */
 function refreshOptionsLStore () {
   let p = new Promise  (
-    (resolve, reject) => {
-   	  let gettingItem = browser.storage.local.get(
-   	   	["pausefavicons_option"
-   	   	,"disablefavicons_option"
-   	    ,"enablecookies_option"
-   	    ,"enableflipflop_option"
-   	    ,"advanced_option"
-   	    ,"closesearch_option"
-   	    ,"opentree_option"
-   	    ,"immediatefavdisplay_option"
-   	    ,"loadffapi_option"
-   	    ,"delayLoad_option"
-   	    ,"reversepath_option"
-   	    ,"remembersizes_option"
-   	    ,"searchheight_option"
-   	    ,"popupheight_option"
-   	    ,"popupwidth_option"
-   	    ,"setfontsize_option"
-   	    ,"fontsize_option"
-   	    ,"setspacesize_option"
-   	    ,"spacesize_option"
-   	    ,"lastcurbnid_option"
-   	    ,"sidebarcommand_option"
-   	    ,"searchfield_option"
-   	    ,"searchscope_option"
-   	    ,"searchmatch_option"
-   	    ,"traceEnabled_option"
-   	    ]
-   	  );
-   	  gettingItem.then((res) => {
-   		// -- Read PFF option..
-   		if ((pauseFavicons_option_file = res.pausefavicons_option) != undefined) {
-   		  pauseFavicons_option = pauseFavicons_option_file;
-   		}
-   		else {
-   		  pauseFavicons_option = false;
-   		}
-   		// -- Read DFF option..
-   		if ((disableFavicons_option_file = res.disablefavicons_option) != undefined) {
-   		  disableFavicons_option = disableFavicons_option_file;
-   		}
-   		else {
-   		  disableFavicons_option = false;
-   		}
+	(resolve, reject) => {
+	  let gettingItem = browser.storage.local.get(
+		["pausefavicons_option"
+		,"disablefavicons_option"
+		,"enablecookies_option"
+		,"enableflipflop_option"
+		,"advanced_option"
+		,"showpath_option"
+		,"closesearch_option"
+		,"opentree_option"
+		,"immediatefavdisplay_option"
+		,"loadffapi_option"
+		,"delayLoad_option"
+		,"reversepath_option"
+		,"remembersizes_option"
+		,"searchheight_option"
+		,"popupheight_option"
+		,"popupwidth_option"
+		,"setfontsize_option"
+		,"fontsize_option"
+		,"setspacesize_option"
+		,"spacesize_option"
+		,"matchtheme_option"
+		,"setcolors_option"
+		,"textcolor_option"
+		,"bckgndcolor_option"
+		,"altfldrimg_option"
+		,"usealtfldr_option"
+		,"lastcurbnid_option"
+		,"sidebarcommand_option"
+		,"searchfield_option"
+		,"searchscope_option"
+		,"searchmatch_option"
+		,"traceEnabled_option"
+		]
+	  );
+	  gettingItem.then((res) => {
+		// -- Read PFF option..
+		if ((pauseFavicons_option_file = res.pausefavicons_option) != undefined) {
+		  pauseFavicons_option = pauseFavicons_option_file;
+		}
+		else {
+		  pauseFavicons_option = false;
+		}
+		// -- Read DFF option..
+		if ((disableFavicons_option_file = res.disablefavicons_option) != undefined) {
+		  disableFavicons_option = disableFavicons_option_file;
+		}
+		else {
+		  disableFavicons_option = false;
+		}
 		// -- Read EC option..
-   		if ((enableCookies_option_file = res.enablecookies_option) != undefined) {
-   		  if (disableFavicons_option) { // Force enableCookies_option to false
-   			enableCookies_option = false;
-   		  }
-   		  else {
-   			enableCookies_option = enableCookies_option_file;
-   		  }
-   		}
-   		else {
-   		  enableCookies_option = false;
-   		}
- 		// -- Read EFF option..
-   		if ((enableFlipFlop_option_file = res.enableflipflop_option) != undefined) {
-   		  enableFlipFlop_option = enableFlipFlop_option_file;
-   		}
-   		else {
-   		  enableFlipFlop_option = false;
-     	}
-   		// -- Read advanced option..
-   		if ((advancedClick_option_file = res.advanced_option) != undefined) {
-   		  advancedClick_option = advancedClick_option_file;
-   		}
-   		else {
-   		  advancedClick_option = false;
-       	}
-	  	// -- Read CS option..
-   		if ((closeSearch_option_file = res.closesearch_option) != undefined) {
-   		  closeSearch_option = closeSearch_option_file;
-   		}
-   		else {
-   		  closeSearch_option = false;
-        }
-   		// -- Read OT option..
-   		if ((openTree_option_file = res.opentree_option) != undefined) {
-   		  if (closeSearch_option) { // Force openTree_option
-   			openTree_option = true;
-   		  }
-   		  else {
-   			openTree_option = openTree_option_file;
-   		  }
-   		}
-   		else {
-   		  openTree_option = false;
-        }
-   		// -- Read IFD option..
-   		if ((immediateFavDisplay_option_file = res.immediatefavdisplay_option) != undefined) {
-   		  immediateFavDisplay_option = immediateFavDisplay_option_file;
-   		}
-   		else {
-   		  immediateFavDisplay_option = false;
-        }
-   		// -- Read LFFA option..
-   		if ((loadffapi_option_file = res.loadffapi_option) != undefined) {
-   		  loadffapi_option = loadffapi_option_file;
-   		}
-   		else {
-   		  loadffapi_option = false;
-        }
-   		// -- Read DL option..
-   		if ((delayLoad_option_file = res.delayLoad_option) != undefined) {
-   		  delayLoad_option = delayLoad_option_file;
-   		}
-   		else {
-   		  delayLoad_option = false;
-        }
+		if ((enableCookies_option_file = res.enablecookies_option) != undefined) {
+		  if (disableFavicons_option) { // Force enableCookies_option to false
+			enableCookies_option = false;
+		  }
+		  else {
+			enableCookies_option = enableCookies_option_file;
+		  }
+		}
+		else {
+		  enableCookies_option = false;
+		}
+		// -- Read EFF option..
+		if ((enableFlipFlop_option_file = res.enableflipflop_option) != undefined) {
+		  enableFlipFlop_option = enableFlipFlop_option_file;
+		}
+		else {
+		  enableFlipFlop_option = false;
+		}
+		// -- Read advanced option..
+		if ((advancedClick_option_file = res.advanced_option) != undefined) {
+		  advancedClick_option = advancedClick_option_file;
+		}
+		else {
+		  advancedClick_option = false;
+		}
+		// -- Read SP option..
+		if ((showPath_option_file = res.showpath_option) != undefined) {
+		  showPath_option = showPath_option_file;
+		}
+		else {
+		  showPath_option = false;
+		}
+		// -- Read CS option..
+		if ((closeSearch_option_file = res.closesearch_option) != undefined) {
+		  closeSearch_option = closeSearch_option_file;
+		}
+		else {
+		  closeSearch_option = false;
+		}
+		// -- Read OT option..
+		if ((openTree_option_file = res.opentree_option) != undefined) {
+		  if (closeSearch_option) { // Force openTree_option
+			openTree_option = true;
+		  }
+		  else {
+			openTree_option = openTree_option_file;
+		  }
+		}
+		else {
+		  openTree_option = false;
+		}
+		// -- Read IFD option..
+		if ((immediateFavDisplay_option_file = res.immediatefavdisplay_option) != undefined) {
+		  immediateFavDisplay_option = immediateFavDisplay_option_file;
+		}
+		else {
+		  immediateFavDisplay_option = false;
+		}
+		// -- Read LFFA option..
+		if ((loadffapi_option_file = res.loadffapi_option) != undefined) {
+		  loadffapi_option = loadffapi_option_file;
+		}
+		else {
+		  loadffapi_option = false;
+		}
+		// -- Read DL option..
+		if ((delayLoad_option_file = res.delayLoad_option) != undefined) {
+		  delayLoad_option = delayLoad_option_file;
+		}
+		else {
+		  delayLoad_option = false;
+		}
 delayLoad_option = false; // Disabled for now
 		// .. Read RP option..
 		if ((reversePath_option_file = res.reversepath_option) != undefined) {
@@ -271,137 +317,179 @@ delayLoad_option = false; // Disabled for now
 		else {
 		  reversePath_option = false;
 		}
-     	// -- Read RS options..
-   		if ((rememberSizes_option_file = res.remembersizes_option) != undefined) {
-   		  rememberSizes_option = rememberSizes_option_file;
-   		}
-   		else {
-   		  rememberSizes_option = false;
-        }
-   		// -- Get search pane height and set the pane properly
-   		if ((searchHeight_option_file = res.searchheight_option) != undefined) {
-   		  if (rememberSizes_option) {
-   			searchHeight_option = searchHeight_option_file; // Remember the current saved size
-   		  }
-   		  else { // Do not remember
-   			searchHeight_option = undefined;
-   			// Remove the remembered sizes when they exist
-   			browser.storage.local.remove("searchheight_option");
-   		  }
-   		}
-   		else {
-   		  searchHeight_option = undefined;
+		// -- Read RS options..
+		if ((rememberSizes_option_file = res.remembersizes_option) != undefined) {
+		  rememberSizes_option = rememberSizes_option_file;
 		}
-   		if (!rememberSizes_option && (res.popupheight_option != undefined)) {
-   		  browser.storage.local.remove("popupheight_option");
-   		}
-   		if (!rememberSizes_option && (res.popupwidth_option != undefined)) {
-   		  browser.storage.local.remove("popupwidth_option");
-   		}
-   		// -- Read SFS option..
-   		if ((setFontSize_option_file = res.setfontsize_option) != undefined) {
-   		  setFontSize_option = setFontSize_option_file;
-   		}
-   		else {
-   		  setFontSize_option = false;
-        }
-   		// -- Read FS option..
-   		if ((fontSize_option_file = res.fontsize_option) != undefined) {
-   		  if (setFontSize_option) {
-   			fontSize_option = fontSize_option_file;
-   		  }
-   		  else { // Do not remember
-   			fontSize_option = undefined;
-   			// Remove the remembered sizes when they exist
-   			browser.storage.local.remove("fontsize_option");
-   		  }
-   		}
-   		else {
-   		  fontSize_option = undefined;
-   		}
-   		// -- Read SSS option..
-   		if ((setSpaceSize_option_file = res.setspacesize_option) != undefined) {
-   		  setSpaceSize_option = setSpaceSize_option_file;
-   		}
-   		else {
-   		  setSpaceSize_option = false;
-        }
-   		// -- Read SSz option..
-   		if ((spaceSize_option_file = res.spacesize_option) != undefined) {
-   		  if (setSpaceSize_option) {
-   			spaceSize_option = spaceSize_option_file;
-   		  }
-   		  else { // Do not remember
-   			spaceSize_option = undefined;
-   			// Remove the remembered sizes when they exist
-   			browser.storage.local.remove("spacesize_option");
-   		  }
-   		}
-   		else {
-   		  spaceSize_option = undefined;
-   		}
-   		// Read LCB option..
-   		if ((lastcurbnid_option_file = res.lastcurbnid_option) != undefined) {
-   		lastcurbnid_option = lastcurbnid_option_file;
-   		}
-   		else {
-   		  lastcurbnid_option = undefined;
-   		}
- 		// -- Read SC option..
- 		if ((sidebarCommand_option_file = res.sidebarcommand_option) != undefined) {
- 		 sidebarCommand_option = sidebarCommand_option_file;
- 		}
- 		else {
- 		 sidebarCommand_option = undefined;
- 		}
+		else {
+		  rememberSizes_option = false;
+		}
+		// -- Get search pane height and set the pane properly
+		if ((searchHeight_option_file = res.searchheight_option) != undefined) {
+		  if (rememberSizes_option) {
+			searchHeight_option = searchHeight_option_file; // Remember the current saved size
+		  }
+		  else { // Do not remember
+			searchHeight_option = undefined;
+			// Remove the remembered sizes when they exist
+			browser.storage.local.remove("searchheight_option");
+		  }
+		}
+		else {
+		  searchHeight_option = undefined;
+		}
+		if (!rememberSizes_option && (res.popupheight_option != undefined)) {
+		  browser.storage.local.remove("popupheight_option");
+		}
+		if (!rememberSizes_option && (res.popupwidth_option != undefined)) {
+		  browser.storage.local.remove("popupwidth_option");
+		}
+		// -- Read SFS option..
+		if ((setFontSize_option_file = res.setfontsize_option) != undefined) {
+		  setFontSize_option = setFontSize_option_file;
+		}
+		else {
+		  setFontSize_option = false;
+		}
+		// -- Read FS option..
+		if ((fontSize_option_file = res.fontsize_option) != undefined) {
+		  if (setFontSize_option) {
+			fontSize_option = fontSize_option_file;
+		  }
+		  else { // Do not remember
+			fontSize_option = undefined;
+			// Remove the remembered sizes when they exist
+			browser.storage.local.remove("fontsize_option");
+		  }
+		}
+		else {
+		  fontSize_option = undefined;
+		}
+		// -- Read SSS option..
+		if ((setSpaceSize_option_file = res.setspacesize_option) != undefined) {
+		  setSpaceSize_option = setSpaceSize_option_file;
+		}
+		else {
+		  setSpaceSize_option = false;
+		}
+		// -- Read SSz option..
+		if ((spaceSize_option_file = res.spacesize_option) != undefined) {
+		  if (setSpaceSize_option) {
+			spaceSize_option = spaceSize_option_file;
+		  }
+		  else { // Do not remember
+			spaceSize_option = undefined;
+			// Remove the remembered sizes when they exist
+			browser.storage.local.remove("spacesize_option");
+		  }
+		}
+		else {
+		  spaceSize_option = undefined;
+		}
+		// -- Read MT option
+		if ((matchTheme_option_file = res.matchtheme_option) != undefined) {
+		  matchTheme_option = matchTheme_option_file;
+		}
+		else {
+		  matchTheme_option = false;
+		}
+		// -- Read SC option
+		if ((setColors_option_file = res.setcolors_option) != undefined) {
+		  setColors_option = setColors_option_file;
+		}
+		else {
+		  setColors_option = false;
+		}
+		// -- Read TC option
+		if ((textColor_option_file = res.textcolor_option) != undefined) {
+		  textColor_option = textColor_option_file;
+		}
+		else {
+		  textColor_option = DfltTextColor;
+		}
+		// -- Read BC option
+		if ((bckgndColor_option_file = res.bckgndcolor_option) != undefined) {
+		  bckgndColor_option = bckgndColor_option_file;
+		}
+		else {
+		  bckgndColor_option = DfltBckgndColor;
+		}
+		// Read AFI option..
+		if ((altFldrImg_option_file = res.altfldrimg_option) != undefined) {
+		  altFldrImg_option = altFldrImg_option_file;
+		}
+		else {
+		  altFldrImg_option = undefined;
+		}
+		// Read UAF option..
+		if ((useAltFldr_option_file = res.usealtfldr_option) != undefined) {
+		  useAltFldr_option = useAltFldr_option_file;
+		}
+		else {
+		  useAltFldr_option = false;
+		}
+		// Read LCB option..
+		if ((lastcurbnid_option_file = res.lastcurbnid_option) != undefined) {
+		  lastcurbnid_option = lastcurbnid_option_file;
+		}
+		else {
+		  lastcurbnid_option = undefined;
+		}
+		// -- Read SC option..
+		if ((sidebarCommand_option_file = res.sidebarcommand_option) != undefined) {
+		  sidebarCommand_option = sidebarCommand_option_file;
+		}
+		else {
+		  sidebarCommand_option = undefined;
+		}
 
-   		// -- Read SF option..
-   		if ((searchField_option_file = res.searchfield_option) != undefined) {
-   		  searchField_option = searchField_option_file;
-   		}
-   		else {
-   		  searchField_option = "both";
-        }
+		// -- Read SF option..
+		if ((searchField_option_file = res.searchfield_option) != undefined) {
+		  searchField_option = searchField_option_file;
+		}
+		else {
+		  searchField_option = "both";
+		}
 
-   		// -- Read SS option..
-   		if ((searchScope_option_file = res.searchscope_option) != undefined) {
-   		  searchScope_option = searchScope_option_file;
-   		}
-   		else {
-   		  searchScope_option = "all";
-        }
+		// -- Read SS option..
+		if ((searchScope_option_file = res.searchscope_option) != undefined) {
+		  searchScope_option = searchScope_option_file;
+		}
+		else {
+		  searchScope_option = "all";
+		}
 
-   		// -- Read trace option..
-   		if ((traceEnabled_option_file = res.traceEnabled_option) != undefined) {
-   		  traceEnabled_option = traceEnabled_option_file;
-   		}
-   		else {
-   		  traceEnabled_option = false;
-        }
+		// -- Read trace option..
+		if ((traceEnabled_option_file = res.traceEnabled_option) != undefined) {
+		  traceEnabled_option = traceEnabled_option_file;
+		}
+		else {
+		  traceEnabled_option = false;
+		}
 
-   		// -- Read SM option..
-   		if ((searchMatch_option_file = res.searchmatch_option) != undefined) {
-   		  searchMatch_option = searchMatch_option_file;
-   		}
-   		else {
-   		  searchMatch_option = "words";
-        }
+		// -- Read SM option..
+		if ((searchMatch_option_file = res.searchmatch_option) != undefined) {
+		  searchMatch_option = searchMatch_option_file;
+		}
+		else {
+		  searchMatch_option = "words";
+		}
 
-   	    resolve(); // Send promise for anybody waiting ..
-   	  })
-   	  .catch( // Asynchronous, like .then
-   		function (err) {
-   		  let msg = "libstore error on loading from local storage 1 : "+err;
-   		  console.log(msg);
+		resolve(); // Send promise for anybody waiting ..
+	  })
+	  .catch( // Asynchronous, like .then
+		function (err) {
+		  let msg = "libstore error on loading from local storage 1 : "+err;
+		  console.log(msg);
 		  if (err != undefined) {
 			console.log("lineNumber: "+err.lineNumber);
 			console.log("fileName:   "+err.fileName);
 		  }
 
-   	      reject(); // Send promise for anybody waiting ..
-   		}
-   	  );
-    }
+		  reject(); // Send promise for anybody waiting ..
+		}
+	  );
+	}
   );
 
   // Return Promise
@@ -420,34 +508,34 @@ delayLoad_option = false; // Disabled for now
  */
 function readFoldersLStore (waitMsg) {
   let p = new Promise  (
-    (resolve, reject) => {
-   	  let gettingItem = browser.storage.local.get(
-  	    ["savedFldrOpenList"
-  	    ]
-  	  );
-   	  gettingItem.then((res) => {
-   		let value;
+	(resolve, reject) => {
+	  let gettingItem = browser.storage.local.get(
+		["savedFldrOpenList"
+		]
+	  );
+	  gettingItem.then((res) => {
+		let value;
 
-   		waitMsg("Read folders state..");
-   		if ((value = res.savedFldrOpenList) != undefined) {
-   		  savedFldrOpenList = value;
-   		}
+		waitMsg("Read folders state..");
+		if ((value = res.savedFldrOpenList) != undefined) {
+		  savedFldrOpenList = value;
+		}
 
-        resolve(); // Send promise for anybody waiting ..
-   	  })
-   	  .catch( // Asynchronous, like .then
-   		function (err) {
-   		  let msg = "libstore error on loading from local storage 2 : "+err;
-   		  console.log(msg);
+		resolve(); // Send promise for anybody waiting ..
+	  })
+	  .catch( // Asynchronous, like .then
+		function (err) {
+		  let msg = "libstore error on loading from local storage 2 : "+err;
+		  console.log(msg);
 		  if (err != undefined) {
 			console.log("lineNumber: "+err.lineNumber);
 			console.log("fileName:   "+err.fileName);
 		  }
 
-   	      reject(); // Send promise for anybody waiting ..
-   		}
-   	  );
-    }
+		  reject(); // Send promise for anybody waiting ..
+		}
+	  );
+	}
   );
 
   // Return Promise
@@ -466,11 +554,12 @@ function launchReadFullLStore (isSidebar) {
   let gettingItem;
   if (isSidebar) {
 	gettingItem = browser.storage.local.get(
-	  ["pausefavicons_option"
+	   ["pausefavicons_option"
 	   ,"disablefavicons_option"
 	   ,"enablecookies_option"
 	   ,"enableflipflop_option"
 	   ,"advanced_option"
+	   ,"showpath_option"
 	   ,"closesearch_option"
 	   ,"opentree_option"
 	   ,"immediatefavdisplay_option"
@@ -485,6 +574,12 @@ function launchReadFullLStore (isSidebar) {
 	   ,"fontsize_option"
 	   ,"setspacesize_option"
 	   ,"spacesize_option"
+	   ,"matchtheme_option"
+	   ,"setcolors_option"
+	   ,"textcolor_option"
+	   ,"bckgndcolor_option"
+	   ,"altfldrimg_option"
+	   ,"usealtfldr_option"
 	   ,"lastcurbnid_option"
 	   ,"sidebarcommand_option"
 	   ,"searchfield_option"
@@ -503,6 +598,7 @@ function launchReadFullLStore (isSidebar) {
 	   ,"enablecookies_option"
 	   ,"enableflipflop_option"
 	   ,"advanced_option"
+	   ,"showpath_option"
 	   ,"closesearch_option"
 	   ,"opentree_option"
 	   ,"immediatefavdisplay_option"
@@ -517,6 +613,12 @@ function launchReadFullLStore (isSidebar) {
 	   ,"fontsize_option"
 	   ,"setspacesize_option"
 	   ,"spacesize_option"
+	   ,"matchtheme_option"
+	   ,"setcolors_option"
+	   ,"textcolor_option"
+	   ,"bckgndcolor_option"
+	   ,"altfldrimg_option"
+	   ,"usealtfldr_option"
 	   ,"lastcurbnid_option"
 	   ,"sidebarcommand_option"
 	   ,"searchfield_option"
@@ -531,6 +633,8 @@ function launchReadFullLStore (isSidebar) {
 	   ,"savedBkmkUriList"
 //	   ,"savedBkmkUriList2"
 //	   ,"savedBkmkUriList3"
+	   ,"savedHNList"
+	   ,"savedHNListBak"
 	   ,"structureVersion"
 	  ]
 	);
@@ -607,6 +711,13 @@ function readFullOptions (res, isSidebar, waitMsg) {
   }
   else {
 	advancedClick_option = false;
+  }
+  waitMsg("Read SP option..");
+  if ((showPath_option_file = res.showpath_option) != undefined) {
+	showPath_option = showPath_option_file;
+  }
+  else {
+	showPath_option = false;
   }
   waitMsg("Read CS option..");
   if ((closeSearch_option_file = res.closesearch_option) != undefined) {
@@ -744,6 +855,48 @@ delayLoad_option = false; // Disabled for now
   else {
 	spaceSize_option = undefined;
   }
+  waitMsg("Read MT option..");
+  if ((matchTheme_option_file = res.matchtheme_option) != undefined) {
+	matchTheme_option = matchTheme_option_file;
+  }
+  else {
+	matchTheme_option = false;
+  }
+  waitMsg("Read SC option..");
+  if ((setColors_option_file = res.setcolors_option) != undefined) {
+	setColors_option = setColors_option_file;
+  }
+  else {
+	setColors_option = false;
+  }
+  waitMsg("Read TC option..");
+  if ((textColor_option_file = res.textcolor_option) != undefined) {
+	textColor_option = textColor_option_file;
+  }
+  else {
+	textColor_option = DfltTextColor;
+  }
+  waitMsg("Read BC option..");
+  if ((bckgndColor_option_file = res.bckgndcolor_option) != undefined) {
+	bckgndColor_option = bckgndColor_option_file;
+  }
+  else {
+	bckgndColor_option = DfltBckgndColor;
+  }
+  waitMsg("Read AFI option..");
+  if ((altFldrImg_option_file = res.altfldrimg_option) != undefined) {
+	altFldrImg_option = altFldrImg_option_file;
+  }
+  else {
+	altFldrImg_option = undefined;
+  }
+  waitMsg("Read UAF option..");
+  if ((useAltFldr_option_file = res.usealtfldr_option) != undefined) {
+	useAltFldr_option = useAltFldr_option_file;
+  }
+  else {
+	useAltFldr_option = false;
+  }
   waitMsg("Read LCB option..");
   if ((lastcurbnid_option_file = res.lastcurbnid_option) != undefined) {
 	lastcurbnid_option = lastcurbnid_option_file;
@@ -816,7 +969,7 @@ delayLoad_option = false; // Disabled for now
 	  savedfTimeBak = value;
 	}
 
-	// Get saved tree / favicons
+	// Get saved tree / favicons and history of bookmark modifications
 	waitMsg("Read saved tree..");
 	if (savedfTimeBak != undefined) {
 	  if ((savedfTime != undefined) && (savedfTime > savedfTimeBak)) {
@@ -831,6 +984,16 @@ delayLoad_option = false; // Disabled for now
 		  // If primary was empty, take backup
 		  savedBNList = value;
 		}
+		if ((value = res.savedHNList) != undefined) {
+		  savedHNList = value;
+		  if ((value = res.savedHNListBak) != undefined) {
+			savedHNListBak = value;
+		  }
+		}
+		else if ((value = res.savedHNListBak) != undefined) {
+		  // If primary was empty, take backup
+		  savedHNList = value;
+		}
 	  }
 	  else { // Backup fresher than primary, or no primary
 		if ((value = res.savedBNListBak) != undefined) {
@@ -843,6 +1006,16 @@ delayLoad_option = false; // Disabled for now
 		  // If backup was empty, attempt primary .. we never know
 		  savedBNList = value;
 		}
+		if ((value = res.savedHNListBak) != undefined) {
+		  savedHNList = value;
+		  if ((value = res.savedHNList) != undefined) {
+			savedHNListBak = value;
+		  }
+		}
+		else if ((value = res.savedHNList) != undefined) {
+		  // If backup was empty, attempt primary .. we never know
+		  savedHNList = value;
+		}
 	  }
 	}
 	else { // No secondary
@@ -853,9 +1026,16 @@ delayLoad_option = false; // Disabled for now
 		// If primary was empty, attempt backup .. we never know
 		savedBNList = value;
 	  }
+	  if ((value = res.savedHNList) != undefined) {
+		savedHNList = value;
+	  }
+	  else if ((value = res.savedHNListBak) != undefined) {
+		// If primary was empty, attempt backup .. we never know
+		savedHNList = value;
+	  }
 	}
 //console.log("res.savedBkmkUriList2: "+res.savedBkmkUriList2);
-	if ((value = res.savedBkmkUriList) != undefined) {
+	if ((value = res.savedBkmkUriList) != undefined) { // Old format ... we will need to migrate
 //	  if ((value = res.savedBkmkUriList2) != undefined) {
 //	  if ((value = res.savedBkmkUriList3) != undefined) {
 	  if (disableFavicons_option) {

@@ -41,9 +41,12 @@
     <label for="simple">Simple click = always "Show bookmark"</label>
     <br/>
     <input type="radio" name="clickoption" id="advanced">
-    <label for="advanced">Advanced click = <img src="/icons/clickshow.png"> "Show bookmark", or <img src="/icons/clickopen.png"> "Show bookmark" and "Open" bookmark in active tab</label>
+    <label for="advanced">Advanced click = <img src="/icons/clickshow.png"> "Show bookmark", or <img src="/icons/clickopen.png"> "Open" bookmark in active tab</label>
   </div>
   <p>
+    <input type="checkbox" id="showpath">
+    <label for="showpath">On mouse hover above search result, show path to bookmark item instead of title + url</label>
+    <br/>
     <input type="checkbox" id="closesearch">
     <label for="closesearch">After "Show bookmark", close search pane. <i>Implies leave bookmark tree open</i></label>
     <br/>
@@ -66,20 +69,38 @@
     <b>User Interface:</b><br/>
     <input type="checkbox" id="reversepath">
     <label for="reversepath">Reverse folder hierarchy in paths</label>
-    <br/>
+  </p>
+  <div class="group">
+	<span>Alternate folder icon: <img src="" height="16" width="16" alt="No image" id="altfldrimg"> </span><label for="altfldrfile"> -> Load a new one: </label><input type="file" accept="image/*" id="altfldrfile">
+	<br/>
+	<input type="checkbox" id="usealtfldr" disabled>
+	<label for="usealtfldr">Use alternate folder icon</label>
+	<br/>
+	<span><i>Note: you can use <a href="https://github.com/aaFn/Bookmark-search-plus-2/tree/master/altFldrIcons">github repo</a> to find other icons or for your contributions</i></span>
+  </div>
+  <p>
     <input type="checkbox" id="remembersizes">
     <label for="remembersizes">Remember size of resizeable objects - search pane, edit bookmark property, ..</label>
     <button type="button" id="resetsizes" disabled>Reset defaults</button>
     <br/>
     <input type="checkbox" id="setfontsize">
-    <label for="setfontsize">Override default font size to </label>
+    <label for="setfontsize">Override font size to </label>
     <input type="number" id="fontsize" step="1" min="10" max="16" required disabled>
     <span> px</span>
     <br/>
     <input type="checkbox" id="setspacesize">
-    <label for="setspacesize">Override default bookmark item spacing to </label>
+    <label for="setspacesize">Override bookmark item spacing to </label>
     <input type="number" id="spacesize" step="2" min="0" max="10" required disabled>
     <span> px</span>
+    <br/>
+    <input type="checkbox" id="matchtheme">
+    <label for="matchtheme">Match active FF theme colors (FF >= 57). <i>Disables colors override option</i></label>
+    <br/>
+    <input type="checkbox" id="setcolors">
+    <label for="setcolors">Override text color to</label>
+    <input type="color" id="textcolor"><span id="tcstring"> (#222426)</span>
+    <span> and background color to </span>
+    <input type="color" id="bckgndcolor"><span id="bcstring"> (#FFFFFF)</span>
     <br/>
     <label for="command1">Sidebar shortcut (FF >= 60):</label>
 	<select id="command1">
@@ -151,6 +172,7 @@
     <button type="button" id="resetmigr16x16" disabled>Re-trigger 16x16 favicon migration</button>
   </p>
   <script src="libstore.js"></script>
+  <script src="libimage.js"></script>
   <script src="options.js"></script>
 </body>
 

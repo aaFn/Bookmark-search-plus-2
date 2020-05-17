@@ -5,7 +5,12 @@
 let p_platform = browser.runtime.getPlatformInfo();
 let p_background = browser.runtime.getBackgroundPage();
 let p_ffversion = browser.runtime.getBrowserInfo();
+let p_getWindowId = browser.windows.getCurrent(
+//  {populate: true	
+//  }
+);
 let p_commands = browser.commands.getAll();
+
 
 /*
  * Constants
@@ -20,6 +25,7 @@ const EnableFlipFlop = document.querySelector("#enableflipflop");
 const SimpleClickInput = document.querySelector("#simple");
 const AdvancedClickInput = document.querySelector("#advanced");
 const OpenTreeInput = document.querySelector("#opentree");
+const ShowPathInput = document.querySelector("#showpath");
 const CloseSearchInput = document.querySelector("#closesearch");
 const ImmediateFavDisplayInput = document.querySelector("#immediatefavdisplay");
 const LoadFFAPIInput = document.querySelector("#loadffapi");
@@ -32,6 +38,15 @@ const SetFontSizeInput = document.querySelector("#setfontsize");
 const FontSizeInput = document.querySelector("#fontsize");
 const SetSpaceSizeInput = document.querySelector("#setspacesize");
 const SpaceSizeInput = document.querySelector("#spacesize");
+const MatchThemeInput = document.querySelector("#matchtheme");
+const SetColorsInput = document.querySelector("#setcolors");
+const TextColorInput = document.querySelector("#textcolor");
+const TextColorSpan = document.querySelector("#tcstring");
+const BckgndColorInput = document.querySelector("#bckgndcolor");
+const BckgndColorSpan = document.querySelector("#bcstring");
+const AltFldrFileInput = document.querySelector("#altfldrfile");
+const AltFldrImg = document.querySelector("#altfldrimg");
+const UseAltFldrInput = document.querySelector("#usealtfldr");
 const Command1Select = document.querySelector("#command1");
 const Command2Select = document.querySelector("#command2");
 const Opt2 = document.createElement("option");
@@ -48,6 +63,8 @@ const ResetMigr16x16Button = document.querySelector("#resetmigr16x16");
 //const VersionImg16 = "-img16"; // Signal that all favicons are in 16x16 format
 //const DfltFontSize = 12; // 12px default
 //const DfltSpaceSize = 0; // 0px default
+//const DfltTextColor = "#222426"; // Default text color
+//const DfltBckgndColor = "white"; // Default background color
 
 
 /*
@@ -55,9 +72,11 @@ const ResetMigr16x16Button = document.querySelector("#resetmigr16x16");
  */
 let backgroundPage;
 let platformOs;
+let beforeFF57;
 let beforeFF60;
 let beforeFF63;
 let ffversion;
+let myWindowId;
 let sidebarCommand;
 let command1;
 let command2;
@@ -185,6 +204,29 @@ function saveOptions (e) {
   else {
 	SpaceSizeInput.value = DfltSpaceSize;
   }
+  let matchtheme = MatchThemeInput.checked;
+  let setcolors = SetColorsInput.checked;
+  SetColorsInput.disabled = matchtheme;
+  let textColor = DfltTextColor;
+  let bckgndColor = DfltBckgndColor;
+  if (matchtheme || setcolors) {
+	textColor = TextColorInput.value;
+	bckgndColor = BckgndColorInput.value;
+  }
+  else {
+	TextColorInput.value = textColor;
+	BckgndColorInput.value = bckgndColor;
+  }
+  TextColorInput.title = textColor;
+  TextColorSpan.textContent = colorLabel(textColor);
+  BckgndColorInput.title = bckgndColor;
+  BckgndColorSpan.textContent = colorLabel(bckgndColor);
+  BckgndColorInput.disabled = TextColorInput.disabled = !setcolors || matchtheme;
+  let altFldrImg = AltFldrImg.src;
+  if (altFldrImg == "") {
+	altFldrImg = undefined;
+  }
+  let useAltFldr = (!UseAltFldrInput.disabled) && UseAltFldrInput.checked;
 
   // Save options
   browser.storage.local.set({
@@ -193,6 +235,7 @@ function saveOptions (e) {
 	,enablecookies_option: EnableCookiesInput.checked
 	,enableflipflop_option: EnableFlipFlop.checked
 	,advanced_option: AdvancedClickInput.checked
+	,showpath_option: ShowPathInput.checked
 	,closesearch_option: CloseSearchInput.checked
 	,opentree_option: OpenTreeInput.checked
 	,immediatefavdisplay_option: ImmediateFavDisplayInput.checked
@@ -204,6 +247,12 @@ function saveOptions (e) {
 	,fontsize_option: fontSize
 	,setspacesize_option: setspacesize
 	,spacesize_option: spaceSize
+	,matchtheme_option: matchtheme
+	,setcolors_option: setcolors
+	,textcolor_option: textColor
+	,bckgndcolor_option: bckgndColor
+	,altfldrimg_option: altFldrImg
+	,usealtfldr_option: useAltFldr
 	,sidebarcommand_option: sidebarCommand
 	,traceEnabled_option: TraceEnabledInput.checked
   })
@@ -213,6 +262,239 @@ function saveOptions (e) {
 	  sendAddonMessage("savedOptions");
 	}
   );
+}
+
+/* 
+ * Convert a #RRGGBB value to 3 decimal blank separated String
+ * 
+ * c is a String
+ * Returns a String
+ */
+function cHex2Dec (c) {
+  let r = "0x" + c[1] + c[2];
+  let g = "0x" + c[3] + c[4];
+  let b = "0x" + c[5] + c[6];
+  let d = (+r).toString(10) + " " + (+g).toString(10) + " " + (+b).toString(10);
+  return(d);
+}
+
+/*
+ * Generate color span text from hex string
+ */
+function colorLabel (c) {
+  return(" (" + cHex2Dec(c) + ")");
+}
+
+/* 
+ * Convert a decimal color to a 2 digit hexadecimal value. Support % values
+ * 
+ * c is a String
+ * Returns a String
+ */
+function cDec2Hex (c) {
+  if (c.indexOf("%") > -1) {
+	c = Math.round(c.substr(0, c.length - 1) / 100 * 255);
+	/* Example: 75% -> 191, because 75/100 = 0.75, * 255 = 191.25 -> 191 */
+  }
+  let h = (+c).toString(16);
+  if (h.length == 1) {
+    h = "0" + h;
+  }
+  return(h);
+}
+
+/*
+ * Normalize color value to a 7 characters #RRGGBB value
+ * Cf. https://css-tricks.com/converting-color-spaces-in-javascript/
+ *     https://developer.mozilla.org/en-US/docs/Web/CSS/color_value
+ * 
+ * color is a String
+ * Returns a #RRGGBB String
+ */
+function normalizeColors (color) {
+  let normColor;
+  if (color.charAt(0) == '#') {
+	if (color.length < 7) { // #RGB form
+	  let r = color.charAt(1);
+	  let g = color.charAt(2);
+	  let b = color.charAt(3);
+	  normColor = "#" + r + r + g + g + b + b;
+	}
+	else { // #RRGGBB form
+	  normColor = color;
+	}
+  }
+  else if (color.startsWith("rgb(")) {
+	// Choose correct separator
+	let sep = (color.indexOf(",") > -1) ? ',' : ' ';
+	// Turn "rgb(r,g,b)" into [r,g,b]
+	let rgb = color.substr(4).split(")")[0].split(sep);
+	normColor = "#" + cDec2Hex(rgb[0]) + cDec2Hex(rgb[1]) + cDec2Hex(rgb[2]);
+  }
+  else if (color.startsWith("hsl(")) {
+	// Choose correct separator
+	let sep = (color.indexOf(",") > -1) ? ',' : ' ';
+	// Turn "hsl(h,s,l)" into [h,s,l]
+	let hsl = color.substr(4).split(")")[0].split(sep);
+	let h = hsl[0];
+	let s = hsl[1].substr(0, hsl[1].length - 1) / 100;
+	let l = hsl[2].substr(0, hsl[2].length - 1) / 100;
+	// Strip label in h and convert to degrees (if necessary)
+	if (h.indexOf("deg") > -1) {
+	  h = h.substr(0,h.length - 3);
+	}
+	else if (h.indexOf("rad") > -1) {
+	  h = Math.round(h.substr(0,h.length - 3) * (180 / Math.PI));
+	}
+	else if (h.indexOf("turn") > -1) {
+	  h = Math.round(h.substr(0,h.length - 4) * 360);
+	}
+	// Keep hue fraction of 360 if ending up over
+	if (h >= 360) {
+	  h %= 360;
+	}
+
+	// Conversion to RGB begins
+	let c = (1 - Math.abs(2 * l - 1)) * s;
+    let x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    let m = l - c/2;
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    if ((0 <= h) && (h < 60)) {
+      r = c;
+      g = x;
+      b = 0;
+    }
+    else if ((60 <= h) && (h < 120)) {
+      r = x;
+      g = c;
+      b = 0;
+    }
+    else if ((120 <= h) && (h < 180)) {
+      r = 0;
+      g = c;
+      b = x;
+    }
+    else if ((180 <= h) && (h < 240)) {
+      r = 0;
+      g = x;
+      b = c;
+    }
+    else if ((240 <= h) && (h < 300)) {
+      r = x;
+      g = 0;
+      b = c;
+    }
+    else if ((300 <= h) && (h < 360)) {
+      r = c;
+      g = 0;
+      b = x;
+    }
+
+    // Having obtained RGB, convert channels to hex
+    r = Math.round((r + m) * 255).toString(16);
+    g = Math.round((g + m) * 255).toString(16);
+    b = Math.round((b + m) * 255).toString(16);
+
+    // Prepend 0s, if necessary
+    if (r.length == 1) {
+      r = "0" + r;
+    }
+    if (g.length == 1) {
+      g = "0" + g;
+    }
+    if (b.length == 1) {
+      b = "0" + b;
+    }
+
+    normColor = "#" + r + g + b;
+  }
+  else { // Assume this is a textual name of color, or hope it will handle other cases ...
+	// Create fake div
+	let fakeDiv = document.createElement("div");
+	fakeDiv.style.color = color;
+	document.body.appendChild(fakeDiv);
+
+	// Get color of div
+	let cs = window.getComputedStyle(fakeDiv);
+	normColor = cs.getPropertyValue("color");
+
+	// Remove div after obtaining desired color value
+	document.body.removeChild(fakeDiv);
+  }
+
+  return(normColor);
+}
+
+/*
+ * Get colors from current windows theme, and register changes to it
+ * 
+ * wTheme is a theme.Theme object
+ */
+function getPanelColors (wTheme) {
+  let textColor;
+  let bckgndColor;
+  let propColors = wTheme.colors;
+  if ((propColors == undefined) || (propColors == null)) { // No colors part => reset to default
+														   // (can also happen when active theme is default)
+	textColor = DfltTextColor;
+	bckgndColor = DfltBckgndColor;
+  }
+  else { // Retrieve the colors
+	textColor = propColors.sidebar_text;
+	bckgndColor = propColors.sidebar;
+
+	// Convert them to 7 characters #hex values if not in that format
+	if (textColor == null) {
+	  textColor = DfltTextColor;
+	}
+	else {
+	  textColor = normalizeColors(textColor)
+	}
+	if (bckgndColor == null) {
+	  bckgndColor = DfltBckgndColor;
+	}
+	else {
+	  bckgndColor = normalizeColors(bckgndColor)
+	}
+  }
+
+  // Register listener
+  browser.theme.onUpdated.addListener(themeRefreshedHandler);
+
+  // Set proper values in the corresponding Input objects, and then save 
+  TextColorInput.title = TextColorInput.value = textColor;
+  TextColorSpan.textContent = colorLabel(textColor);
+  BckgndColorInput.title = BckgndColorInput.value = bckgndColor;
+  BckgndColorSpan.textContent = colorLabel(bckgndColor);
+  saveOptions(undefined);
+}
+
+/*
+ * Fetch current FF window theme and get colors from it
+ */
+function fetchTheme () {
+  if (MatchThemeInput.checked) {
+	browser.theme.getCurrent(myWindowId)
+	.then(getPanelColors);
+  }
+  else {
+	// Remove listener
+	browser.theme.onUpdated.removeListener(themeRefreshedHandler);
+	saveOptions(undefined);
+  }
+}
+
+/*
+ * Handle changes to FF window theme
+ */
+function themeRefreshedHandler (updateInfo) {
+  let wId = updateInfo.windowId;
+  if ((wId == undefined) || (wId = myWindowId)) {
+	browser.theme.getCurrent(myWindowId)
+	.then(getPanelColors);
+  }
 }
 
 /*
@@ -241,6 +523,10 @@ function restoreOptions () {
 
   if (advancedClick_option_file) {
 	AdvancedClickInput.checked = true;
+  }
+
+  if (showPath_option_file) {
+	ShowPathInput.checked = true;
   }
 
   if (closeSearch_option_file) {
@@ -279,24 +565,74 @@ function restoreOptions () {
 	SetFontSizeInput.checked = true;
 	FontSizeInput.disabled = false;
   }
-
   if (fontSize_option_file != undefined) {
 	FontSizeInput.value = fontSize_option_file;
   }
   else {
 	FontSizeInput.value = DfltFontSize;
   }
+
   if (setSpaceSize_option_file) {
 	SetSpaceSizeInput.checked = true;
 	SpaceSizeInput.disabled = false;
   }
-
   if (spaceSize_option_file != undefined) {
 	SpaceSizeInput.value = spaceSize_option_file;
   }
   else {
 	SpaceSizeInput.value = DfltSpaceSize;
   }
+
+  let matchtheme = false;
+  if (matchTheme_option_file) {
+	if (beforeFF57) { // The API is not active before FF57
+	  MatchThemeInput.checked = false;
+	}
+	else {
+	  matchtheme = MatchThemeInput.checked = true;
+	  fetchTheme(); // Get current colors and set other fields appropriately
+	}
+  }
+  if (beforeFF57) {
+	MatchThemeInput.disabled = true;
+  }
+
+  let setcolors = false;
+  if (setColors_option_file) {
+	setcolors = SetColorsInput.checked = true;
+  }
+  SetColorsInput.disabled = matchtheme;
+
+  if (textColor_option_file != undefined) {
+	TextColorInput.title = TextColorInput.value = textColor_option_file;
+	TextColorSpan.textContent = colorLabel(textColor_option_file);
+  }
+  else {
+	TextColorInput.title = TextColorInput.value = DfltTextColor;
+	TextColorSpan.textContent = colorLabel(DfltTextColor);
+  }
+
+  if (bckgndColor_option_file != undefined) {
+	BckgndColorInput.title = BckgndColorInput.value = bckgndColor_option_file;
+	BckgndColorSpan.textContent = colorLabel(bckgndColor_option_file);
+  }
+  else {
+	BckgndColorInput.title = BckgndColorInput.value = DfltBckgndColor;
+	BckgndColorSpan.textContent = colorLabel(DfltBckgndColor);
+  }
+  BckgndColorInput.disabled = TextColorInput.disabled = !setcolors || matchtheme;
+
+  let useAltFldrDisabled = true;
+  if (altFldrImg_option_file != undefined) {
+	AltFldrImg.src = altFldrImg_option_file;
+	useAltFldrDisabled = UseAltFldrInput.disabled = false;
+  }
+  if (useAltFldr_option_file != undefined) {
+	if (!useAltFldrDisabled) {
+	  UseAltFldrInput.checked = useAltFldr_option_file;
+	}
+  }
+
   if (sidebarCommand_option_file != undefined) {
 	sidebarCommand = sidebarCommand_option_file;
 	if (!beforeFF60) {
@@ -326,8 +662,7 @@ function restoreOptions () {
 	Command2Select.disabled = true;
 	Command3Select.disabled = true;
 	ResetCommandButton.disabled = true;
-}
-
+  }
   
   if (traceEnabled_option_file) {
 	TraceEnabledInput.checked = true;
@@ -399,8 +734,8 @@ function changeFontSize () {
 function changeSpaceSize () {
 //  console.log("changeSpaceSize: value sent");
   if (SpaceSizeInput.validity.valid) {
-	let spaceSize = SpaceSizeInput.value;
-//	console.log("changeSpaceSize: value "+spaceSize);
+//let spaceSize = SpaceSizeInput.value;
+//console.log("changeSpaceSize: value "+spaceSize);
 
 	// Save new value
 	saveOptions(undefined);
@@ -428,6 +763,95 @@ function changeSidebarCommand () {
   );
 
   saveOptions();
+}
+
+/*
+ * Load image from specified alternative folder image file
+ */
+let cvtUri;
+const CvtImage = new Image(16, 16);
+CvtImage.onload = convertOnLoad;
+CvtImage.onerror = errorCvtOnLoad;
+function altFldrImgLoad () {
+  let file = AltFldrFileInput.files[0];
+  let reader = new FileReader();
+
+  reader.addEventListener("load", function () {
+	// convert image file to data: base64 URI
+	CvtImage.src = cvtUri = reader.result;
+  }, false);
+
+  if (file) {
+	reader.readAsDataURL(file);
+  }  
+}
+
+/*
+ * Convert and store image in 16x16, triggered by end of CvtImage.src load
+ * 
+ * Uses global variable cvtUri
+ */
+const CvtCanvas = document.createElement('canvas'); // For image conversion to 16 x 16
+CvtCanvas.height = 16;
+CvtCanvas.width = 16;
+const CvtCtx = CvtCanvas.getContext("2d");
+CvtCtx.imageSmoothingEnabled = false;
+CvtCtx.imageSmoothingQuality = "high";
+const CvtImageData = CvtCtx.createImageData(16, 16);
+const CvtIDData = CvtImageData.data;
+const CvtCanvas2 = document.createElement('canvas'); // For loading a favicon to downscale
+const CvtCtx2 = CvtCanvas2.getContext("2d");
+function convertOnLoad () {
+  let nh = CvtImage.naturalHeight;
+  let nw = CvtImage.naturalWidth;
+  let convertedUri;
+  if ((nh > 0) && (nw > 0) && ((nh != 16) || (nw != 16))) {
+	try {
+	  if ((nh > 16) && (nw > 16)) { // Only downscaling .. avoid FF canvas native algo, not really good
+		// Get ImageData.data of the image
+		let srcIDData;
+		CvtCanvas2.height = nh;
+		CvtCanvas2.width = nw;
+		CvtCtx2.drawImage(CvtImage, 0, 0);
+		srcIDData = CvtCtx2.getImageData(0, 0, nw, nh).data;
+
+		// Downscale into CvtImageData
+		downscaleImg(srcIDData, CvtIDData, nh, nw);
+
+		// Put CvtImage into CvtCtx and get base64 uri
+		CvtCtx.putImageData(CvtImageData, 0, 0);
+	  }
+	  else {
+		CvtCtx.clearRect(0, 0, 16, 16);
+		CvtCtx.drawImage(CvtImage, 0, 0, 16, 16);
+	  }
+	  convertedUri = CvtCanvas.toDataURL();
+	  AltFldrImg.src = convertedUri;
+	  UseAltFldrInput.disabled = false;
+	}
+	catch (error) { // Error on rescale, keep original
+	  AltFldrImg.src = "";
+	  AltFldrImg.alt = "Scaling error";
+	  UseAltFldrInput.disabled = true;
+	  UseAltFldrInput.checked = false;
+	}
+  }
+  else { // Cannot rescale or no need to, keep original
+	AltFldrImg.src = cvtUri;
+	UseAltFldrInput.disabled = false;
+  }
+  saveOptions(undefined);
+}
+
+/*
+ * Error on loading the image to convert, triggered by error when loading CvtImage.src
+ */
+function errorCvtOnLoad (error) {
+  AltFldrImg.src = "";
+  AltFldrImg.alt = "Error on load";
+  UseAltFldrInput.disabled = true;
+  UseAltFldrInput.checked = false;
+  saveOptions(undefined);
 }
 
 /*
@@ -582,10 +1006,10 @@ function initialize2 () {
 	Body.classList.replace("fontdflt", "fontwin");
   }
   else if (platformOs == "linux") {
-    Body.style.fontSize = "12px";
+	Body.style.fontSize = "12px";
   }
   else if (platformOs == "mac") {
-    Body.style.fontSize = "12px";
+	Body.style.fontSize = "12px";
   }
 
   // Get options and populate Options page Input elements
@@ -614,6 +1038,7 @@ function initialize2 () {
   SimpleClickInput.addEventListener("click", saveOptions);
   AdvancedClickInput.addEventListener("click", saveOptions);
   OpenTreeInput.addEventListener("click", saveOptions);
+  ShowPathInput.addEventListener("click", saveOptions);
   CloseSearchInput.addEventListener("click", saveOptions);
   ImmediateFavDisplayInput.addEventListener("click", saveOptions);
   LoadFFAPIInput.addEventListener("click", saveOptions);
@@ -626,6 +1051,12 @@ function initialize2 () {
   FontSizeInput.addEventListener("change", changeFontSize);
   SetSpaceSizeInput.addEventListener("click", saveOptions);
   SpaceSizeInput.addEventListener("change", changeSpaceSize);
+  MatchThemeInput.addEventListener("click", fetchTheme);
+  SetColorsInput.addEventListener("click", saveOptions);
+  TextColorInput.addEventListener("change", saveOptions);
+  BckgndColorInput.addEventListener("change", saveOptions);
+  AltFldrFileInput.addEventListener("change", altFldrImgLoad);
+  UseAltFldrInput.addEventListener("change", saveOptions);
   Command1Select.addEventListener("change", changeSidebarCommand1);
   Command2Select.addEventListener("change", changeSidebarCommand);
   Command3Select.addEventListener("change", changeSidebarCommand);
@@ -639,10 +1070,10 @@ function initialize2 () {
  */
 function initialize () {
   // Start when we have the platform and the background page
-  Promise.all([p_platform, p_background, p_ffversion, p_commands])
+  Promise.all([p_platform, p_background, p_ffversion, p_getWindowId, p_commands])
   .then(
 	function (a_values) { // An array of one value per Promise is returned
-	  p_platform = p_background = p_commands = undefined;
+	  p_platform = p_background = p_ffversion = p_getWindowId = p_commands = undefined;
 
 	  // Retrieve values in the same order
 	  platformOs = a_values[0].os; // info object
@@ -656,11 +1087,16 @@ function initialize () {
 	  // Check FF version
 	  let info = a_values[2];
 	  ffversion = info.version;
+	  beforeFF57 = (ffversion < "57.0");
 	  beforeFF60 = (ffversion < "60.0");
 	  beforeFF63 = (ffversion < "63.0");
 
+	  // Handle myWindowId
+	  let windowInfo = a_values[3];
+	  myWindowId = windowInfo.id;
+
 	  // Look at current set command
-	  let logCommands = a_values[3];
+	  let logCommands = a_values[4];
 	  let len = logCommands.length;
 	  let cmd;
 	  for (let i=0 ; i<len ; i++) {
