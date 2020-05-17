@@ -1,12 +1,188 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.77 Improvements
+    - Added support for right-click on the search button (= magnifying glass at left of the search box), in
+      addition to left click, to show the search configuration menu. This should to make it more accessible,
+      depending on user habits.
+    - Made the blue contour a bit thicker on the BSP2 star icon in the toolbar, to better see when the current
+      tab is on a bookmarked URL.
+    - Corrected a bug where tabs without a favicon, when "pause favicon" or "no favicon" fetching option was set,
+      were prevented to activate properly the blue contour on the BSP2 icon in the toolabr.
+    - Slight extra perf optimization as I discovered that for..of and for..in loops have a very costly impact
+      on perfs (up to a factor of 8 per my own measurements on arrays of 10 items average size, but by a factor
+      of 80 for an array of 1000000 items). From now, I will stop using that on arrays, and I converted existing
+      ones into classical loops, only keeping for..in on objects.
+      Cf. also https://www.incredible-web.com/blog/performance-of-for-loops-with-javascript/ as an illustration.
+    - Corrected a bug on monitoring BSP2 sidebar open/close state in private windows. No visible effect, but
+      cleaner code.
+- 2.0.76 Bugs & Improvements
+    - Added a Bookmark history window to examine the history of all recorded bookmark actions, as well as
+      some meta actions (like BSP2 start, or reload). The window is refreshed real time when there are updates
+      and it is open. It also shows the undo/redo cursor position in the history stack, as well as undo/redo
+      operations triggered by BSP2 (undo/redo in the native bookmark sidebar cannot be identified as such by
+      BSP2, which only sees them as normal operations).
+      The window also shows details for each history record, and has a bunch of action buttons, not yet active,
+      so it is only for browsing then. No undo/redo operation available either for now.
+      The window can be open from the context menu on the BSP2 icon in the toolbar, or from the magnifying glass
+      search button menu in the sidebar.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/75
+    - Added Favicon in hstory of bookmark actions, for being able to show them in history window.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/75
+    - Improved a bit robustness on de-synchronization detection.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/135
+    - Corrected a bug where a search would list the Mobile special folder and trigger a spurious reload when
+      it is empty. Probably due to a recent undocumented change in the Bookmark search API response.
+    - Corrected a bug where a search would list the Tags special folder, triggering a spurious reload. Probably
+      due to a recent undocumented change in the Bookmark search API response.
+    - Corrected a bug where right clicking on the History, Downloads, Tags or All bookmarks special folders in
+      the Bookmarks library was triggering a spurious reload.
+    - Added indication on BSP2 icon in toolbar that a tab is recognized to be on a bookmarked URL, by a
+      blue contour of the yellow star.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/137
+    - Added contextual submenu on BSP2 icon in toolbar, active only on a tab with a bookmarked URL, to
+      show in the sidebar the corresponding bookmark (opening BSP2 if it was closed).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/137
+    - Reverted the show bookmark to non "smooth" move, as "smooth" appears to confuse the position to scroll
+      to, and sometimes then does not show the real position of the row, but shifts by what seems to be a delta
+      to old position. Less nice, but at least, it works all the time !
+        https://bugzilla.mozilla.org/show_bug.cgi?id=1139745
+    - Added function to auto open the Properties window when Alt key is pressed on dropping a drag for creating
+      a new bookmark, as accelerator. Note that as consequence, if "Cancel" is pressed on the Property window,
+      the bookmark creation is cancelled => "Ok" must be pressed to keep the bookmark, even if editing nothing.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/136
+    - Added a link to the alternate folder icons repo in GitHub in the options page.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/138
+    - Removed trace of the zoom value (devicePixelRatio) in the Browser console in Property window.
+    - Removed protection from "about:" bookmarks which was set at very early versions of BSP2, this is of
+      no use now, and was annoying because cannot mdrag & drop / move such bookmarks.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/140
+- 2.0.75 Bugs & Improvements
+    - Complemented drag & drop operations with full plain text (with indentation) and HTML representations,
+      including folder title and recursive content, and separators.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/131
+    - Corrected a bug where dragging a result to an external window could leave the non droppable zone
+      active on the object being dragged (or on the zone covered by it when a folder), preventing to drop
+      something on it later, until another drag & drop operation from the result or bookmark pane is started.
+- 2.0.74 Improvements
+    - Added extension short_name = "BSP2" in manifest file, to appear in FF places where normal name is too
+      long and would be truncated.
+    - Changed the hover on search result bookmark items and folders, so that it always shows the default cursor
+      in Simple click mode, and that is shows a pointer cursor in Advanced click mode for bookmark items on the
+      active part (= favicon and text), for better differenciation of when things are active and when not.
+        https://addons.mozilla.org/en-US/firefox/addon/bookmark-search-plus-2/reviews/1503177/
+    - Added context menu item on BSP2 Browser Action button in the toolbar, to open BSP2 options as asked by
+      they86
+        https://addons.mozilla.org/en-US/firefox/addon/bookmark-search-plus-2/reviews/1503177/
+    - Refresh search results when the "Reverse folder hierarchy in paths" option is changing, and the
+      ".. show path to bookmark item .." option is set, for real time rendering of the option change.
+    - Added capability to change the normal folder icon in the option page, dynamically, by picking and loading
+      an image from user local directory.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/112
+      A library of alternate icons is here https://github.com/aaFn/Bookmark-search-plus-2/tree/master/altFldrIcons
+      (use a Pull request to add more to it)
+- 2.0.73 Bugs & Improvements
+    - Added option to show path instead of (title + url) in the tooltip bubble which appears when hovering above
+      a search result. When the option changes while a search result is active, the search result will be
+      refreshed accordingly. Same when a bookmark is moved while a search result is open and the option is set.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/129
+    - Corrected a regression on non native FF menus introduced with 2.0.69 where clicking outside the menu was
+      not sometimes closing it. Also improved the behavior so that now the menu is closing earlier, on mousedown
+      rather than after the click, for more reactiveness.
+    - Changed behavior in advanced mode when clicking on the active part of a bookmark result (favison or text),
+      to only do the action of opening in tab, and not anymore also showing the bookmark. Now, only show when
+      clicking the non active part (left and right of the bookmark item) of the result.
+      Things unchanged for folder results, clicking anywhere on them shows them in the bookmark pane.
+        https://github.com/aaFn/Bookmark-search-plus-2/wiki/Mouse-clicks-and-modifiers-summary-table-(as-of-2.0.73)
+    - Added context menu item on BSP2 Browser Action button in the toolbar, to open BSP2 in a tab besides the
+      current active one, as demanded by blankon
+        https://addons.mozilla.org/en-US/firefox/addon/bookmark-search-plus-2/reviews/1491980/
+- 2.0.72 Improvements
+    - Now handle multiple favicon links in HTML pages for more robustness, picking the closest to 16x16, and
+      then increasingly trying the other bigger ones if fetch error, until getting a good one.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/124
+    - Fall back on the default <root>/favicon.ico method when all other links fetching fail, again for
+      more robustness in fetching favicons.
+    - Detect HTML responses on favicon fetching which answer a 200 return code with HTML to say no object
+      or page at this URL, to then try the next favicon link in the candidate list.
+    - Also catch rel=icon links, without " or '.
+- 2.0.71 Improvements
+    - Detect a number cases of de-synchronization between BSP2 and FF (by receiving a notification from FF,
+      or by getting a search result, on a bookmark which cannot be retrieved in BSP2 cache), and if so provoke
+      an automatic reload of bookmarks through FF API to re-synchronize.
+      When this happens, a message will be displayed in all active BSP2 sidebars to ask for waiting end of reload,
+      and then they are all refreshed.
+      Note that not all cases can be detected through this (e.g. cases where FF does not save BSP2 changes cannot be
+      detected through that mechanism), but there is so far no mean to detect all cases anyway.
+    - Added recording an history of bookmark actions, received from FF or made by BSP2, plus a few other actions (BSP2
+      start and Reload from FF API), to introduce support for undo and redo (Ctrl-Z and Ctrl-Y) later on with a non
+      empty history.
+      The history is trimmed to a 30 days length in past, at FF restart or at BSP2 restart (i.e. actions older than
+      30 days are forgotten).
+      This will also serve later for a more elaborated history panel to be able to restore the bookmark state at any
+      point in past time, or to replay past sequences in case they were missed by FF.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/75
+    - Avoid recreating FF context menu entries on a reload, to avoid "already existing" error messages on browser
+      console.
+    - Added a bit more robustness on corrupted saves.
+    - Added an Advanced submenu in the context menu, for FF versions >= 64 only.
+    - Moved "Refresh favicon" action for Bookmarks into the Advanced submenu
+    - Added "Collapse all in branch" and "Expand all in branch" actions for Folders into the Advanced submenu, also
+      activable by shift-left and shift-right shortcuts on keyboard, for FF64 and higher.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/31
+- 2.0.70 Improvements
+    - Added key shortcuts in integrated context menus (FF >= 64), mimicking as much as possible native
+      FF bookmark sidebar context menus key shortcuts, but resolving an ambiguity error on P which means both
+      "Paste" and "Open in a new private window" actions in the native context menu.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/46
+    - Better handle zooming in Bookmark property window to edit Title & URL. When zoom was different from
+      the normal 100% (for example modified by Ctrl + mouse wheel), the property window was shifting in position
+      across its open / close cycles, and if remember sizes option was set, its size was also changing.
+      This because coordinates for save were obtained in CSS pixels, while they are used as physical pixels
+      when updating window position and size, and when zoom is not 1.0, there is a difference between the two.
+      Note: there is no way to reset the browser zoom value in FF by Javascript or CSS, so I will leave a trace
+      of the zoom value in the browser console (Ctrl+Shit+J and check "Show Content Messages" option) so that
+      users can adjust manually if they want.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/123
+    - Disable Ctrl+mouse wheel zooming out and in in the sidebar and in the properties window, to avoid any
+      accident. Now, only browser global settings or external wanted means (e.g. another add-on for that purpose)
+      can act on the property window aspect.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/123
+- 2.0.69 Bugs & Improvements
+    - Improved compability with browsers before FF62.
+    - Cleaner event handling on mouse button actions.
+    - Aligned order of possible actions in context menus between different objects, to follow a consitent
+      order (keeping default action first though, when there is one).
+    - Added "Properties.." context menu action to items in search result pane.
+    - Now using FF integrated context menus when in FF version 64 or upper, instead of BSP2 built-in
+      emulated menus. This also allows integration / collaboration with other add-ons as described in
+      https://piro.sakura.ne.jp/latest/blosxom/mozilla/xul/2018-10-14_override-context-on-fx64.htm
+      Limitation: it is not possible for now to highlight default actions in bold in such a mode, so they
+      are shown between "<" and ">".
+    - Added a new context menu action "Open all in tabs", which is opening all direct children in new tabs
+      as per native FF bookmark sidebar.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/70
+    - Corrected a regression where BSP2 version bubble was not showing while hovering mouse over the magnifying
+      glass button, when running on FF version 66 and below.
+- 2.0.68 Improvements
+    - Added suppport for FF themes on text and background colors of BSP2. Activate by a special option
+      to read and follow current FF theme.
+    - Added option to override text and background colors in the BSP2 sidebar (disabled by the match
+      FF theme option).
+      To get colors of a theme and edit them later, first set the "Override" option but without touching
+      any value, then set the "Match active theme" option, and unset it .. the text and background input
+      color pickers will contain the theme values and keep them for modification.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/100
+- 2.0.67 Bugs
+    - Corrected a bug where folder state was not saved immediately after a result search, when the option
+      `After "Show Bookmark", leave bookmark tree open by default when closing search pane` is set.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/82 
 - 2.0.66 Improvements
-    - Remember last highlighted bookmark across sidebar sessions, and across FF sessions, if it still exists,
-      else go at top of the tree.
+    - Remember last highlighted bookmark across sidebar sessions, and across FF sessions, if it still exists.
+      Else go at top of the tree.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/82
 - 2.0.65 Improvements
-    - Removed the version number form the Sidebar title, this is superfluous now, as it is shown by hovering
+    - Removed the version number from the Sidebar title, this is superfluous now, as it is shown by hovering
       on the magnifying glass, and on the Star icon in the toolbar, and anyway not really the place for it.
     - Added new option "Reverse folder hierarchy in paths", effective in BSP2 Property popups, and in the
       native Bookmark sidebar, Bookmark Library and Toolbar bookmark context submenus.
@@ -861,33 +1037,29 @@ LIMitations / TODO's:
   BSD UNIX, this is similar or not far from Linux. Have to rely solely on user feedback
   for that piece.
 
-- TODO: Android (and Chrome OS also?) Are mobile users going to have that many bookmarks and
-  install + make use of that extension? Again, will wait for user feedback.
+- TODO: Android (and Chrome OS also ?). Are mobile users going to have that many bookmarks and
+  install + make use of that extension ? Again, will wait for user feedback.
 
 - TODO: Ignore favicon links when they are in comments when retrieving favicons from a page
   (since I am using a quick parser of my own, it is not semantical, and therefore it is misled
    when there are such rel= links inside comments <!-- -->, as it takes them for real).
    This is a rare case, but it happens.
    For example: https://sol-resine.ooreka.fr/comprendre/resine-sol-garage
+   or https://www.netgear.com/support/product/dg834gv3.aspx
  
-- TODO: Add section to show the current tab as a "simili bookmark", allowing:
-    - local (inside sidebar, more practical) drag & drop for bookmark creation,
-    - on double click or right click menu, expands as a tabs panel for switching very quickly when we
-      have large number of open tabs (similar to "Tab Sidebar" and "Vertical Tabs Reloaded" add-ons),
-    - double click back or right click menu on it to restore the Bookmarks view,
-    - and most of all to search on them (not available in the two mentioned add-ons).
-
 - TODO: Be able to select and manipulate multiple bookmark items with Shift+arrow-up/down,
   Shift-hold+click and Ctrl-hold+click.
+
+
 
 - LIM: When retrieving favicons, it seems that following redirects in fetch() is not perfect,
   and so we end up with network errors where the normal browser on such a page gets to some
   other page and finds a favicon.
-  Tried {redirect: "follow"} without success. :-(
+  Tried {redirect: "follow"} without success :-(
 
 - LIM: Did not find a way in Web Extension API's to open modal dialogs for "New bookmark.." and
   "New folder.." actions on context menus.
-  So these are normal popups; hope this won't be too much trouble. 
+  So these are normal popups. Hope this won't be too much trouble. 
 
 - LIM: No access to the sqlite db of favicons. So I had to code myself the fetch of favicons
   from pages, and then save them into local storage for next time the sidebar is loaded.
@@ -906,6 +1078,10 @@ LIMitations / TODO's:
 - LIM: No way to synchronize the folders open state with the native FF bookmarks sidebar,
   or with the "All bookmarks" window, as this is not exposed by the Web Extension API's.
 
+- LIM: In FF integrated contect menu mode (FF >= 64), it is not possible for now to highlight
+  default actions in bold. In such a mode, so they are chown betwen "<" and ">".
+  Note that the native FF bookmark sidebar does not highlight default actions (anymore ?).
+
 - LIM: The add-on works with FF56, however:
     - Separators are not perfectly managed with the add-on because of FF56 limitations.
     - It is not possible to create separators with the add-on, the function was made available
@@ -916,4 +1092,5 @@ LIMitations / TODO's:
       is only available with FF57 and higher.
       So I am disabling it under FF56. Please remove it from the toolbar manually when using FF56,
       it is useless in that version (but there is no way in code to make it appear conditionally
-      to the FF version. It is there for all or not there for all. :-( ).
+      to the FF version. It is there for all or not there for all :-( ).
+    - There is no support for adapting to active theme colors in FF56, so the option is disabled.
