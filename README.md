@@ -3,3 +3,7 @@ Displays and filters bookmarks on search string, show parent folders.  This is a
 
 
 It can be found on https://addons.mozilla.org/firefox/addon/bookmark-search-plus-2/
+
+I upload the source code here from time to time, labelling it with its version, so it can often happen it is not at the latest.
+The latest code is always in the .xpi itself (javascript is an interpreted language,), which is nothing else than a zip file => rename .xpi to .zip if you are on Windows, and open it with your favorite unzip tool.
+The source code is fully documented.
