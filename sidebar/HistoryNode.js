@@ -404,7 +404,7 @@ function historyListTrim (hl, retention) {
 //console.log("Records to trim: "+count);
   if (count > 0) { // Remove all outdated records at start, and update activeIndex
 	hnList.splice(0, count);
-	let activeIndex = hnList.activeIndex - count;
+	let activeIndex = hl.activeIndex - count;
 	hl.activeIndex = (activeIndex >= 0 ? activeIndex : undefined);
   }
 }
