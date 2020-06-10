@@ -1,6 +1,9 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.78 Bugs
+    - Corrected a bug where all previous active records in bookmark history become inactive, on first bookmark
+      action appended after a trim in history where 1 or more past records were removed.
 - 2.0.77 Improvements
     - Added support for right-click on the search button (= magnifying glass at left of the search box), in
       addition to left click, to show the search configuration menu. This should to make it more accessible,
