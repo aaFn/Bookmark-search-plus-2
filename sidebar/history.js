@@ -630,7 +630,7 @@ function displayHN (hnId) {
 	NDToChildIds.textContent = NBSP;
   }
   else {
-	let bnid = NDBNId.textContent = HN.id;
+	NDBNId.textContent = HN.id;
 	type = NDType.textContent = HN.type;
 	displayPath(NDPath, HN.path);
 	NDParentId.textContent = HN.parentId;
@@ -970,7 +970,7 @@ function clickHandler (e) {
   if (mousedownTarget != target) { // Fight against Linux bug on click after contextmenu event with FF66 ..
 	target = mousedownTarget; // Restore the normal target it should have ...
   }
-  let classList = target.classList;
+//let classList = target.classList;
 //console.log("General click event: "+e.type+" button: "+e.button+" target: "+target+" target.nodeName: "+target.nodeName+" class: "+classList);
 
 }

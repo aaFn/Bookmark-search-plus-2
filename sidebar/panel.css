@@ -5,11 +5,11 @@ html, body {
   box-sizing: border-box;
   white-space: nowrap;
   overflow-x: hidden;
+  background-color: white;
+  color: #222426;
 }
 
 body {
-  background-color: white;
-  color: #222426;
   display: flex;
   flex-direction: column;
 }
@@ -32,6 +32,7 @@ p {
   flex-direction: row;
   border: 1px solid #7A7A7A;
   flex: none;
+  background-color: #A0A0A0;
 }
 
 #searchbox:hover {
@@ -40,6 +41,33 @@ p {
 
 #searchbox:focus-within {
   border: 1px solid #0078D7;	
+}
+
+#sresetflt {
+  box-shadow: inset 2px 2px 3px rgba(255, 255, 255, .6),
+              inset -2px -2px 3px rgba(0, 0, 0, .6);
+  border: 0;
+  line-height: 0;
+  padding: 0;
+}
+
+#sresetflt:enabled:active {
+  box-shadow: inset -2px -2px 3px rgba(255, 255, 255, .6),
+              inset 2px 2px 3px rgba(0, 0, 0, .6);
+}
+
+.sreset {
+  background-color: #E0E0E0;
+}
+
+.sreset:enabled:hover {
+  background-color: #FFFFFF;
+}
+
+#sfilters {
+  height: 20px;
+  width: 21px;
+  background-image: url("/icons/resetfiltersdis.png");
 }
 
 #sbutton {
@@ -53,6 +81,18 @@ p {
 #sbutton:active {
   box-shadow: inset -2px -2px 3px rgba(255, 255, 255, .6),
               inset 2px 2px 3px rgba(0, 0, 0, .6);
+}
+
+.sfilterall {
+  border-radius: 0% 0% 0% 0%;
+}
+
+.sfilterfldr {
+  border-radius: 0% 0% 100% 0%;
+}
+
+.sfilterbkmk {
+  border-radius: 100% 0% 0% 0%;
 }
 
 .swboth {

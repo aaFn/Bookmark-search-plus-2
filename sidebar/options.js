@@ -31,7 +31,9 @@ const ImmediateFavDisplayInput = document.querySelector("#immediatefavdisplay");
 const LoadFFAPIInput = document.querySelector("#loadffapi");
 const ReloadFFAPIButton = document.querySelector("#reloadffapi");
 const DelayLoadInput = document.querySelector("#delayLoad");
+const SearchOnEnterInput = document.querySelector("#searchonenter");
 const ReversePathInput = document.querySelector("#reversepath");
+const CloseSibblingFoldersInput = document.querySelector("#closesibblingfolders");
 const RememberSizesInput = document.querySelector("#remembersizes");
 const ResetSizesButton = document.querySelector("#resetsizes");
 const SetFontSizeInput = document.querySelector("#setfontsize");
@@ -241,7 +243,9 @@ function saveOptions (e) {
 	,immediatefavdisplay_option: ImmediateFavDisplayInput.checked
 	,loadffapi_option: LoadFFAPIInput.checked
 	,delayLoad_option: DelayLoadInput.checked
+	,searchonenter_option: SearchOnEnterInput.checked
 	,reversepath_option: ReversePathInput.checked
+	,closesibblingfolders_option: CloseSibblingFoldersInput.checked
 	,remembersizes_option: RememberSizesInput.checked
 	,setfontsize_option: setfontsize
 	,fontsize_option: fontSize
@@ -552,8 +556,16 @@ function restoreOptions () {
 	DelayLoadInput.checked = true;
   }
 
+  if (searchOnEnter_option_file) {
+	SearchOnEnterInput.checked = true;
+  }
+
   if (reversePath_option_file) {
 	ReversePathInput.checked = true;
+  }
+
+  if (closeSibblingFolders_option_file) {
+	CloseSibblingFoldersInput.checked = true;
   }
 
   if (rememberSizes_option_file) {
@@ -717,9 +729,6 @@ function resetSizes  () {
 function changeFontSize () {
 //  console.log("changeFontSize: value sent");
   if (FontSizeInput.validity.valid) {
-	let fontSize = FontSizeInput.value;
-//	console.log("changeFontSize: value "+fontSize);
-
 	// Save new value
 	saveOptions(undefined);
   }
@@ -1044,7 +1053,9 @@ function initialize2 () {
   LoadFFAPIInput.addEventListener("click", saveOptions);
   ReloadFFAPIButton.addEventListener("click", reloadFFAPI);
   DelayLoadInput.addEventListener("click", saveOptions);
+  SearchOnEnterInput.addEventListener("click", saveOptions);
   ReversePathInput.addEventListener("click", saveOptions);
+  CloseSibblingFoldersInput.addEventListener("click", saveOptions);
   RememberSizesInput.addEventListener("click", saveOptions);
   ResetSizesButton.addEventListener("click", resetSizes);
   SetFontSizeInput.addEventListener("click", saveOptions);

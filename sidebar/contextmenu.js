@@ -165,7 +165,7 @@ function createBSP2ContextMenu () {
 	id:					 undefined,
 	title:				 undefined,
 	type:				 undefined,
-	viewTypes:			 ["sidebar"],
+	viewTypes:			 ["sidebar", "tab"],
 	visible: false // hide all by default
   };
   let cPropSub = {
@@ -175,7 +175,7 @@ function createBSP2ContextMenu () {
 	parentId:			 undefined,
 	title:				 undefined,
 	type:				 undefined,
-	viewTypes:			 ["sidebar"],
+	viewTypes:			 ["sidebar", "tab"],
 	visible: false // hide all by default
   };
   let menuIds = Object.keys(ContextMenu);
@@ -241,7 +241,7 @@ function createFFContextMenu () {
   browser.menus.create({ // Main menu
 	contexts: ["bookmark"],
 	id: 	  MainMenuId,
-	title: 	  "BSP2 Path to &bookmark item"
+	title: 	  "&Bookmark path"
   });
   browser.menus.create({ // Sub menu 1
 	id:       SubMenuPathId,
@@ -309,16 +309,16 @@ function showFFContextMenu (bnId) {
  * Create additional context menu to be active on the browser action icon in the toolbar
  */
 function createBAContextMenu () {
-  browser.menus.create({ // Main menu, open BSP2 in a tab
-	contexts: ["browser_action"],
-	id: 	  BAOpenTabId,
-	title: 	  "Open BSP2 in a tab"
-  });
   browser.menus.create({ // Main menu, open Bookmark history window
 	contexts: ["browser_action"],
 	id: 	  BAShowInSidebar,
 	title: 	  "Show bookmark in sidebar",
 	enabled:  false
+  });
+  browser.menus.create({ // Main menu, open BSP2 in a tab
+	contexts: ["browser_action"],
+	id: 	  BAOpenTabId,
+	title: 	  "Open BSP2 in a tab"
   });
   browser.menus.create({ // Main menu, open Bookmark history window
 	contexts: ["browser_action"],

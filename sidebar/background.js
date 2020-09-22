@@ -971,8 +971,10 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  let showPath_option_old = showPath_option;
 	  let closeSearch_option_old = closeSearch_option;
 	  let openTree_option_old = openTree_option;
+	  let searchOnEnter_option_old = searchOnEnter_option;
 	  let reversePath_option_old = reversePath_option;
-	  let rememberSizes_option_old = rememberSizes_option;
+	  let closeSibblingFolders_option_old = closeSibblingFolders_option;
+//	  let rememberSizes_option_old = rememberSizes_option;
 	  let setFontSize_option_old = setFontSize_option;
 	  let fontSize_option_old = fontSize_option;
 	  let setSpaceSize_option_old = setSpaceSize_option;
@@ -988,9 +990,9 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  .then(
 		function () {
 		  let SFSChanged;
-		  let FSChanged;
+//		  let FSChanged;
 		  let SSSChanged;
-		  let SSChanged;
+//		  let SSChanged;
 		  if (pauseFavicons_option_old != pauseFavicons_option) {
 			if (pauseFavicons_option) {
 			  // Stop queued favicon fetching
@@ -1017,7 +1019,7 @@ function handleAddonMessage (request, sender, sendResponse) {
 			sendAddonMessage("reload");
 		  }
 		  else if ((SFSChanged = (setFontSize_option_old != setFontSize_option))
-			  	   || (FSChanged = (fontSize_option_old != fontSize_option))
+			  	   || (fontSize_option_old != fontSize_option)
 		  		  ) {
 			if ((SFSChanged && !setFontSize_option
 							&& (fontSize_option_old != DfltFontSize)
@@ -1029,7 +1031,7 @@ function handleAddonMessage (request, sender, sendResponse) {
 			}
 		  }
 		  else if ((SSSChanged = (setSpaceSize_option_old != setSpaceSize_option))
-			  	   || (SSChanged = (spaceSize_option_old != spaceSize_option))
+			  	   || (spaceSize_option_old != spaceSize_option)
 		  		  ) {
 			if ((SSSChanged && !setSpaceSize_option
 							&& (spaceSize_option_old != DfltSpaceSize)
@@ -1046,12 +1048,14 @@ function handleAddonMessage (request, sender, sendResponse) {
 			  	   || (showPath_option_old != showPath_option)
 			  	   || (closeSearch_option_old != closeSearch_option)
 			  	   || (openTree_option_old != openTree_option)
+			   	   || (searchOnEnter_option_old != searchOnEnter_option)
 			  	   || (reversePath_option_old != reversePath_option)
+			  	   || (closeSibblingFolders_option_old != closeSibblingFolders_option)
 			       || (traceEnabled_option_old != traceEnabled_option)
 			       || (matchTheme_option_old != matchTheme_option)
 			       || (setColors_option_old != setColors_option)
 			       || (setColors_option && ((textColor_option_old != textColor_option)
-			    	   						|| (bckgndColor_option_old = bckgndColor_option)
+			    	   						|| (bckgndColor_option_old != bckgndColor_option)
 			    	   					   )
 			    	  )
 			       || ((useAltFldr_option && (altFldrImg_option_old != altFldrImg_option))
@@ -1437,11 +1441,15 @@ function setWaitingFavicon (bnId) {
  * bnId is BookmarktreeNode id string
  */
 function setNoFavicon (bnId) {
-  let uri = "/icons/nofavicon.png";
-//console.log("BN.id: "+bnId+" index: "+row.rowIndex+" Row id: "+row.dataset.id+" uri: "+uri);
-
   // Save new favicon, if different from previous record
   let BN = curBNList[bnId];
+  let uri;
+  if (BN.url.toLowerCase().endsWith(".pdf")) {
+	uri = "/icons/pdffavicon.png";
+  }
+  else {
+	uri = "/icons/nofavicon.png";
+  }
   let lastUri = BN.faviconUri;
   if (lastUri != uri) {
 	if ((lastUri == "/icons/nofavicontmp.png") && (countFetchFav > 0))
@@ -2155,11 +2163,12 @@ function tabModified (tabId, changeInfo, tabInfo) {
   if (tabInfo.status == "complete") {
 	let tabUrl = tabInfo.url;
 
-//console.log("A tab was updated - tabUrl: "+tabUrl+" tabFaviconUrl: "+tabFaviconUrl);
+//console.log("A tab was updated - tabUrl: "+tabUrl);
 	if ((tabUrl != undefined)
 		&& (!tabUrl.startsWith("moz-extension://"))
 		&& (!tabUrl.startsWith("about:"))
 		&& (!tabUrl.startsWith("data:"))
+		&& (!tabUrl.startsWith("file:"))
 		&& (!tabUrl.startsWith("view-source:"))
 	   ) {
 	  // Look for a bookmark matching the url
@@ -2620,12 +2629,11 @@ function storeAndConvertTree (a_BTN) {
   let child4 = buildBookmarkId(root.children, MobileBookmarks, 0, false);
 
   // Add them to rootBN
-  let children;
   if (child4 == undefined) {
-	children = rootBN.children = [child1, child2, child3];
+	rootBN.children = [child1, child2, child3];
   }
   else {
-	children = rootBN.children = [child1, child2, child3, child4];
+	rootBN.children = [child1, child2, child3, child4];
   }
   endTreeBuildTime = new Date();
   trace("Tree build duration: "+(treeBuildDuration = (endTreeBuildTime.getTime() - endTreeLoadTime.getTime()))+" ms", true);

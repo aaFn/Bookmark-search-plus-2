@@ -1,11 +1,12 @@
 'use strict';
 
-//----- Workaround for top and left position parameters being ignored for panels -----
+//----- Workaround for top and left position parameters being ignored for panels and bug on popups (szince panel is an alis for popup) -----
 // Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
+//     https://bugzilla.mozilla.org/show_bug.cgi?id=1271047
 //This is also used as workaround for bug 1408446 in Linux (window contents is not painted ..)
 // Cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1408446
 // imposing to resize in order to draw contents - Apparently corrected in FF 59.x -
-const PopupWidth  = 375;
+const PopupWidth  = 380;
 const PopupHeight = 190;
 
 let remembersizes_option;
@@ -86,7 +87,7 @@ let btnUrl;
  * e is of type KeyboardEvent
  */
 function keyHandler (e) {
-  let target = e.target; // Type depends ..
+//let target = e.target; // Type depends ..
 //console.log("Key event: "+e.type+" key: "+e.key+" char: "+e.char+" target: "+target);
 
   if (e.key == "Escape") {
@@ -190,28 +191,33 @@ function closeSelf () {
   btnId = undefined; // To avoid closeHandler to remove / update it ...
 
   // Get the CSS pixel ratio
-  // Note: window.windowUtils does not work ...
-  let pixelsPerCSS = window.devicePixelRatio;
+  // Note 1: window.windowUtils does not work ...
+  // Note 2: not reliable ! Is impacted by both the system DPI and the window zoom factor,
+  //         however window.screenX and screenY are only impacted by the window zoom factor :-(
+  //         => Need to rely on browser.windows.getCurrent() instead, which is all in pixels
+//  let pixelsPerCSS = window.devicePixelRatio;
 //console.log("closeSelf() - window.devicePixelRatio="+pixelsPerCSS);
 
   // Get and remember our own position, converting to real pixels
-  let top = Math.floor(window.screenY * pixelsPerCSS);
-  let left = Math.floor(window.screenX * pixelsPerCSS);
-/*  browser.windows.getCurrent()
+//  let top = Math.floor(window.screenY * pixelsPerCSS);
+//  let left = Math.floor(window.screenX * pixelsPerCSS);
+  browser.windows.getCurrent()
   .then(
 	function (wInfo) {
-	  console.log("wInfo.top: "+wInfo.top+" screenY: "+window.screenY);
-	  console.log("calc top: "+(window.screen.top+window.screenY));
-	  console.log("wInfo.left: "+wInfo.left+" screenX: "+window.screenX);
-	  console.log("calc left: "+(window.screen.left+window.screenX));
-
+//	  console.log("closeSelf() - window.devicePixelRatio="+window.devicePixelRatio);
+//	  console.log("closeSelf() - wInfo.top: "+wInfo.top+" screenY: "+window.screenY);
+//	  console.log("closeSelf() - calc top: "+(window.screen.top+window.screenY));
+//	  console.log("closeSelf() - wInfo.left: "+wInfo.left+" screenX: "+window.screenX);
+//	  console.log("closeSelf() - calc left: "+(window.screen.left+window.screenX));
 	  let top = wInfo.top;
 	  let left = wInfo.left;
-*/
+
       let saving;
 	  if (remembersizes_option) {
-		let height = Math.floor(window.outerHeight*pixelsPerCSS);
-		let width = Math.floor(window.outerWidth*pixelsPerCSS);
+//		let height = Math.floor(window.outerHeight*pixelsPerCSS);
+//		let width = Math.floor(window.outerWidth*pixelsPerCSS);
+		let height = wInfo.height;
+		let width = wInfo.width;
 		saving = browser.storage.local.set({
 		  popuptop_option: top,
 		  popupleft_option: left,
@@ -220,13 +226,14 @@ function closeSelf () {
 		});
 //console.log("closeSelf() - remembersizes_option set - top="+top+" left="+left+" height="+height+" width="+width);
 	  }
-      else {
-        saving = browser.storage.local.set({
+	  else {
+		saving = browser.storage.local.set({
 		  popuptop_option: top,
 		  popupleft_option: left
 		});
 //console.log("closeSelf() - top="+top+" left="+left);
 	  }
+
 /*
 browser.windows.getCurrent()
 .then(
@@ -239,6 +246,7 @@ console.log("closeSelf() - browser.windows.getCurrent wInfo - top="+top1+" left=
   }
 );
 */
+
 	  saving.then(
 		function () {
 		  // window.close() is not working, in spite of setting allowScriptsToClose: true
@@ -250,8 +258,8 @@ console.log("closeSelf() - browser.windows.getCurrent wInfo - top="+top1+" left=
 		  //window.close();
 		}
 	  );
-//	}
-//  );
+	}
+  );
 }
 
 /*
@@ -310,31 +318,61 @@ function closeHandler (e) {
   // more junk message .. too bad for the console ..
   if (btnId != undefined) {
 	// Get the CSS pixel ratio
-	// Note: window.windowUtils does not work ...
-	let pixelsPerCSS = window.devicePixelRatio;
-	console.log("closeHandler() - window.devicePixelRatio="+pixelsPerCSS);
+	// Note 1: window.windowUtils does not work ...
+	// Note 2: not reliable ! Is impacted by both the system DPI and the window zoom factor,
+	//         however window.screenX and screenY are only impacted by the window zoom factor :-(
+	//         => Need to rely on browser.windows.getCurrent() instead, which is all in pixels
+//	let pixelsPerCSS = window.devicePixelRatio;
+//console.log("closeHandler() - window.devicePixelRatio="+pixelsPerCSS);
 
 	// Get and remember our own position (and size if option is activated), converting to real pixels
-	let top = Math.floor(window.screenY * pixelsPerCSS);
-	let left = Math.floor(window.screenX * pixelsPerCSS);
-	if (remembersizes_option) {
-	  let height = Math.floor(window.outerHeight*pixelsPerCSS);
-	  let width = Math.floor(window.outerWidth*pixelsPerCSS);
-	  browser.storage.local.set({
-		popuptop_option: top,
-		popupleft_option: left,
-		popupheight_option: height,
-		popupwidth_option: width
-	  });
+//	let top = Math.floor(window.screenY * pixelsPerCSS);
+//	let left = Math.floor(window.screenX * pixelsPerCSS);
+	browser.windows.getCurrent()
+	.then(
+	  function (wInfo) {
+//		console.log("closeHandler() - window.devicePixelRatio="+window.devicePixelRatio);
+//		console.log("closeHandler() - wInfo.top: "+wInfo.top+" screenY: "+window.screenY);
+//		console.log("closeHandler() - calc top: "+(window.screen.top+window.screenY));
+//		console.log("closeHandler() - wInfo.left: "+wInfo.left+" screenX: "+window.screenX);
+//		console.log("closeHandler() - calc left: "+(window.screen.left+window.screenX));
+		let top = wInfo.top;
+		let left = wInfo.left;
+		if (remembersizes_option) {
+//		  let height = Math.floor(window.outerHeight*pixelsPerCSS);
+//		  let width = Math.floor(window.outerWidth*pixelsPerCSS);
+		  let height = wInfo.height;
+		  let width = wInfo.width;
+		  browser.storage.local.set({
+			popuptop_option: top,
+			popupleft_option: left,
+			popupheight_option: height,
+			popupwidth_option: width
+		  });
 //console.log("closeHandler() - remembersizes_option set - top="+top+" left="+left+" height="+height+" width="+width);
-	}
-	else {
-	  browser.storage.local.set({
-		popuptop_option: top,
-		popupleft_option: left
-	  });
+		}
+		else {
+		  browser.storage.local.set({
+			popuptop_option: top,
+			popupleft_option: left
+		  });
 //console.log("closeHandler() - top="+top+" left="+left);
-	}
+		}
+
+/*
+browser.windows.getCurrent()
+.then(
+  function (wInfo) {
+	let top1 = wInfo.top;
+	let left1 = wInfo.left;
+	let height1 = wInfo.height;
+	let width1 = wInfo.width;
+console.log("closeHandler() - browser.windows.getCurrent wInfo - top="+top1+" left="+left1+" height="+height1+" width="+width1);
+  }
+);
+*/
+	  }
+	);
 
 	if (isPropPopup) { // Set back previous values
 	  browser.bookmarks.update(

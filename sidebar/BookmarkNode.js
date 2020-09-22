@@ -764,7 +764,7 @@ function BN_match (BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSe
   if (isRegExp) {
 	let url;
 	isMatch = (isTitleSearch && matchRegExp.test(strLowerNormalize(BN.title)))
-			  || (isUrlSearch && ((url = BN.url) != undefined) && matchRegExp.test(strLowerNormalize(BN.url)));
+			  || (isUrlSearch && ((url = BN.url) != undefined) && matchRegExp.test(strLowerNormalize(url)));
   }
   else { // Match all words with both or only one as needed (note, if both, we can have
 		 // some of the words matching only title, and some others matching url, the native
@@ -1081,6 +1081,9 @@ function scanBNTree (BN, faviconWorker, doStats = true) {
 		  countFetchFav++;
 //console.log("countFetchFav 3: "+countFetchFav+" bnId: "+bnId);
 		}
+	  }
+	  else if ((url.toLowerCase().endsWith(".pdf")) && (uri == "/icons/nofavicon.png")) {
+		BN.faviconUri = "/icons/pdffavicon.png";
 	  }
 	  else {
 		triggerFetch = false;
