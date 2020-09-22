@@ -27,7 +27,9 @@ var openTree_option; // Boolean
 var immediateFavDisplay_option; // Boolean
 var loadffapi_option; // Boolean
 var delayLoad_option; // Boolean
+var searchOnEnter_option; // Boolean
 var reversePath_option; // Boolean
+var closeSibblingFolders_option; // Boolean
 var rememberSizes_option; // Boolean
 var searchHeight_option; // Integer
 var setFontSize_option; // Boolean
@@ -46,6 +48,7 @@ var traceEnabled_option; // Boolean
 var searchField_option; // String
 var searchScope_option; // String
 var searchMatch_option; // String
+var searchFilter_option; // String
 var savedBkmkUriList; // Used to receive the favicon uri saved in storage - Will be deleted at end
 var savedBNList; // Used to receive the BookmarkNodes saved in storage - Will be deleted at end
 var savedBNListBak; // Used to receive the second BookmarkNodes saved in storage if any - Will be deleted at end
@@ -63,7 +66,9 @@ var openTree_option_file; // Boolean
 var immediateFavDisplay_option_file; // Boolean
 var loadffapi_option_file; // Boolean
 var delayLoad_option_file; // Boolean
+var searchOnEnter_option_file; // Boolean
 var reversePath_option_file; // Boolean
+var closeSibblingFolders_option_file; // BNoolean
 var rememberSizes_option_file; // Boolean
 var searchHeight_option_file; // Integer
 var setFontSize_option_file; // Boolean
@@ -82,6 +87,7 @@ var traceEnabled_option_file; // Boolean
 var searchField_option_file; // String
 var searchScope_option_file; // String
 var searchMatch_option_file; // String
+var searchFilter_option_file; // String
 var migration_img16 = false;
 var migration_bnlist = false;
 var migration_spfldr = false;
@@ -138,8 +144,12 @@ function refreshOptionsBgnd (backgroundPage) {
   delayLoad_option_file = backgroundPage.delayLoad_option_file;
   delayLoad_option = backgroundPage.delayLoad_option;
 delayLoad_option = false; // Disabled for now
+  searchOnEnter_option_file = backgroundPage.searchOnEnter_option_file;
+  searchOnEnter_option = backgroundPage.searchOnEnter_option;
   reversePath_option_file = backgroundPage.reversePath_option_file;
   reversePath_option = backgroundPage.reversePath_option;
+  closeSibblingFolders_option_file = backgroundPage.closeSibblingFolders_option_file;
+  closeSibblingFolders_option = backgroundPage.closeSibblingFolders_option;
   rememberSizes_option_file = backgroundPage.rememberSizes_option_file;
   rememberSizes_option = backgroundPage.rememberSizes_option;
   searchHeight_option = backgroundPage.searchHeight_option;
@@ -175,6 +185,8 @@ delayLoad_option = false; // Disabled for now
   searchScope_option = backgroundPage.searchScope_option;
   searchMatch_option_file = backgroundPage.searchMatch_option_file;
   searchMatch_option = backgroundPage.searchMatch_option;
+  searchFilter_option_file = backgroundPage.searchFilter_option_file;
+  searchFilter_option = backgroundPage.searchFilter_option;
   structureVersion = backgroundPage.structureVersion;
 }
 
@@ -198,7 +210,9 @@ function refreshOptionsLStore () {
 		,"immediatefavdisplay_option"
 		,"loadffapi_option"
 		,"delayLoad_option"
+		,"searchonenter_option"
 		,"reversepath_option"
+		,"closesibblingfolders_option"
 		,"remembersizes_option"
 		,"searchheight_option"
 		,"popupheight_option"
@@ -218,6 +232,7 @@ function refreshOptionsLStore () {
 		,"searchfield_option"
 		,"searchscope_option"
 		,"searchmatch_option"
+		,"searchfilter_option"
 		,"traceEnabled_option"
 		]
 	  );
@@ -310,12 +325,26 @@ function refreshOptionsLStore () {
 		  delayLoad_option = false;
 		}
 delayLoad_option = false; // Disabled for now
+		// .. Read SOE option..
+		if ((searchOnEnter_option_file = res.searchonenter_option) != undefined) {
+		  searchOnEnter_option = searchOnEnter_option_file;
+		}
+		else {
+		  searchOnEnter_option = false;
+		}
 		// .. Read RP option..
 		if ((reversePath_option_file = res.reversepath_option) != undefined) {
 		  reversePath_option = reversePath_option_file;
 		}
 		else {
 		  reversePath_option = false;
+		}
+		// .. Read CSF option..
+		if ((closeSibblingFolders_option_file = res.closesibblingfolders_option) != undefined) {
+		  closeSibblingFolders_option = closeSibblingFolders_option_file;
+		}
+		else {
+		  closeSibblingFolders_option = false;
 		}
 		// -- Read RS options..
 		if ((rememberSizes_option_file = res.remembersizes_option) != undefined) {
@@ -475,6 +504,14 @@ delayLoad_option = false; // Disabled for now
 		  searchMatch_option = "words";
 		}
 
+		// -- Read SF option..
+		if ((searchFilter_option_file = res.searchfilter_option) != undefined) {
+		  searchFilter_option = searchFilter_option_file;
+		}
+		else {
+		  searchFilter_option = "all";
+		}
+
 		resolve(); // Send promise for anybody waiting ..
 	  })
 	  .catch( // Asynchronous, like .then
@@ -565,7 +602,9 @@ function launchReadFullLStore (isSidebar) {
 	   ,"immediatefavdisplay_option"
 	   ,"loadffapi_option"
 	   ,"delayLoad_option"
+	   ,"searchonenter_option"
 	   ,"reversepath_option"
+	   ,"closesibblingfolders_option"
 	   ,"remembersizes_option"
 	   ,"searchheight_option"
 	   ,"popupheight_option"
@@ -585,6 +624,7 @@ function launchReadFullLStore (isSidebar) {
 	   ,"searchfield_option"
 	   ,"searchscope_option"
 	   ,"searchmatch_option"
+	   ,"searchfilter_option"
 	   ,"traceEnabled_option"
 	   ,"savedFldrOpenList"
 	   ,"structureVersion"
@@ -604,7 +644,9 @@ function launchReadFullLStore (isSidebar) {
 	   ,"immediatefavdisplay_option"
 	   ,"loadffapi_option"
 	   ,"delayLoad_option"
+	   ,"searchonenter_option"
 	   ,"reversepath_option"
+	   ,"closesibblingfolders_option"
 	   ,"remembersizes_option"
 	   ,"searchheight_option"
 	   ,"popupheight_option"
@@ -624,6 +666,7 @@ function launchReadFullLStore (isSidebar) {
 	   ,"searchfield_option"
 	   ,"searchscope_option"
 	   ,"searchmatch_option"
+	   ,"searchfilter_option"
 	   ,"traceEnabled_option"
 	   ,"fIndex"
 	   ,"fTime"
@@ -775,12 +818,26 @@ function readFullOptions (res, isSidebar, waitMsg) {
 	delayLoad_option = false;
   }
 delayLoad_option = false; // Disabled for now
+  waitMsg("Read SOE option..");
+  if ((searchOnEnter_option_file = res.searchonenter_option) != undefined) {
+	searchOnEnter_option = searchOnEnter_option_file;
+  }
+  else {
+	searchOnEnter_option = false;
+  }
   waitMsg("Read RP option..");
   if ((reversePath_option_file = res.reversepath_option) != undefined) {
 	reversePath_option = reversePath_option_file;
   }
   else {
 	reversePath_option = false;
+  }
+  waitMsg("Read CSF option..");
+  if ((closeSibblingFolders_option_file = res.closesibblingfolders_option) != undefined) {
+	closeSibblingFolders_option = closeSibblingFolders_option_file;
+  }
+  else {
+	closeSibblingFolders_option = false;
   }
   waitMsg("Read RS options..");
   if ((rememberSizes_option_file = res.remembersizes_option) != undefined) {
@@ -934,6 +991,14 @@ delayLoad_option = false; // Disabled for now
   }
   else {
 	searchMatch_option = "words";
+  }
+
+  waitMsg("Read SF option..");
+  if ((searchFilter_option_file = res.searchfilter_option) != undefined) {
+	searchFilter_option = searchFilter_option_file;
+  }
+  else {
+	searchFilter_option = "all";
   }
 
   waitMsg("Read trace option..");
@@ -1123,11 +1188,10 @@ function retryReadFullLStore (resolve, reject, retries, isSidebar, waitMsg) {
  * Returns a promise to wait on
  */
 function readFullLStore (isSidebar, waitMsg) {
-  let retries = 3;
   let p = new Promise  (
-    (resolve, reject) => {
-      retryReadFullLStore(resolve, reject, 10, isSidebar, waitMsg); // 10 retries
-    }
+	(resolve, reject) => {
+	  retryReadFullLStore(resolve, reject, 10, isSidebar, waitMsg); // 10 retries
+	}
   );
 
   // Return Promise

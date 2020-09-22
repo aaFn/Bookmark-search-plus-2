@@ -67,8 +67,14 @@
   </p>
   <p>
     <b>User Interface:</b><br/>
+    <input type="checkbox" id="searchonenter">
+    <label for="searchonenter">Wait for "Enter" in search box to launch search (no trigger on key typing inactivity timeout)</label>
+    <br/>
     <input type="checkbox" id="reversepath">
     <label for="reversepath">Reverse folder hierarchy in paths</label>
+    <br/>
+    <input type="checkbox" id="closesibblingfolders">
+    <label for="closesibblingfolders">Only 1 open folder at a time : close all other open folders under same parent when opening a folder</label>
   </p>
   <div class="group">
 	<span>Alternate folder icon: <img src="" height="16" width="16" alt="No image" id="altfldrimg"> </span><label for="altfldrfile"> -> Load a new one: </label><input type="file" accept="image/*" id="altfldrfile">

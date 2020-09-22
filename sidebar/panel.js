@@ -21,24 +21,25 @@ let p_getTab = browser.tabs.getCurrent();
  *     Browsing docs & API's for hours is the only way to get good information about what can
  *     be done of an "object" .. However, and even with that good basis, we can only guess
  *     and try based on what we want to do, and what we believe we are manipulating.
- *     Then verify with traces this is really what we expect, and doing what we want.
- *     Most of all, recipe is to copy on what others did or on the very good Mozilla's tutorials
- *     and doc illustration examples, and hope that will work and that this will be efficient :-(
+ *     Then verify with traces what happens is really what we expect / want.
+ *     Most of all, a recipe for finding a good way is to copy on what others did, or on the
+ *     very good Mozilla's tutorials and doc illustration examples, and to verify that will work
+ *     and that this will be efficient :-(
  *
  *     One of the real useful things is https://developer.mozilla.org/en-US/docs/Web/API
  *     and then try to find which "Interface" (closest to object type ..) to use, and
  *     try its attributes and methods with a bit of crossing fingers after reading.
  *
  *     Also, there is the general assumption in javascript that it is single-threaded:
- *     - given piece of code is always executed atomically until end and never interrupted
- *       by another thread running javaScript.
+ *     - a given piece of code is always executed atomically until end and never interrupted
+ *       by another thread running javascript.
  *     - events are queued, and executed serially in order of occurrence when handling of
  *       previous event is finished.
  *     - hence the "A script is taking too long to run" dialog which many browsers have to
- *       implement, in case some event processing is not yielding back control in some due time ..
+ *       implement, in case some event processing is not yielding back control in due time ..
  *     Therefore, there is no "synchronized" nor "atomic" keyword like in other languages to make
  *     sure that concurrent accesses to an object are serialized and not intermixed, which
- *     could mess up and have unexpected results (yeah, I met some ..).
+ *     could mess up and have unexpected results (yes, I met some ..).
  *     That may be true in today version of the language, but this gives very bad programming habits
  *     to people using javascript. And what about tomorrow ?? (note also that "synchronized" was
  *     reserved in ECMAScript until 5 & 6 ..)
@@ -46,18 +47,20 @@ let p_getTab = browser.tabs.getCurrent();
  *     A side consequence is that most browsers wait the current script execution to end
  *     before displaying / refreshing the DOM. So when we have long tasks, we should use Workers
  *       https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API
- *     They run in another thread (?? well, is that so true in FF ? I wonder), and post event
- *     messages back for display to the main script, therefore not bogging down display.
+ *     to give chances for the display to update.
+ *     These run in another thread (?? well, is that so true in FF ? I wonder), and post event
+ *     messages back to the main script, therefore not bogging down display.
  *     Note that Workers are quite limited in what they can access.
  *     At least, good news (not for performances, but for integrity) is that they are passed
  *     values (copies), so there is no access concurrency risk with the main thread or between
- *     themselves when they run "at same time".
+ *     themselves when they run "at same time", which would normally occur when no concurrency
+ *     protection on objects / data.
  *
- *     All in all, really crap language and poor way of programming things .. but this is in the
- *     air, like a few others which emerged in parallel and compete brillantly, if not better,
- *     on crapiness, such as perl, python, php (although latest evolutions improve .. good news !!)
- *     and their derivatives.
- *     All those want to claim they ease the programmer life and make things faster, but on the
+ *     All in all, poor way of programming things .. but this is in the air, like a few others
+ *     which emerged in parallel and compete brillantly I must say, if not better, on crapiness,
+ *     such as perl, python, php (although latest evolutions improve .. good news !!) and their
+ *     derivatives.
+ *     Such languages claim they ease the programmer life and make things faster, but on the
  *     contrary we end up debugging more than needed our mistakes/bugs which could be simply
  *     avoided by more strict typing, and so it takes longer to get to a robust result at the
  *     end of the day :-((
@@ -100,6 +103,9 @@ let p_ffversion = browser.runtime.getBrowserInfo();
 
 const Performance = window.performance;
 const Body = document.querySelector("#body"); // Assuming it is an HTMLBodyElement
+const ResetFiltersButtonInput = document.querySelector("#sresetflt"); // Assuming it is an HTMLButtonElement
+const SFiltersImg = document.querySelector("#sfilters"); // Assuming it is an HTMLImgElement
+const SFiltersImgStyle = SFiltersImg.style;
 const SearchButtonInput = document.querySelector("#sbutton"); // Assuming it is an HTMLButtonElement
 const MGlassImg = document.querySelector("#mglass"); // Assuming it is an HTMLImgElement
 const MGlassImgStyle = MGlassImg.style;
@@ -154,16 +160,24 @@ const NotifAutoReloadStyle = NotifAutoReload.style;
 const SFieldTitleUrlInput = document.querySelector("#titleurl");
 const SFieldTitleOnlyInput = document.querySelector("#titleonly");
 const SFieldUrlOnlyInput = document.querySelector("#urlonly");
+const SFieldUrlOnlyLabel = document.querySelector("#lblurlonly");
 const SScopeAllInput = document.querySelector("#all");
 const SScopeSubfolderInput = document.querySelector("#subfolder");
 const SMatchWordsInput = document.querySelector("#words");
 const SMatchRegexpInput = document.querySelector("#regexp");
+const SFilterAllInput = document.querySelector("#fall");
+const SFilterFldrOnlyInput = document.querySelector("#ffldronly");
+const SFilterBkmkOnlyInput = document.querySelector("#fbkmkonly");
 
 const InputKeyDelay = 500; // Delay in ms from last keystropke to activate / refresh search result
+const UpdateSearchDelay = 50; // Delay in ms to trigger an update search
+const SBoxEmpty = 0;	// No active search
+const SBoxChanging = 1;	// Content of search box is changing
+const SBoxExecuted = 2; // Search was launched or is complete
 const PopupURL = browser.extension.getURL("sidebar/popup.html");
 const SelfURL = browser.extension.getURL("sidebar/panel.html");
 const HistoryURL = browser.extension.getURL("sidebar/history.html");
-const PopupWidth  = 375;
+const PopupWidth  = 380;
 const PopupHeight = 190;
 const DfltMenuSize = 150;
 const DfltMenuSizeLinux = 170;
@@ -456,8 +470,14 @@ function saveFldrOpen () {
  */
 function appendResult (BTN) {
 //  trace("Displaying <<"+BTN.id+">><<"+BTN.title+">><<"+BTN.type+">><<"+BTN.url+">>");
-  let rc = false;
+  let type = getType(BTN);
+  if (((searchFilter_option == "fldr") && (type == "bookmark"))
+	  || ((searchFilter_option == "bkmk") && (type == "folder"))
+	 ) { // Filter out the result
+	return(true);
+  }
 
+  let rc = false;
   // Append new bookmark row inside the search results table
   let row = resultsTable.insertRow();
   row.draggable = true; // Adding this, but with no handler, avoids that the anchor inside
@@ -487,7 +507,6 @@ function appendResult (BTN) {
 	//   - an <img> (class "favicon") and a <span> with text
 	//     (set class to "favtext" in javascript to get 3px margin-left, but not in HTML where
 	//      it's already done, don't know why).
-	let type = getType(BTN);
 	if (type == "folder") {				// Folder
 	  // Mark that row as folder
 	  row.dataset.type = "folder";
@@ -693,9 +712,11 @@ function refreshFaviconSearch (btnId, uri) {
 /*
  * Turn the Cancel search button on, and show search pane
  */
+let sboxState = SBoxEmpty;	// No active search
 function enableCancelSearch () {
   CancelSearchInput.src = "/icons/cancel.png";
   CancelSearchInput.disabled = false;
+  sboxState = SBoxExecuted;	// Search was launched or is complete
   SearchResult.hidden = false;
 }
 
@@ -705,7 +726,17 @@ function enableCancelSearch () {
 function disableCancelSearch () {
   CancelSearchInput.src = "/icons/empty.png";
   CancelSearchInput.disabled = true;
+  sboxState = SBoxEmpty;	// No active search
   SearchResult.hidden = true;
+}
+
+/*
+ * Turn the execute search button on
+ */
+function enableExecuteSearch () {
+  CancelSearchInput.src = "/icons/enter.png";
+  CancelSearchInput.disabled = false;
+  sboxState = SBoxChanging;	// Content of search box is changing
 }
 
 /*
@@ -762,7 +793,7 @@ function displayResults (a_BTN) {
  * Execute / update a bookmark search and display result
  */
 function updateSearch () {
-  // Triggered by timeout, so now clear the id
+  // Triggered by timeout (or Enter key), so now clear the id
   inputTimeout = null;
 
   // Get search string
@@ -772,11 +803,11 @@ function updateSearch () {
   // Can happen in rare cases where we would hit the cancel button, and updateSearch() is dispatched
   // before the event dispatch to manageSearchTextHandler() and so before it could clear the timeout.
   if (value.length > 0) { // Launch search only if there is something to search for
-	// Activate search mode and Cancel search button if not already on
-	if (CancelSearchInput.disabled) {
+	// Activate search mode and Cancel search button if not already
+	if (sboxState != SBoxExecuted) {
 	  enableCancelSearch();
 	}
-	else if (resultsTable != null) { // Else discard previous results table if there is one
+	if (resultsTable != null) { // Discard previous results table if there is one
 	  SearchResult.removeChild(resultsTable);
 	  resultsTable = null;
 	  curResultRowList = {};
@@ -796,7 +827,7 @@ function updateSearch () {
 	}
 	else {
 	  searching = new Promise ( // Do it asynchronously as that can take time ...
-		(resolve, reject) => {
+		(resolve) => {
 		  let a_matchStr;
 		  let matchRegExp;
 		  let isRegExp, isTitleSearch, isUrlSearch;
@@ -824,27 +855,29 @@ function updateSearch () {
 			  matchRegExp = new RegExp (strNormalize(value), "i"); // Do normalized insensitive case matching
 			}
 			catch (e) { // If malformed regexp, do not continue, match nothing
-			  resolve([]);
+			  a_BN = [];
 			}
 		  }
 
-		  if (searchScope_option == "all") { // Use the List form
-			a_BN = searchCurBNList(a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch);
-		  }
-		  else { // Use the recursive form
-			let BN;
-			if ((cellHighlight == undefined) || (cellHighlight == null)) { // Start from Root
-			  BN = rootBN;
+		  if (a_BN == undefined) { // No error detected, execute search
+			if (searchScope_option == "all") { // Use the List form
+			  a_BN = searchCurBNList(a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch);
 			}
-			else { // Retrieve BN of highlighted cell
-			  let bnId = cellHighlight.parentElement.dataset.id;
-			  BN = curBNList[bnId];
-			  // Protection
-			  if (BN == undefined) {
+			  else { // Use the recursive form
+			  let BN;
+			  if ((cellHighlight == undefined) || (cellHighlight == null)) { // Start from Root
 				BN = rootBN;
 			  }
+			  else { // Retrieve BN of highlighted cell
+				let bnId = cellHighlight.parentElement.dataset.id;
+				BN = curBNList[bnId];
+				// Protection
+				if (BN == undefined) {
+				  BN = rootBN;
+				}
+			  }
+			  a_BN = searchBNRecur(BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch);
 			}
-			a_BN = searchBNRecur(BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch);
 		  }
 
 		  resolve(a_BN);
@@ -869,12 +902,13 @@ function updateSearch () {
  */
 function triggerUpdate () {
   if (SearchTextInput.value.length > 0) { // Refresh only if a search is active
-	if (inputTimeout == null) { // If not null, a setTimeout is active and so is going to call
-	  							// updateSearch() anyway ..
-	  // Else, schedule a new one (this allows to integrate together multiple events,
-	  // like remove of a folder and its subtree)
-	  inputTimeout = setTimeout(updateSearch, InputKeyDelay);
+	// Clear input timeout if there was one active, to replace it by new (maybe faster) one
+	// This allows to integrate together multiple events, like remove of a folder and its subtree
+	if (inputTimeout != null) {
+	  clearTimeout(inputTimeout);
 	}
+	// Schedule a new one
+	inputTimeout = setTimeout(updateSearch, UpdateSearchDelay);
   }
 }
 
@@ -925,8 +959,11 @@ function manageSearchTextHandler () {
    * - 1 or more character(s) = set the cancel image, enable the button
    */
   if (value.length > 0) {
-	// Set timeout before triggering / updating search mode
-	inputTimeout = setTimeout(updateSearch, InputKeyDelay);
+	if (!searchOnEnter_option) { // Auto trigger search when no more key typed in
+	  // Set timeout before triggering / updating search mode
+	  inputTimeout = setTimeout(updateSearch, InputKeyDelay);
+	}
+	enableExecuteSearch();
   }
   else { // Clear search mode
 	inputTimeout = null; // We just cleared any last timeout, so set to null
@@ -967,14 +1004,27 @@ function manageSearchTextHandler () {
  * Clear the contents of the Search text box
  */
 function clearSearchTextHandler () {
-  clearMenu(); // Clear any open menu  
-  SearchTextInput.disabled = false; // If it was disabled, re-enable it
+  clearMenu(); // Clear any open menu
+  SearchTextInput.disabled = false; // If it was disabled, re-enable it (happens on "Show bookmark in sidebar")
   SearchTextInput.value = ""; // Empty the input box
 
   // Fire event on searchText to handle things properly
   let event = new InputEvent ("input");
   SearchTextInput.dispatchEvent(event);
   SearchTextInput.focus(); // Keep focus on it ...
+}
+
+/*
+ * Execute or clear the contents of the Search text box, depending on state of the button
+ */
+function cancelSearchTextHandler () {
+  if (sboxState == SBoxChanging) {
+	clearMenu(); // Clear any open menu
+	triggerUpdate();
+  }
+  else {
+	clearSearchTextHandler();
+  }
 }
 
 /*
@@ -990,14 +1040,31 @@ function clearSearchTextHandler () {
  */
 function setSearchOptions () {
   let cn;
+  let buttonTitleFields, buttonTitleScope, buttonTitleMatch, buttonTitleFilter;
   if (searchMatch_option == "regexp") {
 	cn = "sr" + searchField_option;
 	SMatchRegexpInput.checked = true;
+	buttonTitleMatch = "Use regex";
   }
   else {
 	cn = "sw" + searchField_option;
 	SMatchWordsInput.checked = true;
   }
+  if (searchFilter_option == "all") {
+	SFilterAllInput.checked = true;
+	SFieldUrlOnlyInput.disabled = SFieldUrlOnlyLabel.disabled = false;
+  }
+  else if (searchFilter_option == "fldr") {
+	SFilterFldrOnlyInput.checked = true;
+	SFieldUrlOnlyInput.disabled = true; // Disable search on URL
+	buttonTitleFilter = "Show folders only";
+  }
+  else {
+	SFilterBkmkOnlyInput.checked = true;
+	SFieldUrlOnlyInput.disabled = SFieldUrlOnlyLabel.disabled = false;
+	buttonTitleFilter = "Show bookmarks only";
+  }
+  cn +=  " sfilter"+searchFilter_option;
   SearchButtonInput.className = cn;
   if (searchScope_option == "all") {
 	MGlassImgStyle.backgroundImage = 'url("/icons/search.png"';
@@ -1006,6 +1073,7 @@ function setSearchOptions () {
   else {
 	MGlassImgStyle.backgroundImage = 'url("/icons/searchsub.png"';
 	SScopeSubfolderInput.checked = true;
+	buttonTitleScope = "Inside current folder";
   }
 
   if (searchField_option == "both") {
@@ -1013,23 +1081,68 @@ function setSearchOptions () {
   }
   else if (searchField_option == "title") {
 	SFieldTitleOnlyInput.checked = true;
+	buttonTitleFields = "Search title only";
   }
   else {
 	SFieldUrlOnlyInput.checked = true;
+	buttonTitleFields = "Search URL only";
   }
 
-  // Clear any ongoing search
-  clearSearchTextHandler();
+  // Set hover text on button
+  let buttonTitle;
+  if (buttonTitleFields != undefined) {
+	buttonTitle = buttonTitleFields;
+  }
+  if (buttonTitleScope != undefined) {
+	if (buttonTitle == undefined) {
+	  buttonTitle = buttonTitleScope;
+	}
+	else {
+	  buttonTitle += "\n"+buttonTitleScope;
+	}
+  }
+  if (buttonTitleMatch != undefined) {
+	if (buttonTitle == undefined) {
+	  buttonTitle = buttonTitleMatch;
+	}
+	else {
+	  buttonTitle += "\n"+buttonTitleMatch;
+	}
+  }
+  if (buttonTitleFilter != undefined) {
+	if (buttonTitle == undefined) {
+	  buttonTitle = buttonTitleFilter;
+	}
+	else {
+	  buttonTitle += "\n"+buttonTitleFilter;
+	}
+  }
+  if (buttonTitle == undefined) {
+	buttonTitle = "Filters: none\nPress button to modify";
+	ResetFiltersButtonInput.disabled = true;
+	SFiltersImgStyle.backgroundImage = 'url("/icons/resetfiltersdis.png"';
+  }
+  else {
+	ResetFiltersButtonInput.disabled = false;
+	SFiltersImgStyle.backgroundImage = 'url("/icons/resetfiltersen.png"';
+  }
+  SearchButtonInput.title = buttonTitle;
+
+
+  // Redo any ongoing search
+  triggerUpdate();
 }
 
 function saveSearchOptions () {
   searchField_option_file = searchField_option;
   searchScope_option_file = searchScope_option;
   searchMatch_option_file = searchMatch_option;
+  searchFilter_option_file = searchFilter_option;
   browser.storage.local.set({
 	 searchfield_option: searchField_option,
 	 searchscope_option: searchScope_option,
-	 searchmatch_option: searchMatch_option
+	 searchmatch_option: searchMatch_option,
+	 searchfilter_option: searchFilter_option
   })
   .then(
 	function () {
@@ -1037,6 +1150,14 @@ function saveSearchOptions () {
 	  sendAddonMessage("savedSearchOptions");
 	}
   );
+}
+
+function resetSearchHandler () {
+  searchField_option = "both";
+  searchScope_option = "all";
+  searchMatch_option = "words";
+  searchFilter_option = "all";
+  saveSearchOptions();
 }
 
 function setSFieldTitleUrlHandler () {
@@ -1071,6 +1192,22 @@ function setSMatchWordsHandler () {
 
 function setSMatchRegexpHandler () {
   searchMatch_option = "regexp";
+  saveSearchOptions();
+}
+
+function setSFilterAllHandler () {
+  searchFilter_option = "all";
+  saveSearchOptions();
+}
+
+function setSFilterFldrOnlyHandler () {
+  searchFilter_option = "fldr";
+  searchField_option = "title"; // Force title, searchng on URL for a folder makes no sense
+  saveSearchOptions();
+}
+
+function setSFilterBkmkOnlyHandler () {
+  searchFilter_option = "bkmk";
   saveSearchOptions();
 }
 
@@ -1706,7 +1843,7 @@ function bkmkMoved (bnId, curParentId, targetParentId, targetIndex) {
 	  insertRowIndex = bookmarksTable.rows.length;
 	else   insertRowIndex = targetRow.rowIndex; // Get the updated row index of target
   }
-  let insertPos = insertBkmks(BN, targetParentRow);
+  insertBkmks(BN, targetParentRow);
 
   // State of parent folders may change, so save folder open state
   saveFldrOpen();
@@ -2036,7 +2173,6 @@ function isVisible (BN_id) {
   // Get to parent row and check it
   let BN = curBNList[BN_id];
   let parentBN_id = BN.parentId;
-  let parentVisible, parentOpen;
   if (parentBN_id == Root) {
 	// Root, which is not displayed, is always considered visible and open,
     // since all its children folders are shown (= top level system folders).
@@ -2052,10 +2188,10 @@ function isVisible (BN_id) {
 	}
 	else { // Parent is visible
 	  // We are visible only if parent is open
-      visible = curFldrOpenList[parentBN_id];
-      // If we are not visible, we are the first one invisible since pour parent is visible,
-      // so set firstVisibleParentRow to parent row
-      firstVisibleParentRow = curRowList[parentBN_id];
+	  visible = curFldrOpenList[parentBN_id];
+	  // If we are not visible, we are the first one invisible since pour parent is visible,
+	  // so set firstVisibleParentRow to parent row
+	  firstVisibleParentRow = curRowList[parentBN_id];
 	}
   }
 
@@ -2123,7 +2259,7 @@ function handleFolderClick (twistie) {
 	twistie.classList.replace("twistieao", "twistieac");
 	curFldrOpenList[BN_id] = false;
 	saveFldrOpen();
-
+    // Hide higher level rows
 	while ((row = row.nextElementSibling) != null) {
 	  if (parseInt(row.dataset.level, 10) <= level)
 		break; // Stop when lower or same level
@@ -2139,23 +2275,50 @@ function handleFolderClick (twistie) {
 	  sendAddonMessage("refreshRecentBkmks");
 	} 
 
+	// If option set, go backwards until parent folder to close all other open folders at same level
+	let prev_row = row;
+	let prev_level;
+	let prev_twistie;
+	let is_open;
+	let bnId;
+	if (closeSibblingFolders_option) {
+	  while ((prev_row = prev_row.previousElementSibling) != null) {
+		prev_level = parseInt(prev_row.dataset.level, 10);
+		if (prev_level < level) { // Reached parent, stop
+		  break;
+		}
+		else if (prev_level == level) { // If folder at same level with an open twistie, close it 
+		  // Check if this is an open folder row
+		  prev_twistie = prev_row.firstElementChild.firstElementChild;
+		  is_open = prev_twistie.classList.contains("twistieao");
+		  if (is_open) { // Yes, close it
+			prev_twistie.classList.replace("twistieao", "twistieac");
+			bnId = prev_row.dataset.id;
+			curFldrOpenList[bnId] = false;
+			saveFldrOpen();
+		  }
+		}
+		else { // Higher level, hide
+		  prev_row.hidden = true;
+		}
+	  }
+	}
+	
 	// Open twistie
 	twistie.classList.replace("twistieac", "twistieao");
 	curFldrOpenList[BN_id] = true;
 	saveFldrOpen();
 
-	let last_open_level, cur_level, prev_level;
-	let prev_row;
+	// Unhide everything at higher level below it, when visible
+	let last_open_level, cur_level;
 	last_open_level = prev_level = level + 1;
 	while ((row = (prev_row = row).nextElementSibling) != null) {
 	  if ((cur_level = parseInt(row.dataset.level, 10)) <= level)
 		break; // Stop when lower or same level
-//	  trace("Row: "+row+" cur_level: "+cur_level+" prev_level: "+prev_level);
 	  if (cur_level > prev_level) { // We just crossed a folder in previous row ..
 		// Check if it was open or not
 		twistie = prev_row.firstElementChild.firstElementChild;
-		let is_open = twistie.classList.contains("twistieao");
-//		trace("Row: "+row+" cur_level: "+cur_level+" prev_level: "+prev_level+" twistie: "+twistie.classList+" open:"+open);
+		is_open = twistie.classList.contains("twistieao");
 
 		// Make the new level visible only if the previous one was visible
 		if (is_open && (last_open_level == cur_level - 1))
@@ -2169,6 +2332,39 @@ function handleFolderClick (twistie) {
 
 	  // Row is not visible below last open level
 	  row.hidden = (cur_level > last_open_level);
+	}
+
+	// If option set, go until end or lower level to close all other open folders at same level
+	if (closeSibblingFolders_option && (row != null) && (cur_level == level)) { // There are sibbling rows
+	  // Check if current row is an open folder
+	  twistie = row.firstElementChild.firstElementChild;
+	  is_open = twistie.classList.contains("twistieao");
+	  if (is_open) { // Yes, close it
+		twistie.classList.replace("twistieao", "twistieac");
+		bnId = row.dataset.id;
+		curFldrOpenList[bnId] = false;
+		saveFldrOpen();
+	  }
+	  while ((row = row.nextElementSibling) != null) { // Go with next ones
+		cur_level = parseInt(row.dataset.level, 10);
+		if (cur_level < level) { // Reached an ancestor sibling, stop
+		  break;
+		}
+		else if (cur_level == level) { // If folder at same level with an open twistie, close it 
+		  // Check if this is an open folder row
+		  twistie = row.firstElementChild.firstElementChild;
+		  is_open = twistie.classList.contains("twistieao");
+		  if (is_open) { // Yes, close it
+			twistie.classList.replace("twistieao", "twistieac");
+			bnId = row.dataset.id;
+			curFldrOpenList[bnId] = false;
+			saveFldrOpen();
+		  }
+		}
+		else { // Higher level, hide
+		  row.hidden = true;
+		}
+	  }
 	}
   }
 }
@@ -2984,8 +3180,8 @@ function enableBkmkScroll () {
 }
 
 function bkmkScrollHandler (e) {
-  let target = e.target; // Type depends ..
-  let className = target.className;
+//let target = e.target; // Type depends ..
+//let className = target.className;
 //console.log("Bookmark scroll event: "+e.type+" layerX: "+e.layerX+" layerY: "+e.layerY+" pageX: "+e.pageX+" pageY: "+e.pageY+" target: "+target+" class: "+className);
   // If not dragging a bookmark item, and scroll was not reactivated
   // then disable scroll
@@ -3162,8 +3358,8 @@ function disableRsltScroll () {
 }
 
 function rsltScrollHandler (e) {
-  let target = e.target; // Type depends ..
-  let className = target.className;
+//let target = e.target; // Type depends ..
+//let className = target.className;
 //console.log("Results scroll event: "+e.type+" layerX: "+e.layerX+" layerY: "+e.layerY+" pageX: "+e.pageX+" pageY: "+e.pageY+" target: "+target+" class: "+className);
   // If not dragging a result item, and scroll was not reactivated
   // then disable scroll
@@ -3295,11 +3491,9 @@ function setDragTransfer (BN_id, rowDragged, dt) {
   // Native Bookmark data like  about:blank\nNew bookmark5\nabout:blank\nNew bookmark4
   //							about:blank\n_  New bookmark
   let type = BNDragged.type;
-  let isBookmark;
   let isFolder = (type == "folder");
   let json;
   if (isFolder) {
-	isBookmark = false;
 	json = JSON.stringify(
 	  {title: BNDragged.title,
 	   itemGuid: BN_id,
@@ -3311,7 +3505,6 @@ function setDragTransfer (BN_id, rowDragged, dt) {
 	);
   }
   else if (type == "separator") {
-	isBookmark = false;
 	json = JSON.stringify(
 	  {title: "",
 	   itemGuid: BN_id,
@@ -3323,7 +3516,6 @@ function setDragTransfer (BN_id, rowDragged, dt) {
 	);
   }
   else { // Bookmark
-	isBookmark = true;
 	json = JSON.stringify(
 	  {title: BNDragged.title,
 	   itemGuid: BN_id,
@@ -3391,10 +3583,9 @@ function bkmkDragEndHandler (e) {
   isBkmkDragActive = false;
   refBkmkScrollLeft = refBkmkScrollTop = -1;
 
-  let target = e.target;
-  let dt = e.dataTransfer;
-  noDropMinRowIndex = noDropMaxRowIndex = -1;
+//  let target = e.target;
 //console.log("Drag end event: "+e.type+" target: "+target+" class: "+target.classList);
+  noDropMinRowIndex = noDropMaxRowIndex = -1;
 }
 
 /*
@@ -3437,10 +3628,9 @@ function resultsDragEndHandler (e) {
   isBkmkDragActive = false;
   refBkmkScrollLeft = refBkmkScrollTop = -1;
 
-  let target = e.target;
-  let dt = e.dataTransfer;
-  noDropMinRowIndex = noDropMaxRowIndex = -1;
+//let target = e.target;
 //console.log("Drag end event: "+e.type+" target: "+target+" class: "+target.classList);
+  noDropMinRowIndex = noDropMaxRowIndex = -1;
 }
 
 /*
@@ -3449,8 +3639,8 @@ function resultsDragEndHandler (e) {
  * e = DragEvent
  */
 function rsltDragEnterHandler (e) {
-  let target = e.target;
   let dt = e.dataTransfer;
+//let target = e.target;
 //console.log("Reslt drag enter event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
   // Handle drag scrolling inhibition
   handleRsltDragScroll(EnterEvent, e);
@@ -3463,8 +3653,8 @@ function rsltDragEnterHandler (e) {
  * e = DragEvent
  */
 function rsltDragOverHandler (e) {
-  let target = e.target;
   let dt = e.dataTransfer;
+  let target = e.target;
   if (isLinux) {
 	curRsltTarget = target;
 	curRsltDt = dt;
@@ -3481,8 +3671,8 @@ function rsltDragOverHandler (e) {
  * e = DragEvent
  */
 function rsltDragLeaveHandler (e) {
-  let target = e.target;
   let dt = e.dataTransfer;
+//let target = e.target;
 //console.log("Rslt drag leave event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
   // Handle drag scrolling inhibition
   handleRsltDragScroll(LeaveEvent, e);
@@ -3495,8 +3685,8 @@ function rsltDragLeaveHandler (e) {
  * e = DragEvent
  */
 function rsltDragExitHandler (e) {
-  let target = e.target;
   let dt = e.dataTransfer;
+//let target = e.target;
 //console.log("Rslt drag exit event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
   // Handle drag scrolling inhibition
   handleRsltDragScroll(ExitEvent, e);
@@ -3666,8 +3856,7 @@ function openFolderTimeoutHandler () {
 							   cancelable: true
 	  						  }
   );
-  let ret = bkmkitem_x.dispatchEvent(event);
-//console.log("ret: "+ret);
+  bkmkitem_x.dispatchEvent(event);
 }
 
 /*
@@ -4570,30 +4759,49 @@ function getMenuRow (item) {
 }
 
 /*
- * Upon Bookmark creation menu event, open Window to let the user enter values in fields
+ * Open bookmark Property popup with given title
  * 
- * BTN is of type BookmarkTreeNode (promise from browser.bookmarks.create())
+ * propType = "new" or "prop", to indicate creation of a new item, or editing its properties
+ * BN_id = String identifying the bookmark item to edit
  */
-function createBookmark (BTN) {
+function openPropPopup (popupType, BN_id, path, type, title, url) {
+  // Open popup on bookmark item
+  let titlePreface;
+  let popupUrl;
 //  let popupURL = browser.extension.getURL("sidebar/popup.html");
   // Did not find a good way to get a modal dialog so far :-(
   // 1) let sign = prompt("What's your sign?");
   //    creates a modal inside the sidebar, half hidden if the sidebar is not large enough. 
   // 2) It appears window.open works outside of the .then, but not inside !!
   //    I do not understand why ..
-  //    Anyway, "modal" is ignored, and I can't figure how to get
-  //    the UniversalBrowserWrite privilege so far .. :-(
   //    window.open(popupURL, "_blank", "dialog,modal,height=200,width=200");
+  //    Anyway, "modal" is ignored, and I can't figure how to get the UniversalBrowserWrite privilege so far .. :-(
   // So using browser.windows instead, which is not modal, and which is resizeable.
-  // Truncate title to just before "?" if it has one
-  let title = BTN.title;
-  let paramPos = title.indexOf("?");
-  if (paramPos != -1) {
-	title = title.slice(0, paramPos);
+  if (type == "folder") {
+	let winType;
+	if (popupType == "new") {
+	  winType = "newfldr";
+	  titlePreface = "New folder";
+	}
+	else {
+	  winType = "propfldr";
+	  titlePreface = "Properties of « "+title+" »";
+	}
+	popupUrl = PopupURL+"?type="+winType+"&id="+BN_id+"&path="+encodeURIComponent(path)+"&title="+encodeURIComponent(title)+"&url=null";
   }
-  let path = BN_path(BTN.parentId);
-  let url = PopupURL+"?type=newbkmk&id="+BTN.id+"&path="+encodeURIComponent(path)+"&title="+encodeURIComponent(title)+"&url="+encodeURIComponent(BTN.url);
-  url = encodeURI(url);
+  else { // Bookmark
+	let winType;
+	if (popupType == "new") {
+	  winType = "newbkmk";
+	  titlePreface = "New bookmark";
+	}
+	else {
+	  winType = "propbkmk";
+	  titlePreface = "Properties of « "+title+" »";
+	}
+	popupUrl = PopupURL+"?type="+winType+"&id="+BN_id+"&path="+encodeURIComponent(path)+"&title="+encodeURIComponent(title)+"&url="+encodeURIComponent(url);
+  }
+  popupUrl = encodeURI(popupUrl);
   let gettingItem = browser.storage.local.get(
 	{popuptop_option: 300,
 	 popupleft_option: 300
@@ -4606,51 +4814,80 @@ function createBookmark (BTN) {
 	// the previous screen went off, or display resolution changed.
 	let top = res.popuptop_option;
 	let left = res.popupleft_option;
+//console.log("openPropPopup() - top="+top+" left="+left);
 	let scr = window.screen;
 	let adjust = false;
-	if ((left < scr.availLeft) || (left >= scr.availLeft + scr.availWidth)) {
+	// Also, protect if possible against privacy.resistFingerprinting which does not return the screen size,
+	// but the sidebar size instead !! :-(
+	let al = scr.availLeft;
+	let aw = scr.availWidth;
+	if ((PopupWidth < aw) // If wider than the reported screen width, do not adjust
+		&& ((left < al) || (left >= al + aw))
+	   ) {
 	  adjust = true;
-	  left = scr.availLeft + Math.floor((scr.availWidth - PopupWidth) / 2);
+	  left = al + Math.floor((aw - PopupWidth) / 2);
 	}
-	if ((top < scr.availTop) || (top >= scr.availTop + scr.availHeight)) {
+	let at = scr.availTop;
+	let ah = scr.availHeight;
+	if ((PopupHeight < ah) // If higher than the reported screen height, do not adjust
+		&& ((top < at) || (top >= at + ah))
+	   ) {
 	  adjust = true;
-	  top = scr.availTop + Math.floor((scr.availHeight - PopupHeight) / 2);
+	  top = at + Math.floor((ah - PopupHeight) / 2);
 	}
-	if (adjust) { // Save new values
+	if (adjust) { // Save new position values
 	  browser.storage.local.set({
 		popuptop_option: top,
 		popupleft_option: left
 	  });
+//console.log("openPropPopup() - had to adjust position top="+top+" left="+left);
 	}
-
+  
 	browser.windows.create(
-	  {titlePreface: "New bookmark",
+	  {titlePreface: titlePreface,
 	   type: "popup",
-//	   type: "detached_panel",
+//		 type: "detached_panel",
 	   // Using a trick with URL parameters to tell the window which type
 	   // it is, which bookmark id, .. etc .. since titlePreface doesn't appear to work
 	   // and there appears to be no way to pass parameters to the popup by the call. 
-	   url: url,
-//----- Workaround for top and left position parameters being ignored for panels -----
+	   url: popupUrl,
+//----- Workaround for top and left position parameters being ignored for panels and bug on popups (since panel is an alias for popup) -----
 // Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
-// Make the start size as small as possible so that it briefly flashes in its initial
-// position in the least conspicuous way.
-// Note: 1,1 does not work, this sets the window in a state reduced to the bar, and no
-// internal resize seems to work after that.
-// Also tried to start minimized, but the window pops in a big size first before being minimized,
-// even les pretty.			   .
-// => .. FF does not seem very clean on all this .. :-( 
-//	   height: PopupHeight,
-//	   width: PopupWidth
+//     https://bugzilla.mozilla.org/show_bug.cgi?id=1271047
+//Make the start size as small as possible so that it briefly flashes in its initial
+//position in the least conspicuous way.
+//Note: 1,1 does not work, this sets the window in a state reduced to the bar, and no
+//internal resize seems to work after that.
+//Also tried to start minimized, but the window pops in a big size first before being minimized,
+//even less pretty.			   .
+//=> .. FF does not seem very clean on all this .. :-( 
+//       height: PopupHeight,
+//       width: PopupWidth,
 	   height: 40,
 	   width: 40,
-//	   left: left,
-//	   top: top,
+//	     left: left,
+//		 top: top,
 //----- End of position ignored workaround -----
 	   allowScriptsToClose: true
 	  }
 	);
   });
+}
+
+/*
+ * Upon Bookmark creation menu event, open Window to let the user enter values in fields
+ * 
+ * BTN is of type BookmarkTreeNode (promise from browser.bookmarks.create())
+ */
+function createBookmark (BTN) {
+  // Truncate title to just before "?" if it has one
+  let title = BTN.title;
+  let paramPos = title.indexOf("?");
+  if (paramPos != -1) {
+	title = title.slice(0, paramPos);
+  }
+  let path = BN_path(BTN.parentId);
+  openPropPopup("new", BTN.id, path, BTN.type, title, BTN.url);
 
   // Don't call refresh search, it is already called through bkmkCreatedHandler
 }
@@ -4662,63 +4899,7 @@ function createBookmark (BTN) {
  */
 function createFolder (BTN) {
   let path = BN_path(BTN.parentId);
-  let gettingItem = browser.storage.local.get(
-	{popuptop_option: 300,
-	 popupleft_option: 300
-	}
-  );
-  gettingItem.then((res) => {
-  	// Open popup window where it was last. If it was in another screen than
-  	// our current screen, then center it.
-  	// This avoids having the popup out of screen and unreachable, in case
-  	// the previous screen went off, or display resolution changed.
-  	let top = res.popuptop_option;
-  	let left = res.popupleft_option;
-  	let scr = window.screen;
-  	let adjust = false;
-  	if ((left < scr.availLeft) || (left >= scr.availLeft + scr.availWidth)) {
-  	  adjust = true;
-  	  left = scr.availLeft + Math.floor((scr.availWidth - PopupWidth) / 2);
-  	}
-  	if ((top < scr.availTop) || (top >= scr.availTop + scr.availHeight)) {
-   	  adjust = true;
-   	  top = scr.availTop + Math.floor((scr.availHeight - PopupHeight) / 2);
-   	}
-  	if (adjust) { // Save new values
-  	  browser.storage.local.set({
-  		popuptop_option: top,
-  		popupleft_option: left
-  	  });
-  	}
-	  	  
-    browser.windows.create(
-      {titlePreface: "New folder",
-	   type: "popup",
-//	     type: "detached_panel",
-	   // Using a trick with URL parameters to tell the window which type
-       // it is, which bookmark id, .. etc .. since titlePreface doesn't appear to work
-	   // and there appears to be no way to pass parameters to the popup by the call. 
-	   url: PopupURL+"?type=newfldr&id="+BTN.id+"&path="+encodeURIComponent(path)+"&title="+encodeURIComponent(BTN.title)+"&url=null",
-//----- Workaround for top and left position parameters being ignored for panels -----
-// Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
-// Make the start size as small as possible so that it briefly flashes in its initial
-// position in the least conspicuous way.
-// Note: 1,1 does not work, this sets the window in a state reduced to the bar, and no
-// internal resize seems to work after that.
-// Also tried to start minimized, but the window pops in a big size first before being minimized,
-// even les pretty.			   .
-// => .. FF does not seem very clean on all this .. :-( 
-//	     height: PopupHeight,
-//	     width: PopupWidth
-	   height: 40,
-	   width: 40,
-//		 left: left,
-//		 top: top,
-//----- End of position ignored workaround -----
-	   allowScriptsToClose: true
-	  }
-    );
-  });
+  openPropPopup("new", BTN.id, path, BTN.type, BTN.title, undefined);
 
   // Don't call refresh search, it is already called through bkmkCreatedHandler
 }
@@ -4747,13 +4928,18 @@ function keyHandler (e) {
 	}
   }
   else if (target.id == "searchtext") {
-	if (key == "Enter") { // Enter in search input box should go to first search result if any
-	  // Get to first row if there is one
-	  let len = resultsTable.rows.length;
-	  if (len > 0) {
-		let firstRow = resultsTable.rows[0];
-		let cell = firstRow.firstElementChild;
-		cell.focus();
+	if (key == "Enter") { // Enter in search input box should execute new search or go to first search result if any
+	  if (sboxState == SBoxChanging) { // If new content in search box, execute search in parallel
+		triggerUpdate();
+	  }
+	  else if (resultsTable != undefined) {
+		// Get to first row if there is one
+		let len = resultsTable.rows.length;
+		if (len > 0) {
+		  let firstRow = resultsTable.rows[0];
+		  let cell = firstRow.firstElementChild;
+		  cell.focus();
+		}
 	  }
 	  e.preventDefault();
 	}
@@ -5413,77 +5599,10 @@ function menuRefreshFav (BN_id) {
  */
 function menuProp (BN_id) {
   let BN = curBNList[BN_id];
-  let type = BN.type;
 
   // Open popup on bookmark item
   let path = BN_path(BN.parentId);
-  let url;
-  if (type == "folder") {
-	url = PopupURL+"?type=propfldr&id="+BN_id+"&path="+encodeURIComponent(path)+"&title="+encodeURIComponent(BN.title)+"&url=null";
-  }
-  else {
-	url = PopupURL+"?type=propbkmk&id="+BN_id+"&path="+encodeURIComponent(path)+"&title="+encodeURIComponent(BN.title)+"&url="+encodeURIComponent(BN.url);
-  }
-  url = encodeURI(url);
-  let gettingItem = browser.storage.local.get(
-   	{popuptop_option: 300,
-   	 popupleft_option: 300
-   	}
-  );
-  gettingItem.then((res) => {
-	// Open popup window where it was last. If it was in another screen than
-	// our current screen, then center it.
-	// This avoids having the popup out of screen and unreachable, in case
-	// the previous screen went off, or display resolution changed.
-	let top = res.popuptop_option;
-	let left = res.popupleft_option;
-//console.log("menuProp() - top="+top+" left="+left);
-	let scr = window.screen;
-	let adjust = false;
-	if ((left < scr.availLeft) || (left >= scr.availLeft + scr.availWidth)) {
-	  adjust = true;
-	  left = scr.availLeft + Math.floor((scr.availWidth - PopupWidth) / 2);
-	}
-	if ((top < scr.availTop) || (top >= scr.availTop + scr.availHeight)) {
-	  adjust = true;
-	  top = scr.availTop + Math.floor((scr.availHeight - PopupHeight) / 2);
-	}
-	if (adjust) { // Save new values
-	  browser.storage.local.set({
-		popuptop_option: top,
-		popupleft_option: left
-	  });
-//console.log("menuProp() - had to adjust position top="+top+" left="+left);
-	}
-  
-	browser.windows.create(
-	  {titlePreface: "Properties of « "+BN.title+" »",
-	   type: "popup",
-//		 type: "detached_panel",
-	   // Using a trick with URL parameters to tell the window which type
-	   // it is, which bookmark id, .. etc .. since titlePreface doesn't appear to work
-	   // and there appears to be no way to pass parameters to the popup by the call. 
-	   url: url,
-//----- Workaround for top and left position parameters being ignored for panels -----
-//Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
-//Make the start size as small as possible so that it briefly flashes in its initial
-//position in the least conspicuous way.
-//Note: 1,1 does not work, this sets the window in a state reduced to the bar, and no
-//internal resize seems to work after that.
-//Also tried to start minimized, but the window pops in a big size first before being minimized,
-//even less pretty.			   .
-//=> .. FF does not seem very clean on all this .. :-( 
-//       height: PopupHeight,
-//       width: PopupWidth,
-	   height: 40,
-	   width: 40,
-//	     left: left,
-//		 top: top,
-//----- End of position ignored workaround -----
-	   allowScriptsToClose: true
-	  }
-	);
-  });
+  openPropPopup("prop", BN_id, path, BN.type, BN.title, BN.url);
 }
 
 /*
@@ -5763,7 +5882,7 @@ function clickHandler (e) {
 	  menuAction = true;
 	  setSFieldTitleOnlyHandler();
 	}
-	else if (classList.contains("menusfurl")) { // Search options
+	else if (classList.contains("menusfurl") && (!SFieldUrlOnlyInput.disabled)) { // Search options
 	  menuAction = true;
 	  setSFieldUrlOnlyHandler();
 	}
@@ -5783,15 +5902,26 @@ function clickHandler (e) {
 	  menuAction = true;
 	  setSMatchRegexpHandler();
 	}
+	else if (classList.contains("menusfall")) { // Search options
+	  menuAction = true;
+	  setSFilterAllHandler();
+	}
+	else if (classList.contains("menusffldr")) { // Search options
+	  menuAction = true;
+	  setSFilterFldrOnlyHandler();
+	}
+	else if (classList.contains("menusfbkmk")) { // Search options
+	  menuAction = true;
+	  setSFilterBkmkOnlyHandler();
+	}
 
 	// Clear open menus on left or middle click, or on right click but only on (a menu action
 	// or outside bookmarks or results).
 	// Indeed, sometimes, the "click" Handler is called after the "context" Handler
 	// instead of before, and so we do not want to close what we just opened :-( (in Linux at least)
-	let button = e.button;
 	let targetType = Object.prototype.toString.call(target).slice(8, -1);
 //console.log("targetType: "+targetType+" classList: "+classList+" classList.length: "+classList.length);
-	if ((button != 2) || menuAction || (classList == undefined) || (classList.length == 0)
+	if (menuAction || (classList == undefined) || (classList.length == 0)
 		|| (targetType == "HTMLBodyElement") || (targetType == "HTMLInputElement") || (targetType == "HTMLTextAreaElement")
 	   ) {
 	  clearMenu();
@@ -5808,7 +5938,9 @@ function onClickedContextMenuHandler (info, tab) {
   let bnId = info.bookmarkId;
 //console.log("menu item clicked on <"+bnId+"> with contexts="+info.contexts+" menuIds="+info.menuIds+" menuItemId="+info.menuItemId+" pageUrl="+info.pageUrl+" targetElementId="+info.targetElementId+" viewType="+info.viewType+" tab="+tab);
   if (myMenu_open // This sidebar instance is the one which opened the context menu
-	  && (info.viewType == "sidebar") && (bnId != undefined) && (bnId.length > 0)) { // Context menu inside of sidebar
+	  && ((info.viewType == "sidebar") || (info.viewType == "tab")) // Context menu inside of sidebar or insde BSP2 in a tab
+	  && (bnId != undefined) && (bnId.length > 0)
+	 ) {
 	// Retrieve the clicked menu action
 	let menuItemId = info.menuItemId;
 	let pos = menuItemId.indexOf("-");
@@ -5894,6 +6026,16 @@ function onClickedContextMenuHandler (info, tab) {
  */
 function onHiddenContextMenuHandler () {
   myMenu_open = false; // This sidebar instance menu closed, do not interpret onClicked events anymore
+}
+
+/*
+ * Reset all filters
+ */
+function resetFiltersButtonHandler (e) {
+  e.stopImmediatePropagation();
+  e.preventDefault();
+  clearMenu(); // Clear any open menu
+  resetSearchHandler();
 }
 
 /*
@@ -6083,7 +6225,7 @@ function handleAddonMessage (request, sender, sendResponse) {
 		let setColors_option_old = setColors_option;
 		let textColor_option_old = textColor_option;
 		let bckgndColor_option_old = bckgndColor_option;
-		let reversePath_option_old = reversePath_option;
+		let closeSibblingFolders_option_old = closeSibblingFolders_option;
 		let altFldrImg_option_old = altFldrImg_option;
 		let useAltFldr_option_old = useAltFldr_option;
 		let traceEnabled_option_old = traceEnabled_option;
@@ -6405,7 +6547,8 @@ function completeDisplay () {
 	SearchResult.addEventListener("dragleave", rsltMouseLeaveHandler, true);
   }
 
-  // Setup mouse handlers for search button
+  // Setup mouse handlers for search buttons
+  ResetFiltersButtonInput.addEventListener("click", resetFiltersButtonHandler);
   SearchButtonInput.addEventListener("click", searchButtonHandler);
   SearchButtonInput.addEventListener("contextmenu", searchButtonHandler);
 
@@ -6654,7 +6797,7 @@ function setBackgroundColors (cssRules, prop) {
 	prop = "white";
   }
 
-  cssStyleRule = getStyleRule(cssRules, "body");
+  cssStyleRule = getStyleRule(cssRules, "html, body");
   style = cssStyleRule.style; // A CSSStyleDeclaration object
   style.setProperty("background-color", prop);
 
@@ -6680,7 +6823,7 @@ function setTextColors (cssRules, prop) {
   if ((prop != undefined) && (prop != null)) {
 	sidebarTextColor = prop;
 
-	cssStyleRule = getStyleRule(cssRules, "body");
+	cssStyleRule = getStyleRule(cssRules, "html, body");
 	style = cssStyleRule.style; // A CSSStyleDeclaration object
 	style.setProperty("color", prop);
 
@@ -6704,7 +6847,7 @@ function setTextColors (cssRules, prop) {
   else {
 	sidebarTextColor = undefined;
 
-	cssStyleRule = getStyleRule(cssRules, "body");
+	cssStyleRule = getStyleRule(cssRules, "html, body");
 	style = cssStyleRule.style; // A CSSStyleDeclaration object
 	style.removeProperty("color");
 
@@ -6996,7 +7139,7 @@ function initialize2 () {
   SearchTextInput.addEventListener("input", manageSearchTextHandler);
 
   // Catch clicks on the Cancel search button
-  CancelSearchInput.addEventListener("click", clearSearchTextHandler);
+  CancelSearchInput.addEventListener("click", cancelSearchTextHandler);
 //    CancelSearchInput.addEventListener("contextmenu", contextSearchTextHandler);
 
   // Display the bookmarks tree inside the sidebar table
@@ -7019,6 +7162,7 @@ function initialize2 () {
   completeDisplay();
 
   // Display our version number
+/*
   browser.management.getSelf()
   .then(
 	function (extensionInfo) {
@@ -7038,6 +7182,7 @@ function initialize2 () {
 	  SearchButtonInput.title = title2;
 	}
   );
+*/
 }
 
 /*
@@ -7199,7 +7344,7 @@ Promise.all([p_platform, p_background, p_ffversion, p_getTab])
 //console.log("is in sidebar");
 	  isInSidebar = true;
 	}
-	
+
 	initialize();
   }
 );

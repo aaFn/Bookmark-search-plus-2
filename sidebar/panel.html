@@ -8,7 +8,8 @@
 
 <body id="body" class="fontdflt">
   <div id="searchbox">
-    <button type="button" id="sbutton" class="swboth"><div id="mglass"></div></button>
+    <button type="button" id="sresetflt" class="sreset" title="Reset filters" disabled><div id="sfilters"></div></button>
+    <button type="button" id="sbutton" class="swboth sfilterall"><div id="mglass"></div></button>
     <input id="searchtext" type="text" placeholder="Search bookmarks.." class="fontdflt" size=1 autofocus>
     <input id="cancelsearch" type="image" src="/icons/empty.png" disabled>
   </div>
@@ -252,7 +253,7 @@
 	</div>
     <div class="menusfurl">
   	  <input type="radio" class="menuinputradio" name="searchfields" id="urlonly">
-  	  <label for="urlonly" class="menulabel">URL only</label>
+  	  <label for="urlonly" class="menulabel" id="lblurlonly">URL only</label>
 	</div>
     <hr class="menuhr">
     <div class="menussall">
@@ -271,6 +272,19 @@
     <div class="menusmregexp">
   	  <input type="radio" class="menuinputradio" name="matchmethod" id="regexp">
   	  <label for="regexp" class="menulabel">Use regex</label>
+	</div>
+    <hr class="menuhr">
+    <div class="menusfall">
+  	  <input type="radio" class="menuinputradio" name="searchfilter" id="fall" checked>
+  	  <label for="fall" class="menulabel">Show all (default)</label>
+	</div>
+    <div class="menusffldr">
+  	  <input type="radio" class="menuinputradio" name="searchfilter" id="ffldronly">
+  	  <label for="ffldronly" class="menulabel">Show folders only</label>
+	</div>
+    <div class="menusfbkmk">
+  	  <input type="radio" class="menuinputradio" name="searchfilter" id="fbkmkonly">
+  	  <label for="fbkmkonly" class="menulabel">Show bookmarks only</label>
 	</div>
     <hr class="menuhr">
     <div class="menuopenbsp2">Open BSP2 in a tab</div>
