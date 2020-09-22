@@ -1,6 +1,64 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.83 Bugs and Improvements
+    - Corrected a bug where hitting the "Enter" key inside the search box when no result table was displayed
+      was generating an exception.
+    - Added an option to only wait for "Enter" key (or "Enter" icon click) inside the search box to launch
+      search, instead of also triggering search after 0.5s of key typing inactivity (native FF Bookmark sidebar
+      behavior). This is for people who prefer something less interactive, and who can then type at their own
+      rhythm.
+         https://github.com/aaFn/Bookmark-search-plus-2/issues/157
+    - Show a "Enter" icon in the button at end of search box when changing its content, to launch search (same
+      effect as pressing "Enter" key).
+         https://github.com/aaFn/Bookmark-search-plus-2/issues/157
+    - Reduced delay for updating search results on events like search filters change, or bookmark item changes. 
+- 2.0.82 Improvements
+    - Added display of a default PDF favicon when a bookmarked URL returns no favicon, and the URL ends in ".pdf"
+      in lowercase.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/126
+    - Added option to close all other open folders at same level (under same parent) when opening a folder, to
+      keep only one folder open at a time for clarity.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/128 
+        and https://addons.mozilla.org/en-US/firefox/addon/bookmark-search-plus-2/reviews/1474439/
+- 2.0.81 Bugs and Improvements
+    - Added partial protection against adverse bookmark property window positioning effects induced by
+      privacy.resistFingerprinting = true. This FF mode, activated by a minority of users, does not allow the
+      add-on to get the real screen size, and does not say it is active :-(. The improvement is limited to some
+      special cases presumably only happening in that mode, to not impact the majority of users.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/148
+    - Modified the new "Reset filters" button to make it sharper and clearer, and to be disabled when no filter
+      is applied => it is now enabled only when there is/are some filter(s) active.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/151
+    - Corrected a bug where the FF dynamic behavior on scrollbar colors, introduced with FF 72, was not applying.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/153
+        https://www.ghacks.net/2019/11/11/firefox-72-dynamic-scrollbars-based-on-page-color/
+- 2.0.80 Bugs & Improvements
+    - Some more code clean up.
+    - Worked around an inconsistency in FF API related to system DPI settings / zoom factor, impacting
+      window.devicePixelRatio, but not window.screenX and screenY, so leading to bookmark property window
+      shifting from one open to another when the system scale ratio was different from 1.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/151
+    - Aligned Name/title and Location/URL between bookmark properties and filters
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/151
+    - Added options to the filter menu to show folders only or bookmarks only in the search result, or to
+      show all as default.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/151
+    - Added a button at front of the filter button for resetting filters to default (= none). Modified the
+      filter button to show the active filters / match methods on hover instead of BSP2 version.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/151
+    - Corrected a regression where context menu actions were not executed when BSP2 was open in a tab.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/151
+- 2.0.79 Bugs & Improvements
+    - Shortened the BSP2 menu label which shows path of a bookmark in native FF interfaces (and other compatible
+      add-ons).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/148
+    - Corrected a regression where the BSP2 context menu was not showing properly when open in a tab.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/151
+    - Improved search box behavior by refreshing any already active search when changing the filter menu options
+      instead of clearing the search.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/151
+    - Some code cleanup
 - 2.0.78 Bugs
     - Corrected a bug where all previous active records in bookmark history become inactive, on first bookmark
       action appended after a trim in history where 1 or more past records were removed.
