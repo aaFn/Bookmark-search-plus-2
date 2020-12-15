@@ -1,6 +1,55 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.84 Bugs and Improvements
+    - Introduced internal code support for multi-bookmarks selection and drag & drop, first phase before delivering
+      the function in UI in a next release.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/29
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/163
+    - Set bookmark selection on mouse down event instead of waiting for click, auxclick, contextmenu mouse-up events,
+      to align curent selection with row dragged information (no such event fired when dragging, can lead to
+      trouble, in particular when going to multi-bookmark selection).
+    - Corrected a bug where middle button click on a search result was not selecting the item.
+    - Added Ctrl-C, Ctrl-X and Ctrl-V keyboard shortcuts for Copy, Cut and Paste.
+    - Corrected a bug where cut on a search result row was not dimming the corresponding row in the bookmark
+      tree, and was improperly setting the no-paste protection zone when cutting a folder.
+    - Aligned no-paste/no-drop protection zone for single bookmarks and separators to the same logic as folders
+      = cannot paste / drop before itself.
+    - Added no-drop protection zone when dragging bookmark items from another BSP2 instance or from FF native bookmarks,
+      to avoid odd things like pasting a folder in itself (already protected when drag within same BSP2 instance).
+      Note: for FF native bookmark sidebar originated drags, the protection happens only when the drop operation
+      is complete, since the FF native bookmark sidebar doesn't give dragged values until moment of drop, so cannot
+      show an interdiction sign on the mouse during the drag :-( ).
+    - Disabled the no-drop protection zone when pressing Ctrl key while dropping, since this is a copy operation.
+    - Added visual feedback on drag pointer to indicate when Copy (Ctrl key pressed), for BSP2 internal drags.
+    - Added support for tab dragging from one FF window to a BSP2 sidebar running in another FF window. 
+    - Better support for any tab dragging into BSP2 bookmarks pane, even those with special "about:...." URLs.
+    - Workaround for introducing back multi-tabs drag support, not supported anymore by FF API since version 71 :-(.
+    - Added support for multiple URL shortcut drags from Windows, Linux and MacOS desktops and file managers to BSP2,
+      and mono-bookmark drag from BSP2 to Windows, Linux and MacOS desktops and file managers.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/163
+    - Do not fetch favicon when switching to a tab which has an internal icon chrome://global/skin/icons/,
+      as this is generating a security exception. 
+    - Corrected a bug where "Refresh favicon" menu item was still active in FF native context menu when favicon
+      fetching  was disabled.
+    - Do not refresh favicon on "file:" type of URLs.
+    - Corrected a bug where the option to not include cookies on favicon fetching was not respected on manual favicon
+      refresh from context menu.
+    - Set transparency on the "no favicon" background, so that it doesn't look weird on colored backgrounds.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/165
+    - Added option to change the "No favicon" icon to a custom one.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/165
+    - Corrected a bug where the "Use alternate folder icon" checkbox was enabled although no image was loaded as
+      as alternate folder icon.
+    - Adjusted slightly the "Advanced click" option description for hopefully a more explicit one.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/162
+    - Disabled F2 key on std bookmarks, a leftover of a try for in-place edit, not working well.
+    - Now open BSP2 bookmark property popup, when in the context menu of a native FF bookmark (sidebar,
+      history, toolbar ..) and clicking on the path of the bookmark item, inside the submenu of BSP2 added
+      "Bookmark path" action. This is to overcome submenu size limits when path it too long, as well as to have a
+      rapid access to BSP2 properties window.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/160
+    - Code cleaning and optimizations.
 - 2.0.83 Bugs and Improvements
     - Corrected a bug where hitting the "Enter" key inside the search box when no result table was displayed
       was generating an exception.
