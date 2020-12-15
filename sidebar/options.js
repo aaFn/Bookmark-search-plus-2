@@ -49,6 +49,9 @@ const BckgndColorSpan = document.querySelector("#bcstring");
 const AltFldrFileInput = document.querySelector("#altfldrfile");
 const AltFldrImg = document.querySelector("#altfldrimg");
 const UseAltFldrInput = document.querySelector("#usealtfldr");
+const AltNoFavFileInput = document.querySelector("#altnofavfile");
+const AltNoFavImg = document.querySelector("#altnofavimg");
+const UseAltNoFavInput = document.querySelector("#usealtnofav");
 const Command1Select = document.querySelector("#command1");
 const Command2Select = document.querySelector("#command2");
 const Opt2 = document.createElement("option");
@@ -224,11 +227,16 @@ function saveOptions (e) {
   BckgndColorInput.title = bckgndColor;
   BckgndColorSpan.textContent = colorLabel(bckgndColor);
   BckgndColorInput.disabled = TextColorInput.disabled = !setcolors || matchtheme;
-  let altFldrImg = AltFldrImg.src;
-  if (altFldrImg == "") {
-	altFldrImg = undefined;
+  let altFldrImgSrc = AltFldrImg.src;
+  if ((altFldrImgSrc == "") || (altFldrImgSrc == AltFldrImg.baseURI)) {
+	altFldrImgSrc = undefined;
   }
   let useAltFldr = (!UseAltFldrInput.disabled) && UseAltFldrInput.checked;
+  let altNoFavImgSrc = AltNoFavImg.src;
+  if ((altNoFavImgSrc == "") || (altNoFavImgSrc == AltNoFavImg.baseURI)) {
+	altNoFavImgSrc = undefined;
+  }
+  let useAltNoFav = (!UseAltNoFavInput.disabled) && UseAltNoFavInput.checked;
 
   // Save options
   browser.storage.local.set({
@@ -255,8 +263,10 @@ function saveOptions (e) {
 	,setcolors_option: setcolors
 	,textcolor_option: textColor
 	,bckgndcolor_option: bckgndColor
-	,altfldrimg_option: altFldrImg
+	,altfldrimg_option: altFldrImgSrc
 	,usealtfldr_option: useAltFldr
+	,altnofavimg_option: altNoFavImgSrc
+	,usealtnofav_option: useAltNoFav
 	,sidebarcommand_option: sidebarCommand
 	,traceEnabled_option: TraceEnabledInput.checked
   })
@@ -645,6 +655,17 @@ function restoreOptions () {
 	}
   }
 
+  let useAltNoFavDisabled = true;
+  if (altNoFavImg_option_file != undefined) {
+	AltNoFavImg.src = altNoFavImg_option_file;
+	useAltNoFavDisabled = UseAltNoFavInput.disabled = false;
+  }
+  if (useAltNoFav_option_file != undefined) {
+	if (!useAltNoFavDisabled) {
+	  UseAltNoFavInput.checked = useAltNoFav_option_file;
+	}
+  }
+
   if (sidebarCommand_option_file != undefined) {
 	sidebarCommand = sidebarCommand_option_file;
 	if (!beforeFF60) {
@@ -775,24 +796,57 @@ function changeSidebarCommand () {
 }
 
 /*
- * Load image from specified alternative folder image file
+ * Machanics to load image from specified alternative image files
  */
 let cvtUri;
+let cvtImg;
+let cvtUseInput;
 const CvtImage = new Image(16, 16);
 CvtImage.onload = convertOnLoad;
 CvtImage.onerror = errorCvtOnLoad;
-function altFldrImgLoad () {
+
+function altFldrImgLoad () { // When loading a new Folder image
   let file = AltFldrFileInput.files[0];
-  let reader = new FileReader();
-
-  reader.addEventListener("load", function () {
-	// convert image file to data: base64 URI
-	CvtImage.src = cvtUri = reader.result;
-  }, false);
-
   if (file) {
+	let reader = new FileReader();
+
+	// Prepare callback function for conversion and store in local storage when file content is read
+	reader.addEventListener(
+	  "load",
+	  function () {
+		cvtImg = AltFldrImg;
+		cvtUseInput = UseAltFldrInput;
+		// convert image file to data: base64 URI
+		CvtImage.src = cvtUri = reader.result;
+	  },
+	  false
+	);
+
+	// Read and then convert
 	reader.readAsDataURL(file);
-  }  
+  }
+}
+
+function altNoFavImgLoad () { // When loading a new No-favicon image
+  let file = AltNoFavFileInput.files[0];
+  if (file) {
+	let reader = new FileReader();
+
+	// Prepare callback function for conversion and store in local storage when file content is read
+	reader.addEventListener(
+	  "load",
+	  function () {
+		cvtImg = AltNoFavImg;
+		cvtUseInput = UseAltNoFavInput;
+		// convert image file to data: base64 URI
+		CvtImage.src = cvtUri = reader.result;
+	  },
+	  false
+	);
+
+	// Read and then convert
+	reader.readAsDataURL(file);
+  }
 }
 
 /*
@@ -835,20 +889,21 @@ function convertOnLoad () {
 		CvtCtx.drawImage(CvtImage, 0, 0, 16, 16);
 	  }
 	  convertedUri = CvtCanvas.toDataURL();
-	  AltFldrImg.src = convertedUri;
-	  UseAltFldrInput.disabled = false;
+	  cvtImg.src = convertedUri;
+	  cvtUseInput.disabled = false;
 	}
 	catch (error) { // Error on rescale, keep original
-	  AltFldrImg.src = "";
-	  AltFldrImg.alt = "Scaling error";
-	  UseAltFldrInput.disabled = true;
-	  UseAltFldrInput.checked = false;
+	  cvtImg.src = "";
+	  cvtImg.alt = "Scaling error";
+	  cvtUseInput.disabled = true;
+	  cvtUseInput.checked = false;
 	}
   }
   else { // Cannot rescale or no need to, keep original
-	AltFldrImg.src = cvtUri;
-	UseAltFldrInput.disabled = false;
+	cvtImg.src = cvtUri;
+	cvtUseInput.disabled = false;
   }
+  // Store result in local storage
   saveOptions(undefined);
 }
 
@@ -856,10 +911,10 @@ function convertOnLoad () {
  * Error on loading the image to convert, triggered by error when loading CvtImage.src
  */
 function errorCvtOnLoad (error) {
-  AltFldrImg.src = "";
-  AltFldrImg.alt = "Error on load";
-  UseAltFldrInput.disabled = true;
-  UseAltFldrInput.checked = false;
+  cvtImg.src = "";
+  cvtImg.alt = "Error on load";
+  cvtUseInput.disabled = true;
+  cvtUseInput.checked = false;
   saveOptions(undefined);
 }
 
@@ -991,12 +1046,12 @@ function resetMigr16x16 () {
   let pos = structureVersion.indexOf(VersionImg16);
   if (pos != -1) { // Remove the flag
 	structureVersion = structureVersion.slice(0, pos)
-	                   + structureVersion.slice(pos + VersionImg16.length);
+					   + structureVersion.slice(pos + VersionImg16.length);
 //    console.log("structureVersion: <<"+structureVersion+">>");
 
-    browser.storage.local.set({
-  	  structureVersion: structureVersion
-    });
+	browser.storage.local.set({
+	  structureVersion: structureVersion
+	});
   }
 
   // Disable button
@@ -1067,7 +1122,9 @@ function initialize2 () {
   TextColorInput.addEventListener("change", saveOptions);
   BckgndColorInput.addEventListener("change", saveOptions);
   AltFldrFileInput.addEventListener("change", altFldrImgLoad);
+  AltNoFavFileInput.addEventListener("change", altNoFavImgLoad);
   UseAltFldrInput.addEventListener("change", saveOptions);
+  UseAltNoFavInput.addEventListener("change", saveOptions);
   Command1Select.addEventListener("change", changeSidebarCommand1);
   Command2Select.addEventListener("change", changeSidebarCommand);
   Command3Select.addEventListener("change", changeSidebarCommand);

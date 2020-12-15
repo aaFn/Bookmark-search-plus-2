@@ -228,7 +228,7 @@ function retrieveHref (text) {
 
   // Get the value with current Caps and lower case mix, and return it
   // Indeed, /i is only used for matching, but the result and groups still contain upper cases if there are 
-  let faviconUrl = a_href[1];
+  let faviconUrl = a_href[1]; // 0 is the full matched string, 1 is the first () group matched
 
   return(faviconUrl);
 }
@@ -632,7 +632,7 @@ async function handleRequest () {
 //let nbBNmin = 0;
 //let nbBNmax = nbBNmin + 100;
 function faviconWorkerPostMessage (e) { // e is of type MessageEvent,
-  // and its data contains [action, bnId, url, enableCookies], with:
+  // and its data contains [action, bnId, bnUrl, enableCookies], with:
   //
   // action = a string, either "get", "get2", "iconurl", "hysteresis" or "nohysteresis"
   // bnId = Id of a BookmarkNode of type "bookmark"
@@ -663,6 +663,7 @@ function faviconWorkerPostMessage (e) { // e is of type MessageEvent,
 	reqQueue.length = 0; // No more request
   }
   else {
+	let url = data[1];
 	if (action == "get2") { // If this is a manual refresh favicon request, or an existing bookmark,
 	  						// put the request at front of the queue, and reset hysteresis to
 	  						// normal Cadence value.
@@ -678,7 +679,7 @@ function faviconWorkerPostMessage (e) { // e is of type MessageEvent,
 	  }
 	  reqQueue.unshift(data); // Add new request at beginning
 	}
-	else {
+	else { // Not a manual refresh of favicon, queue at end
 //	  if (((nbBN >= nbBNmin) && (nbBN < nbBNmax)) || e.data[0].startsWith("icon:") || e.data[0].startsWith("get2")) {
 	  reqQueue.push(data); // Add new request at end
 	}

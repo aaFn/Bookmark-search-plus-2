@@ -41,7 +41,7 @@
     <label for="simple">Simple click = always "Show bookmark"</label>
     <br/>
     <input type="radio" name="clickoption" id="advanced">
-    <label for="advanced">Advanced click = <img src="/icons/clickshow.png"> "Show bookmark", or <img src="/icons/clickopen.png"> "Open" bookmark in active tab</label>
+    <label for="advanced">Advanced click = blank <img src="/icons/clickshow.png"> "Show bookmark", and bookmark <img src="/icons/clickopen.png"> "Open" in active tab</label>
   </div>
   <p>
     <input type="checkbox" id="showpath">
@@ -81,6 +81,11 @@
 	<br/>
 	<input type="checkbox" id="usealtfldr" disabled>
 	<label for="usealtfldr">Use alternate folder icon</label>
+	<br/>
+	<span>Alternate no-favicon icon: <img src="" height="16" width="16" alt="No image" id="altnofavimg"> </span><label for="altnofavfile"> -> Load a new one: </label><input type="file" accept="image/*" id="altnofavfile">
+	<br/>
+	<input type="checkbox" id="usealtnofav" disabled>
+	<label for="usealtnofav">Use alternate no-favicon icon</label>
 	<br/>
 	<span><i>Note: you can use <a href="https://github.com/aaFn/Bookmark-search-plus-2/tree/master/altFldrIcons">github repo</a> to find other icons or for your contributions</i></span>
   </div>

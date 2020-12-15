@@ -63,10 +63,9 @@ var mostVisitedBNId, mostVisitedBN, recentTagBNId, recentTagBN, recentBkmkBNId, 
 //    undefined for separators and for root node.
 // faviconUri Optional
 //    A string URI (data: ..) holding the bookmark favicon, for display.
-//    undefined for separators and for root node, or for bookmarks for which we didn't yet
-//    retrieve the favicon.
+//    Undefined for separators and for root node, or when no favicon fetching
 // fetchedUri Optional
-//    A boolean indicating for bookmark if the uri is internal or was fetched from Internet,
+//    A boolean indicating for bookmark if the uri is BSP2 internal or was fetched from Internet / FF,
 //    and indicating for folder if this is a special folder favicon or a standard one.
 // url Optional
 //    A string which represents the URL for the bookmark.
@@ -105,6 +104,8 @@ function BookmarkNode (id, type, level, parentId, dateAdded, protect = false,
 
 /*
  * Recursively convert the BN tree to plain text, with indentation
+ * BN = BookmarkNode to "print" to plain text
+ * indent = String, leading part before printed string and before tab indented folder contents
  * 
  * Returns: a String
  */
@@ -132,6 +133,7 @@ function BN_toPlain (BN, indent = "") {
 
 /*
  * Recursively convert the BN tree to HTML
+ * BN = BookmarkNode to "print" to HTML
  * 
  * Returns: a String
  */
@@ -522,12 +524,8 @@ function getType (BTN) {
 // level = depth in tree.
 // faviconWorker = a worker to trigger favicon fetching if missing
 //
-// Relies on Global variables savedBkmkUriList, savedBNList and uglyHackTabFavIconUrl.
+// Relies on Global variables savedBkmkUriList and savedBNList
 // Returns the created node.
-let uglyHackTabFavIconUrl = undefined; // Used by bkmkDropHandler() to speed up favIconUrl
-									   // retrieval process when dragging & dropping a tab,
-									   // since there is no way to pass the favicon to the
-									   // bookmarks.create() call.
 function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
   let node;
   let BTN_id = BTN.id;
@@ -631,16 +629,13 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 		title = url;
 	  }
 	}
-	else if (url.startsWith("about:")) { // about: is protected - security error ..
+	else if (url.startsWith("about:") || url.startsWith("file:")) { // about: and file: generate a security error when we try to fetch ..
 	  uri = "/icons/nofavicon.png";
 	  fetchedUri = false;
-	  // about:blank and about:reader are not protected ... and now all of them
 	  // They are draggable, but keep favicon = nofavicon
 	  protect = false;
-//	  protect = (url != "about:blank") && !url.startsWith("about:reader?url=");
 	}
 	else if (disableFavicons_option) {
-	  uri = undefined;
 	  fetchedUri = false;
 	  protect = false;
 	}
@@ -662,7 +657,7 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 		  uri = BN.faviconUri;
 		  if ((uri == "/icons/nofavicontmp.png")  // Last time we stopped the sidebar
 			  || (uri == "/icons/waiting.gif")    // it didn't have time to fetch that
-		     ) {                                  // favicon .. so let's do it now.
+			 ) {                                  // favicon .. so let's do it now.
 			uri = undefined;
 		  }
 		}
@@ -692,22 +687,10 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 	);
 
 	if (triggerFetch && !pauseFavicons_option) { // Trigger favicon fetch, except if paused
-	  if (uglyHackTabFavIconUrl == undefined) {
-		// This is a bookmark, so here no need for cloneBN(), there is no tree below
-//		faviconWorker.postMessage(["get", BTN_id, url, enableCookies_option]);
-		if (faviconWorker != undefined) {
-		  faviconWorker({data: ["get", BTN_id, url, enableCookies_option]});
-		}
+	  // This is a bookmark, so here no need for cloneBN(), there is no tree below
+	  if (faviconWorker != undefined) {
+		faviconWorker({data: ["get", BTN_id, url, enableCookies_option]});
 	  }
-	  else {
-		// This is a bookmark, so here no need for cloneBN(), there is no tree below
-//		faviconWorker.postMessage(["icon", BTN_id, uglyHackTabFavIconUrl, enableCookies_option]);
-		// If uglyHackTabFavIconUrl is set, faviconWorker is not undefined
-		faviconWorker({data: ["icon", BTN_id, uglyHackTabFavIconUrl, enableCookies_option]});
-		
-//trace("Retrieval demand 1 sent for icon:"+uglyHackTabFavIconUrl);
-		uglyHackTabFavIconUrl = undefined; // One shot ..
-	  } 
 	}
   }
 
@@ -805,11 +788,31 @@ function BN_search (BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlS
 		if ((i.type != "separator")
 			&& (((url = i.url) == undefined) || !url.startsWith("place:"))  // Ignore special bookmarks
 		   ) {
-		  BN_search (i, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch, a_result)
+		  BN_search(i, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch, a_result)
 		}
 	  }
 	}
   }
+}
+
+// Search a BookmarkNode and its children for inclusion of a given BN
+//
+// Returns Boolean, true if searched BN is included
+function BN_includes (BN, sBN) {
+  let found = Object.is(BN, sBN);
+  if (!found && (BN.type == "folder")) {
+	let children = BN.children;
+	let len;
+	if ((children != undefined) && ((len = children.length) > 0)) {
+	  for (let i=0 ; i<len ; i++) {
+		if (BN_includes(children[i], sBN)) {
+		  found = true;
+		  break;
+		}
+	  }
+	}
+  }
+  return (found);
 }
 
 
@@ -854,7 +857,7 @@ function BN_trace (BN) {
 
 /*
  * Recursive build of BNList from a BN tree
- * BNList: the list (Array) to reconstruct
+ * BNList: the list (Object) to reconstruct
  * BN: source BN tree to build from
  * 
  * Returns: true if no null encountered while completing the BNList (= no error)
@@ -884,7 +887,7 @@ function recurRebuildBNList (BNList, BN) {
 
 /*
  * Rebuild the full BNList from a BN tree
- * BNList: the list (Array) to reconstruct
+ * BNList: the list (Object) to reconstruct
  * BN: source BN tree to build from
  * 
  * Returns: true if no null encountered while completing the BNList (= no error)
@@ -956,6 +959,73 @@ function searchBNRecur (BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, is
   }
 
   return(a_result);
+}
+
+/*
+ * Uniquely append a BN to a unique ordered list of BNs (Array) =
+ * - do not include if already there or already included by a listed BN
+ * - if added, add at end and remove previous listed BNs which it includes
+ * Unique list property is that all its elements are different, and none includes another one in its tree.
+ * 
+ * bnId = Id of BN to add
+ * BN = BN to add
+ * a_BNId = list of unique BN Ids to add to, [] if empty, cannot be undefined
+ * a_BN = list of unique BNs to add to, in same order than a_BNId, [] if empty
+ * addCopy = Boolean, if true add a copy  of BN, else add BN, to a_BN (if not undefined)
+ */
+function uniqueListAddBN (bnId, BN, a_BNIds, a_BN, addCopy = false) {
+  let is_included = false;
+  let len = a_BN.length;
+  if (len > 0) {
+	let is_including = false;
+	let tmpBN;
+	for (let i=0 ; i<len ; ) { // i is incremented, or len is decremented, inside loop
+	  tmpBN = a_BN[i];
+	  // Check if BN equals or is under tmpBN tree
+ 	  // If is_including is true (meaning BN includes tmpBN), then we do not need to check for is_included anymore,
+	  // because no node after previously included tmpBN could exist in unique list and include BN, or it would also
+	  // include current tmpBN, breaking the unique property of the list (all different, and none includes another) 
+	  if (!is_including && BN_includes(tmpBN, BN)) {
+		is_included = true;
+		break;
+	  }
+	  else if (BN_includes(BN, tmpBN)) { // Check if BN is under tmpBN tree. Note: tmpBN != BN if we are here
+		is_including = true;
+		// Remove tmpBN from list, since BN includes it and we're going to add it
+		a_BNIds.splice(i, 1);
+		a_BN.splice(i, 1);
+		// Decrease length
+		len--;
+	  }
+	  else {
+		i++;
+	  }
+	}
+  }
+  if (!is_included) { // If not there, add at end
+	a_BNIds.push(bnId);
+	if (addCopy) { // Add a copy of BN
+	  a_BN.push(BN_copy(BN));
+	}
+	else {
+	  a_BN.push(BN);
+	}
+  }
+}
+
+/*
+ * Create a copy of a unique list (containing a copy of all nodes)
+ * 
+ * a_BN = list of unique BNs to copy, [] if empty
+ * Returns an Arry copy of that list, with copied BookmarkNodes
+ */
+function uniqueListCopy (a_BN) {
+  let a_BNcopy = [];
+  let len = a_BN.length;
+  for (let i=0 ; i<len ; i++) {
+	a_BNcopy.push(BN_copy(a_BN[i]));
+  }
+  return(a_BNcopy);
 }
 
 /*
@@ -1034,12 +1104,10 @@ function scanBNTree (BN, faviconWorker, doStats = true) {
 		countOddities++;
 	}
 	let url = BN.url;
-	if (url == undefined) { // Change nothing
+	if ((url == undefined) || url.startsWith("file:")) { // Change nothing
 	}
-	else if (url.startsWith("about:")) { // Change nothing, except if protect is setL
-//	  if (BN.protect && url.startsWith("about:reader?url=")) {
-		BN.protect = false;
-//	  }
+	else if (url.startsWith("about:")) { // Change nothing also, except if protect is set
+	  BN.protect = false;
 	}
 	else if (migration_spfldr && url.startsWith("place:")) { // Change nothing also, but transform (and remember pointers) ..
 	  // These are now special folders, still counted as bookmarks

@@ -45,7 +45,6 @@ const HistoryNodeRetention = 30; // In days
 //const DfltSpaceSize = 0; // 0px default
 //const DfltTextColor = "#222426"; // Default text color
 //const DfltBckgndColor = "white"; // Default background color
-const PopupURL = browser.extension.getURL("sidebar/popup.html");
 
 const CvtCanvas = document.createElement('canvas'); // For image conversion to 16 x 16
 CvtCanvas.height = 16;
@@ -647,7 +646,7 @@ function refreshMostVisited (a_MVU) {
 	BTN.url               = i.url;
 	node = BN_create(BTN, 2, undefined); // Do not fetch any favicon yet
 	let uri = i.favicon;
-	if (uri != undefined) { // only with FF63, and if the favicon is known by FF
+	if (uri != undefined) { // Only with FF63+, when the favicon is known by FF
 	  node.faviconUri = uri;
 	  node.fetchedUri = true;
 	  // Convert to 16x16 if needed
@@ -688,6 +687,7 @@ function refreshRecentBkmks (a_BTN) {
 	origBN = curBNList[bnId];
 	if (origBN != undefined) {
 	  node.faviconUri = origBN.faviconUri;
+	  node.fetchedUri = origBN.fetchedUri;
 	}
 	listBN.push(node);
   }
@@ -985,6 +985,8 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  let bckgndColor_option_old = bckgndColor_option;
 	  let altFldrImg_option_old = altFldrImg_option;
 	  let useAltFldr_option_old = useAltFldr_option;
+	  let altNoFavImg_option_old = altNoFavImg_option;
+	  let useAltNoFav_option_old = useAltNoFav_option;
 	  let traceEnabled_option_old = traceEnabled_option;
 	  refreshOptionsLStore()
 	  .then(
@@ -1061,6 +1063,9 @@ function handleAddonMessage (request, sender, sendResponse) {
 			       || ((useAltFldr_option && (altFldrImg_option_old != altFldrImg_option))
 				  	   || (useAltFldr_option_old != useAltFldr_option)
 				  	  )
+			       || ((useAltNoFav_option && (altNoFavImg_option_old != altNoFavImg_option))
+				  	   || (useAltNoFav_option_old != useAltNoFav_option)
+				  	  )
 			      ) { // Those options only require a re-read and some minor actions
 			sendAddonMessage("savedOptions");
 		  }
@@ -1109,7 +1114,7 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  let pos = structureVersion.indexOf(VersionImg16);
 	  if (pos != -1) { // Remove the flag
 		structureVersion = structureVersion.slice(0, pos)
-		                   + structureVersion.slice(pos + VersionImg16.length);
+						   + structureVersion.slice(pos + VersionImg16.length);
 		migr16x16Open = true; // Reset to allow next migration signal to work
 		// Do not send any signal to add-ons. Migration is triggered when loading a new sidebar and displaying
 	  }
@@ -1360,6 +1365,7 @@ console.log("convertedUri: "+convertedUri);
 	  && (BN.faviconUri != convertedUri)) {
 //console.log("  different from previous uri: "+BN.faviconUri);
 	BN.faviconUri = convertedUri;
+	BN.fetchedUri = true;
 	historyListUpdateFaviconUri(curHNList, destCvtBnId, convertedUri);
 	saveBNList();
 
@@ -1421,15 +1427,16 @@ console.log("data: "+data);
  * bnId is BookmarktreeNode id string
  */
 function setWaitingFavicon (bnId) {
-  let uri = "/icons/waiting.gif";
 //console.log("bnId: "+bnId+" set to waiting");
 
-  // Keep waiting image in memory only, do not save (it has the temporary one on disk anyway)
   let BN = curBNList[bnId];
-  let lastUri = BN.faviconUri;
-  if ((lastUri == "/icons/nofavicontmp.png") && (countFetchFav > 0))
+  if ((BN.faviconUri == "/icons/nofavicontmp.png") && (countFetchFav > 0))
 	countFetchFav--;
+  let uri = "/icons/waiting.gif";
   BN.faviconUri = uri;
+  BN.fetchedUri = false;
+  // Keep waiting image in memory only, do not save (it has the temporary one on disk anyway)
+  // nor add to history
 
   // Signal to sidebars
   sendAddonMsgFavicon(bnId, uri);
@@ -1444,7 +1451,7 @@ function setNoFavicon (bnId) {
   // Save new favicon, if different from previous record
   let BN = curBNList[bnId];
   let uri;
-  if (BN.url.toLowerCase().endsWith(".pdf")) {
+  if (BN.url.toLowerCase().endsWith(".pdf")) { // In case we got a bookmark to PDF without favicon
 	uri = "/icons/pdffavicon.png";
   }
   else {
@@ -1455,6 +1462,7 @@ function setNoFavicon (bnId) {
 	if ((lastUri == "/icons/nofavicontmp.png") && (countFetchFav > 0))
 	  countFetchFav--;
 	BN.faviconUri = uri;
+	BN.fetchedUri = false;
 	historyListUpdateFaviconUri(curHNList, destCvtBnId, uri);
 	saveBNList();
 
@@ -1573,11 +1581,11 @@ function migrate16x16 (migr16x16ConvertList, migr16x16Len) {
 			// Set migration as finished
 			trace("Migration to 16x16 favicons complete");
 			trace("Count of abnormal favicons: "+count0x0Favicons, true); 
-		    structureVersion += VersionImg16;
-		    browser.storage.local.set({
-		  	  structureVersion: structureVersion
-		    });
-	      }
+			structureVersion += VersionImg16;
+			browser.storage.local.set({
+			  structureVersion: structureVersion
+			});
+		  }
 		  else {
 			destBnId = migr16x16ConvertList.shift();
 			migr16x16Len--;
@@ -1639,7 +1647,9 @@ function migrate16x16 (migr16x16ConvertList, migr16x16Len) {
 		}
 
 		// Save new favicon
-		curBNList[destBnId].faviconUri = migratedUri;
+		let BN = curBNList[destBnId];
+		BN.faviconUri = migratedUri;
+		BN.fetchedUri = true;
 		saveBNList();
 
 		// Signal to sidebars
@@ -1791,10 +1801,10 @@ function insertFF56EndGapSep (parentBN) {
  *       When creating several bookmarks in a row very fast like "Mark all tabs", we are getting
  *       plenty of requests nearly at the same time just after the initial parent folder, which are
  *       its children.
- *       And when we were using getSubTree(id) to get more on BTN children, since getSubTree() can be
- *       quite long, it frequently happened that children that we were starting to process while still
- *       processing the parent folder (thanks to the Promise mechanism) were processed faster than their
- *       parent, so their result arrived before.
+ *       And when using getSubTree(id) to get more on BTN children, since getSubTree() can be
+ *       quite long, it frequently happened that children were starting to process while still
+ *       processing the parent folder (thanks to the Promise mechanism), and were processed faster than their
+ *       parent, so their getSubTree() result arrived before the one of their parent.
  *       That ended up in a mess, with exceptions thrown since for ex. curRowList was not yet filled
  *       with the parent when children got executed, and so parentRowIndex was null, and we were calling
  *       insertBkmks() with therefore a null returned by bookmarksTable.rows[parentRowIndex] !!
@@ -1815,8 +1825,8 @@ function bkmkCreatedHandler (id, BTN) {
   let parentId = BTN.parentId;
   let parentBN = curBNList[parentId];
   let index = BTN.index;
-//  let t1 = new Date();
-//  trace(t1.getTime()+" Create event on: "+id+" type: "+BTN.type+" parentId: "+parentId+" index: "+index);
+//let t1 = new Date();
+//trace(t1.getTime()+" Create event on: "+id+" type: "+BTN.type+" parentId: "+parentId+" index: "+index);
 
   // Create the new BN tree and insert it under its parent
   let BN = buildTree(BTN, parentBN.level+1);
@@ -1959,6 +1969,7 @@ function bkmkChangedHandler (id, changeInfo) {
 //		faviconWorker.postMessage(["get2", id, cUrl, enableCookies_option]);
 		faviconWorkerPostMessage({data: ["get2", id, cUrl, enableCookies_option]});
 	  }
+	  BN.fetchedUri = false;
 	}
 
 	// Record action
@@ -2194,6 +2205,7 @@ function tabModified (tabId, changeInfo, tabInfo) {
 			if (!disableFavicons_option				// Ignore if disableFavicons_option is set
 				&& !pauseFavicons_option				// Ignore if pauseFavicons_option is set
 				&& (tabFaviconUrl != undefined)
+				&& (!tabFaviconUrl.startsWith("chrome://global/skin/icons/")) // Internal icon, we can't fetch it, security error
 			   ) {
 			  let bnId;
 			  for (let i=0 ; i<len ; i++) {
@@ -2367,19 +2379,17 @@ function onHiddenContextMenuHandler () {
 function onClickedContextMenuHandler (info, tab) {
   let menuItemId = info.menuItemId;
 //console.log("menuItemId = "+menuItemId);
-//  if (menuItemId == SubMenuPathId) {
+  if (menuItemId == SubMenuPathId) {
 //console.log("SubMenuPathId clicked");
-//  }
-//  else
+	let bnId =  info.bookmarkId;
+	let BN = curBNList[bnId];
+	openPropPopup("prop", bnId, BN_path(BN.parentId), BN.type, BN.title, BN.url);
+  }
+  else
   if (menuItemId == BAOpenTabId) {
 //console.log("BAOpenTabId clicked, tab id = "+tab.id);
-	// Open in new tab, referred by this tab to come back to it when closing
-	// Get current active tab as opener id to come back to it when closing the new tab
-	let href = SelfURL;
-	if (beforeFF57)
-	  browser.tabs.create({url: href});
-	else
-	  browser.tabs.create({url: href, openerTabId: tab.id});
+	// Open BSP2 in new tab, referred by this tab to come back to it when closing
+	openBsp2NewTab(tab);
   }
   else if (menuItemId == BAShowInSidebar) {
 //console.log("Show "+lastMenuBnId+" in BSP2 sidebar");
@@ -2400,73 +2410,7 @@ function onClickedContextMenuHandler (info, tab) {
   }
   else if (menuItemId == BAHistory) {
 	// Open Bookmark history window
-	let href = HistoryURL;
-	// Open in new window, like Properties popup
-	// Open popup window where it was last. If it was in another screen than
-	// our current screen, then center it.
-	// This avoids having the popup out of screen and unreachable, in case
-	// the previous screen went off, or display resolution changed.
-/*
-	let top = res.historytop_option;
-	let left = res.historyleft_option;
-	let scr = window.screen;
-	let adjust = false;
-	if ((left < scr.availLeft) || (left >= scr.availLeft + scr.availWidth)) {
-	  adjust = true;
-	  left = scr.availLeft + Math.floor((scr.availWidth - PopupWidth) / 2);
-	}
-	if ((top < scr.availTop) || (top >= scr.availTop + scr.availHeight)) {
-	  adjust = true;
-	  top = scr.availTop + Math.floor((scr.availHeight - PopupHeight) / 2);
-	}
-	if (adjust) { // Save new values
-	  browser.storage.local.set({
-		historytop_option: top,
-		historyleft_option: left
-	  });
-	}
-*/
-	// Open Bookmark history window if not already open, else just focus on it
-	browser.windows.getAll({populate: true, windowTypes: ["popup"]})
-	.then(
-	  function (a_Windowinfo) {
-		let wi, openedWi;
-		let wTitle = "("+selfName+") - Bookmark history -";
-		for (wi of a_Windowinfo) {
-		  if (wi.title.includes(wTitle)) {
-			openedWi = wi; 
-		  }
-		}
-		if (openedWi != undefined) {
-		  browser.windows.update(openedWi.id, {focused: true});
-		}
-		else {
-		  browser.windows.create(
-			{titlePreface: "Bookmark history",
-			 type: "popup",
-			 url: href,
-			 //----- Workaround for top and left position parameters being ignored for panels -----
-			 //Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
-			 //Make the start size as small as possible so that it briefly flashes in its initial
-			 //position in the least conspicuous way.
-			 //Note: 1,1 does not work, this sets the window in a state reduced to the bar, and no
-			 //internal resize seems to work after that.
-			 //Also tried to start minimized, but the window pops in a big size first before being minimized,
-			 //even less pretty.			   .
-			 //=> .. FF does not seem very clean on all this .. :-( 
-//			 height: PopupHeight,
-//			 width: PopupWidth,
-			 height: 800,
-			 width: 800,
-//			 left: left,
-//			 top: top,
-			 //----- End of position ignored workaround -----
-			 allowScriptsToClose: true
-			}
-		  );
-		}
-	  }
-	);
+	openBsp2History();
   }
   else if (menuItemId == BAOptionsId) {
 	// Open BSP2 options
@@ -2477,8 +2421,6 @@ function onClickedContextMenuHandler (info, tab) {
 /*
  * Complete load of bookmarks table
  */
-const SelfURL = browser.extension.getURL("sidebar/panel.html");
-const HistoryURL = browser.extension.getURL("sidebar/history.html");
 function completeBookmarks () {
   // Remove the faviconworker delay at start if nothing queued
 //faviconWorker.postMessage(["nohysteresis"]);

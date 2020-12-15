@@ -98,6 +98,7 @@ const Migr16x16Timeout = 60000; // Time to wait before triggering 16x16 favicon 
 let beforeFF57;
 let beforeFF58;
 let beforeFF64;
+let beforeFF71;
 let ffversion;
 let p_ffversion = browser.runtime.getBrowserInfo();
 
@@ -174,16 +175,11 @@ const UpdateSearchDelay = 50; // Delay in ms to trigger an update search
 const SBoxEmpty = 0;	// No active search
 const SBoxChanging = 1;	// Content of search box is changing
 const SBoxExecuted = 2; // Search was launched or is complete
-const PopupURL = browser.extension.getURL("sidebar/popup.html");
-const SelfURL = browser.extension.getURL("sidebar/panel.html");
-const HistoryURL = browser.extension.getURL("sidebar/history.html");
-const PopupWidth  = 380;
-const PopupHeight = 190;
 const DfltMenuSize = 150;
 const DfltMenuSizeLinux = 170;
 const OpenFolderTimeout = 1000; // Wait time in ms for opening a closed folder, when dragging over it
 
-const Selhighlight = "selbrow"; // selhighlight class name in CSS
+const SelectHighlight = "selbrow"; // select highlight class name in CSS
 const HighlightTextColor = "#222426"; // Text color used when hovering or focusing a cell (or dragging over a folder)
 const Reshidden = "reshidden"; // reshidden class name in CSS, to remember a shown row was hidden before show
 const BScrollOk = "bscrollok"; // scrollok class name in CSS, to enable Bookmarks scrolling
@@ -290,9 +286,8 @@ BookmarkTempl.classList.add("bkmkitem_b");
 BookmarkTempl.draggable = false; // False by default for <div> 
 tmpElem1 = document.createElement("img"); // Assuming it is an HTMLImageElement
 tmpElem1.classList.add("favicon");
-// Cannot prepare image as it is taking much time ..
-// So set "display: inline-block;" in CSS .favicon to reserve space in advance
-//tmpElem1.src = "/icons/nofavicon.png";
+// Avoid preparing image as it is taking much time ..
+// So set "display: inline-block;" in CSS .favicon instead, to reserve space in advance
 tmpElem1.draggable = false; // True by defaul for <img>
 BookmarkTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
@@ -307,9 +302,8 @@ RBookmarkTempl.classList.add("rbkmkitem_b");
 RBookmarkTempl.draggable = false; // False by default for <div> 
 tmpElem1 = document.createElement("img"); // Assuming it is an HTMLImageElement
 tmpElem1.classList.add("favicon");
-// Cannot prepare image as it is taking much time ..
-// So set "display: inline-block;" in CSS .favicon to reserve space in advance
-//tmpElem1.src = "/icons/nofavicon.png";
+// Avoid preparing image as it is taking much time ..
+// So set "display: inline-block;" in CSS .favicon instead, to reserve space in advance
 tmpElem1.draggable = false; // True by defaul for <img>
 RBookmarkTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
@@ -393,8 +387,8 @@ let bookmarksTable; // Assuming it is an HTMLTableElement
 let highest_open_level; // Indicator of what to hide / display when initially displaying the table
 let inputTimeout = null; // Timeout between keystrokes to trigger bookmarck search from input
 let sidebarTextColor = undefined; // Contains text color if we apply a theme's colors
-let cellHighlight = null; // Current highlight of a row in source bookmarks = cell
-let myMenu_open = false;
+let myMenu_open = false; // Indicate that our context menu is open
+let isResultMenu = false; // Indicate if current open context menu is in result pane or not 
 let myRBkmkMenu_open = false;
 let myRShowBkmkMenu_open = false;
 let myRFldrMenu_open = false;
@@ -406,9 +400,21 @@ let myBSepMenu_open = false;
 let myBProtMenu_open = false;
 let myBProtFMenu_open = false;
 let myMGlassMenu_open = false;
-let bkmkClipboard = undefined; // Contains the BookmarkNode(s) being copied or cut
-let rowClipboard = undefined; // Remains undefined in case of copy, else contains the row(s)
-                              // being cut.
+let cursor = {
+	  cell: null, // Current cursor on a row in bookmarks panel = cell, null if none selected
+	  bnId: undefined // BN Id of bookmark under cursor in bookmarks panel
+	};
+let rcursor = {
+	  cell: null, // Current cursor on a row in bookmarks panel = cell, null if none selected
+	  bnId: undefined // BN Id of bookmark under cursor in bookmarks panel
+	};
+let bkmkSelectIds = []; // List (ordered) of selected Bookmark Id(s), [] if empty
+let rbkmkSelectIds = []; // List (ordered) of selected result Bookmark Id(s), [] if empty
+let bkmkClipboardIds = []; // Unique list of copied or cut Bookmark Id(s), [] if empty
+let bkmkClipboard = []; // Unique list of copied or cut BookmarkNode(s), [] if empty
+let isClipboardOpCut = undefined; // Boolean, false if copy operation, true if cut, undefined if empty clipboard
+let bkmkDragIds = []; // Unique list of dragged Bookmark Id(s), [] if empty
+let bkmkDrag = []; // Unique list of dragged BookmarkNode(s), [] if empty
 
 // Declared in BookmarkNode.js
 //var countBookmarks, countFolders, countSeparators, countOddities, countFetchFav;
@@ -483,6 +489,7 @@ function appendResult (BTN) {
   row.draggable = true; // Adding this, but with no handler, avoids that the anchor inside
   						// can be dragged .. not sure of exactly why, but this is what I observe !
   let BTN_id = row.dataset.id = BTN.id; // Keep unique id of bookmark in the data-id attribute
+  row.dataset.rslt = "true"; // Mark that this is a result row for easy identification
   let BN = curBNList[BTN_id];
   if ((BN == undefined) && (BTN_id != MobileBookmarks)) { // Desynchro !! => reload bookmarks from FF API
 	// Signal reload to background, and then redisplay to all
@@ -491,7 +498,7 @@ function appendResult (BTN) {
   else {
 	curResultRowList[BTN_id] = row;
 	// Set cut status of the row (dim it), if corresponding to a cut row
-	if ((rowClipboard != undefined) && (BTN_id == bkmkClipboard.id)) {
+	if ((isClipboardOpCut == true) && (bkmkClipboardIds[BTN_id] != undefined)) {
 	  row.classList.add("cut");
 	}
 
@@ -516,48 +523,19 @@ function appendResult (BTN) {
 	  div2.classList.add("rtwistieac");
 	  div2.draggable = false; // False by default for <div>
 	  cell.appendChild(div2);
-	  let fetchedUri;
 	  let div3;
-	  if (BTN_id == PersonalToobar) {
-		fetchedUri = "/icons/toolbarbkmk.png";
-		div3 = RSFolderTempl.cloneNode(true);
-	  }
-	  else if (BTN_id == BookmarksMenu) {
-		fetchedUri = "/icons/menubkmk.png";
-		div3 = RSFolderTempl.cloneNode(true);
-	  }
-	  else if (BTN_id == OtherBookmarks) {
-		fetchedUri = "/icons/otherbkmk.png";
-		div3 = RSFolderTempl.cloneNode(true);
-	  }
-	  else {
-		div3 = RFolderTempl.cloneNode(true);
-	  }
-//	  let div3 = document.createElement("div"); // Assuming it is an HTMLDivElement
-//	  div3.classList.add("bkmkitem_f");
-//	  div3.draggable = false;
-//	  cell.appendChild(div3);
-
-//	  let img = document.createElement("img"); // Assuming it is an HTMLImageElement
-//	  img.classList.add("favicon");
-//	  if (BTN_id == PersonalToobar)   img.src = "/icons/toolbarbkmk.png";
-//	  else if (BTN_id == BookmarksMenu)   img.src = "/icons/menubkmk.png";
-//	  else if (BTN_id == OtherBookmarks)   img.src = "/icons/otherbkmk.png";
-//	  else   img.src = "/icons/folder.png";
-//	  img.draggable = false;
-//	  div3.appendChild(img);
 	  let span;
-	  if (fetchedUri != undefined) {
+	  if (BN.fetchedUri) { // Special bookmark folder with special favicon
+		div3 = RSFolderTempl.cloneNode(true);
 		let img = div3.firstElementChild;
-		img.src = fetchedUri;
+		img.src = BN.faviconUri;
 		span = img.nextElementSibling;
 	  }
 	  else {
+		div3 = RFolderTempl.cloneNode(true);
 		span = div3.firstElementChild.nextElementSibling;
 	  }
 
-//	  let span = document.createElement("span"); // Assuming it is an HTMLSpanElement
-//	  span.classList.add("favtext");
 	  let title = BTN.title;
 	  if (showPath_option) {
 		div3.title = BN_path(BTN.parentId);
@@ -567,7 +545,6 @@ function appendResult (BTN) {
 	  }
 	  span.textContent = title;
 //	  span.draggable = false;
-//	  div3.appendChild(span);
 	  cell.appendChild(div3);
 	}
 	else {								// "bookmark"
@@ -588,7 +565,7 @@ function appendResult (BTN) {
 		anchor = RNFBookmarkTempl.cloneNode(true);
 		span = anchor.firstElementChild.nextElementSibling;
 	  }
-	  else { // clone normal one, we will fill the image later
+	  else { // clone normal one, and fill image
 		anchor = RBookmarkTempl.cloneNode(true);
 		let img = anchor.firstElementChild;
 		img.src = uri;
@@ -597,19 +574,6 @@ function appendResult (BTN) {
 	  if (!url.startsWith("place:")) {
 		anchor.href = url;
 	  }
-//	  let isSpecial = url.startsWith("place:");
-//	  let anchor;
-//	  if (isSpecial) {
-//		anchor = document.createElement("div"); // Assuming it is an HTMLDivElement
-//	  }
-//	  else {
-	  // We can attach an href attribute to <div> !!
-	  // Much better as it avoids any special behavior of <a> on clicks and look/CSS ..
-	  //anchor = document.createElement("a"); // Assuming it is an HTMLAnchorElement
-//	  anchor = document.createElement("div"); // Assuming it is an HTMLDivElement
-//	  anchor.href = url;
-//	}
-//	anchor.classList.add("rbkmkitem_b");
 	  if (showPath_option) {
 		anchor.title = BN_path(BTN.parentId);
 		if (title == "") {
@@ -638,47 +602,103 @@ function appendResult (BTN) {
 }
 
 /*
- * Remove highlight from a cell, if there is one
+ * Remove highlight from cursor cell, reomve from selection, if there is one.
+ * Clear cursor
+ *
+ * cursor = Object describing cursor to manipulate
+ * selectedIds = list (Array) of ids of selected bookmark items
+ * is_remove = Boolean, if true, only remove cursor from selection, if false clear all selection
  */
-function clearCellHighlight () {
-  if (cellHighlight != null) {
-	cellHighlight.classList.replace(Selhighlight, "brow");
-	if (cellHighlight.classList.contains(Reshidden))
-	  cellHighlight.classList.remove(Reshidden);
-	cellHighlight = null;
-  }
-}
-
-/*
- * Set cell highlight, remember current selected bnId for next FF or sidebar reopen
- * 
- * cell = .brow cell to set. Preserve the Reshidden flag if this is not changing cellHighlight.
- */
-function setCellHighlight (cell) {
-  if (cell != cellHighlight) {
-	clearCellHighlight();
-	cellHighlight = cell;
-	cellHighlight.classList.replace("brow", Selhighlight);
-  }
-
-  let bnId = cell.parentElement.dataset.id;
-  if (backgroundPage == undefined) {
-	sendAddonMsgCurBnId(bnId);
+function clearCellHighlight (cursor, selectedIds, is_remove = false) {
+  let cellCursor = cursor.cell;
+  if (cellCursor != null) {
+	// Clear highlight and selection
+	cellCursor.classList.replace(SelectHighlight, "brow");
+	if (cellCursor.classList.contains(Reshidden)) {
+	  cellCursor.classList.remove(Reshidden);
+	}
+	if (is_remove) {
+	  let i = selectedIds.indexOf(cursor.bnId);
+	  if (i >= 0) {
+		selectedIds.splice(i, 1);
+	  }
+	}
+	else {
+	  selectedIds.length = 0;
+	}
+	// Clear cursor
+	cursor.cell = null;
+	cursor.bnId = undefined;
   }
   else {
-	backgroundPage.saveCurBnId(myWindowId, bnId);
+	selectedIds.length = 0;
   }
 }
 
 /*
- * Call to refresh cut status of any result in a bookmark search, if there is one active.
+ * Move cursor to new cell, remember current cursor bnId for next FF or sidebar reopen.
+ * Set cell highlight on new cell and add to bookmark selection
  * 
- * btnId = String, id of BookmarkTreeNode id string with modified cut status
+ * cursor = Object describing cursor to manipulate
+ * cell = .brow cell to set. Preserve the Reshidden flag if cellCursor is not changing.
+ * selectedIds = list (Array) of ids of selected bookmark items
+ * is_add = Boolean, if true, add to selection, if false replace selection
+ */
+function setCellHighlight (cursor, cell, selectedIds, is_add = false) {
+  if (cell != cursor.cell) {
+	clearCellHighlight(cursor, selectedIds, is_add);
+	// Set cursor
+	cursor.cell = cell;
+	let bnIdCursor = cursor.bnId = cell.parentElement.dataset.id;
+	// Save cursor position
+	if (backgroundPage == undefined) {
+	  sendAddonMsgCurBnId(bnIdCursor);
+	}
+	else {
+	  backgroundPage.saveCurBnId(myWindowId, bnIdCursor);
+	}
+	// Set highlight and bookmark selection
+	cell.classList.replace("brow", SelectHighlight);
+	selectedIds.push(bnIdCursor); // If is_add is false, selectedIds was already emptied by clearCellHighlight()
+  }
+}
+
+/*
+ * Call to refresh cut status of bookmark rows in a bookmark search, if there is one active
+ * 
+ * a_bnId = list of BookmarkNodes Ids on which to modify cut status
  * status = Boolean, if true set cut status on (dim), else set it off
  */
-function refreshCutSearch (btnId, status) {
+function refreshCutSearch (a_bnId, status) {
   if (SearchTextInput.value.length > 0) { // Refresh only if a search is active
-	let row = curResultRowList[btnId];
+	let row;
+	let len = a_bnId.length;
+	for (let i=0 ; i<len ; i++) {
+	  row = curResultRowList[a_bnId[i]];
+	  if (row != undefined) { // There is a result in search pane corresponding to that BTN
+		// Update only the row, do not change anything else
+		if (status) {
+		  row.classList.add("cut");
+		}
+		else {
+		  row.classList.remove("cut");
+		}
+	  }
+	}
+  }
+}
+
+/*
+ * Call to refresh cut status of  bookmark rows in bookmark panel
+ * 
+ * a_bnId = list of BookmarkNodes Ids on which to modify cut status
+ * status = Boolean, if true set cut status on (dim), else set it off
+ */
+function refreshCutPanel (a_bnId, status) {
+  let row;
+  let len = a_bnId.length;
+  for (let i=0 ; i<len ; i++) {
+	row = curRowList[a_bnId[i]];
 	if (row != undefined) { // There is a result in search pane corresponding to that BTN
 	  // Update only the row, do not change anything else
 	  if (status) {
@@ -747,7 +767,7 @@ function enableExecuteSearch () {
 function displayResults (a_BTN) {
   // Discard previous results table if any
   // Can happen if we have slow searches, and several have been "queued" in series all happening
-  // after last updateSearch() disptach ..
+  // after last updateSearch() dispatch ..
   if (resultsTable != null) {
 	SearchResult.removeChild(resultsTable);
 	resultsTable = null;
@@ -755,7 +775,7 @@ function displayResults (a_BTN) {
 //	resultsFragment = null;
 
 	// If a row cell was highlighted, do not highlight it anymore
-//	clearCellHighlight();
+	clearCellHighlight(rcursor, rbkmkSelectIds);
   }
 
   // Create search results table
@@ -814,7 +834,7 @@ function updateSearch () {
 //	  resultsFragment = null;
 
 	  // If a row cell was highlighted, do not highlight it anymore
-//	  clearCellHighlight();
+	  clearCellHighlight(rcursor, rbkmkSelectIds);
 	}
 
 	// Display waiting for results icon
@@ -865,12 +885,11 @@ function updateSearch () {
 			}
 			  else { // Use the recursive form
 			  let BN;
-			  if ((cellHighlight == undefined) || (cellHighlight == null)) { // Start from Root
+			  if (cursor.cell == null) { // Start from Root
 				BN = rootBN;
 			  }
-			  else { // Retrieve BN of highlighted cell
-				let bnId = cellHighlight.parentElement.dataset.id;
-				BN = curBNList[bnId];
+			  else { // Retrieve BN of cell in cursor
+				BN = curBNList[cursor.bnId];
 				// Protection
 				if (BN == undefined) {
 				  BN = rootBN;
@@ -978,7 +997,7 @@ function manageSearchTextHandler () {
 	}
 
 	// If a row was highlighted, do not highlight it anymore
-//	clearCellHighlight();
+	clearCellHighlight(rcursor, rbkmkSelectIds);
 
 	// Restore bookmarks tree to its initial visibility state
 	resetTreeVisiblity();
@@ -1223,10 +1242,11 @@ function trigMigrate16x16 () {
   else {
 	backgroundPage.signalMigrate16x16(migr16x16ConvertList, migr16x16Len);
   }
+  migration_img16 = false; // No need to migrate existing favicons anymore, only new ones will come now
 }
 
 /*
- * Add an icon to migration list if needed
+ * Add an existing favicon to migration list if needed = we can verify the size only when the image is loaded
  */
 function migr16x16OnLoad () {
   this.onload = undefined; // Do not trigger again
@@ -1244,13 +1264,13 @@ function migr16x16OnLoad () {
   }
   else if ((nh != 16) || (nw != 16)) {
 //    console.log("Have to rescale: "+nh+","+nw+" for "+this.src.substr(0,50)+" - "+row.firstElementChild.firstElementChild.title);
-    migr16x16Len = migr16x16ConvertList.push(id);
+	migr16x16Len = migr16x16ConvertList.push(id);
 
     // Set or reset timer to trigger migration
-    if (migrationTimeout != null) {
-      clearTimeout(migrationTimeout);
-    }
-    migrationTimeout = setTimeout(trigMigrate16x16, Migr16x16Timeout);
+	if (migrationTimeout != null) {
+	  clearTimeout(migrationTimeout);
+	}
+	migrationTimeout = setTimeout(trigMigrate16x16, Migr16x16Timeout);
   }
 }
 
@@ -1345,7 +1365,7 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
 
 	let div3;
 	let span;
-	if (BN.fetchedUri) { // Special folder
+	if (BN.fetchedUri) { // Special folder, load image now, there are not a big number of them
 	  div3 = SFolderTempl.cloneNode(true);
 	  let img = div3.firstElementChild;
 	  img.src = BN.faviconUri;
@@ -1370,44 +1390,41 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
 	// Create elements
 	let url = BN.url;
 	let title = BN.title;
-	// We can attach an href attribute to <div> !!
-	// Much better as it avoids any special behavior of <a> on clicks and look/CSS ..
 	let anchor;
-	if (disableFavicons_option) { // Clone with nofavicon image background
+	let span;
+	let uri = BN.faviconUri;
+	if ((uri == undefined) || (uri == "/icons/nofavicon.png")) { // Clone with nofavicon image background
 	  anchor = NFBookmarkTempl.cloneNode(true);
+	  span = anchor.firstElementChild.nextElementSibling;
 	}
 	else { // Clone normal one, we will fill the image later
+	  let img;
 	  anchor = BookmarkTempl.cloneNode(true);
+	  if (migration_img16 && BN.fetchedUri) { // Catch end of image load if we have to migrate
+		img = anchor.firstElementChild;
+		img.onload = migr16x16OnLoad;
+		span = img.nextElementSibling;
+	  }
+	  if (immediateFavDisplay_option
+		  || isDisplayComplete			// Do not defer once initial load/display is complete
+		 ) {
+		if (img == undefined) {
+		  img = anchor.firstElementChild;
+		  span = img.nextElementSibling;
+		}
+		img.src = uri;
+	  }
+	  if (img == undefined) {
+		span = anchor.firstElementChild.nextElementSibling;
+	  }
 	}
+	// We can attach an href attribute to <div> !!
+	// Much better as it avoids any special behavior of <a> on clicks and look/CSS ..
 	if (!url.startsWith("place:")) {
 	  anchor.href = url;
 	}
 	if (level > 0) {
 	  anchor.style.marginLeft = (LevelIncrementPx * level + 16)+"px";
-	}
-
-	let span;
-	if (BN.fetchedUri && (migration_img16)) { // Catch end of image load if we have to migrate
-	  let img = anchor.firstElementChild;
-	  img.onload = migr16x16OnLoad;
-	  if (immediateFavDisplay_option) {
-		let uri = BN.faviconUri;
-		img.src = (uri == undefined ? "/icons/nofavicon.png" : uri);
-	  }
-	  span = img.nextElementSibling;
-	}
-	else {
-	  if (immediateFavDisplay_option
-		  || isDisplayComplete			// Do not defer once initial load/display is complete
-	     ) {
-		let img = anchor.firstElementChild;
-		let uri = BN.faviconUri;
-		img.src = (uri == undefined ? "/icons/nofavicon.png" : uri);
-		span = img.nextElementSibling;
-	  }
-	  else {
-		span = anchor.firstElementChild.nextElementSibling;
-	  }
 	}
 
 	if (title == "") {
@@ -1598,10 +1615,10 @@ function removeBkmks (row, cleanup) {
   let previousRow = row.previousElementSibling;
 
   let rowIndex = row.rowIndex;
-  if (cellHighlight == row.firstElementChild) {
-	// Clear cellHighlight if that is the deleted row to avoid
-	// problems later when moving selection
-	cellHighlight = null;
+  if (cursor.cell == row.firstElementChild) {
+	// Clear cursor if that is the deleted row to avoid
+	// problems later when moving cursor
+	clearCellHighlight(cursor, bkmkSelectIds);
   }
   if (row.dataset.type == "folder") {
 	isOtherThanSeparatorRemoved = true;
@@ -1984,8 +2001,9 @@ function showRow (srcRow) {
 	}
   }
 
-  // Highlight the source cell + scroll it into view
-  setCellHighlight(srcRow.firstElementChild);
+  // Set/move cursor on the source cell + highlight it
+  setCellHighlight(cursor, srcRow.firstElementChild, bkmkSelectIds);
+  // Get row into view
   // BUG: "smooth" has a bug when the viewport content is modified, it points at the origin position before modification
   // See https://bugzilla.mozilla.org/show_bug.cgi?id=1139745
   // So using "auto" instead of "smooth", which appears to work all time .. even if less nice
@@ -2156,7 +2174,7 @@ function openResParents (row) {
   saveFldrOpen();
 
   // Remove the .reshidden class now that parents are open
-  cellHighlight.classList.remove(Reshidden);
+  cursor.cell.classList.remove(Reshidden);
 }
 
 /*
@@ -2201,15 +2219,9 @@ function isVisible (BN_id) {
 /*
  * Handle clicks on results = show source row in bookmarks tree
  *
- * resultRow is an HTMLTableRowElement in the result pane
+ * resultBN_id is the id of the bookmark item to show
  */
-function handleResultClick (resultRow) {
-  // Retrieve bookmark information in the result row (BN.id)
-  let resultBN_id = resultRow.dataset.id;
-
-  // If there was a previous highlighted row cell, go back to normal
-//  clearCellHighlight();
-
+function handleResultClick (resultBN_id) {
   // Verify the current visiblity of the row before potentially modifying its parent state
   // if the openTree_option is set !
   // If it is hidden (one of its parents is closed), we'll need to display the special
@@ -2236,7 +2248,7 @@ function handleResultClick (resultRow) {
 		saveFldrOpen();
 	  }
 	  else { // Else show special action on context menu
-		cellHighlight.classList.add(Reshidden); // Show special menu
+		cursor.cell.classList.add(Reshidden); // Show special menu
 	  }
 	}
   }
@@ -2370,6 +2382,39 @@ function handleFolderClick (twistie) {
 }
 
 /*
+ * Receive mouse down event on results table
+ *
+ * e is of type MouseEvent (click)
+ */
+function resultsMouseDownHandler (e) {
+  let target = e.target; // Type depends ..
+  let className = target.className;
+//console.log("Result mouse down event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" target: "+target+" class: "+className);
+  if ((className != undefined)
+	  && (className.length > 0)) {
+	// The click target is one of .brow cell,
+	// .rbkmkitem_x div or anchor, .favicon img or .favttext span
+	// Find cell, for selection
+	let cell;
+	if (className.includes("fav")) { // <div>, <img> or <span> -> got to .bkmkitem_x
+	  								 // when advanced or Alt key, else go to .brow
+	  cell = target.parentElement.parentElement;
+	}
+	else if (className.startsWith("rbkmkitem_") || (className == "rtwistieac")) {
+	  cell = target.parentElement;
+	}
+	else if (className.includes("brow")) {
+	  cell = target;
+	}
+
+	// Select result item if recognized
+	if (cell != undefined) {
+	  setCellHighlight(rcursor, cell, rbkmkSelectIds);
+	}
+  }
+}
+
+/*
  * Receive event from left clicks on results table
  *
  * e is of type MouseEvent (click)
@@ -2377,37 +2422,43 @@ function handleFolderClick (twistie) {
 function resultsMouseHandler (e) {
   let target = e.target; // Type depends ..
   let className = target.className;
-//  trace("Result click event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" target: "+target+" class: "+className);
+//console.log("Result click event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" target: "+target+" class: "+className);
   if ((className != undefined)
 	  && (className.length > 0)) {
-//  if (resultsTable.rows.length > 0) {
-
 	// The click target is one of .brow cell,
-	// .bkmkitem_x div or anchor, .favicon img or .favttext span
+	// .rbkmkitem_x div or anchor, .favicon img or .favttext span
 	// Handle click, and go to the parent row
+	let row;
 	if (className.includes("fav")) { // <div>, <img> or <span> -> got to .bkmkitem_x
 	  								 // when advanced or Alt key, else go to .brow
 	  if (advancedClick_option || e.altKey) {
-		target = target.parentElement;
+		row = (target = target.parentElement).parentElement.parentElement;
 	  }
-	  else {
-		target = target.parentElement.parentElement;
+	  else { // Go to .brow
+		row = (target = target.parentElement.parentElement).parentElement;
 	  }
+	  className = target.className;
 	}
-	else if (className.startsWith("rbkmkitem_")) { // If Alt key or advanced, open in current tab
-	  											  // else just show -> go to .brow
+	else if (className.startsWith("rbkmkitem_") || (className == "rtwistieac")) {
+	  let cell;
+	  row = (cell = target.parentElement).parentElement;
+	  // If Alt key or advanced, open in current tab, else just show => go to .brow
 	  if (!advancedClick_option && !e.altKey) {
-		target = target.parentElement;
+		target = cell;
+		className = target.className;
 	  }
 	}
-	else if (e.altKey) { //  Presumably .brow, if Alt key, force open in current tab if bookmark
-	  if (target.parentElement.dataset.type == "bookmark") {
-		target = target.firstElementChild;
+	else { // .brow, cannot be scrollbars when left mouse click
+	  row = target.parentElement;
+	  if (e.altKey) { // .brow, if Alt key, force open in current tab if bookmark
+		if (target.parentElement.dataset.type == "bookmark") {
+		  target = target.firstElementChild;
+		  className = target.className;
+		}
 	  }
 	}
-	className = target.className;
 
-	let showRow = true;
+	let showSrcRow = true;
 	if (className == "rbkmkitem_b") { // An HTMLDivElement
 	  e.preventDefault(); // We do not want the left click to open in a new tab ..
 	  					  // but in the active tab
@@ -2435,25 +2486,18 @@ function resultsMouseHandler (e) {
 		}
 		else { // Open in current tab
 		  browser.tabs.update({url: href});
-		  showRow = false; // Do not show row, we already got an action
+		  showSrcRow = false; // Do not show row, we already got an action
 		}
 	  }
-	  // Now go to row
-	  target = target.parentElement.parentElement;
-	}
-	else if ((className == "rbkmkitem_f") || (className == "rtwistieac")) {
-	  // Go to row
-	  target = target.parentElement.parentElement;
-	}
-	else { // Presumably the .brow cell
-	  // Go to row
-	  target = target.parentElement;
 	}
 
 	// Make the source object visible .. and scroll to it, except when Shift, Ctrl or Alt are pressed,
 	// and when not on favtext / favicon in advanced mode
-	if (showRow && !e.shiftKey && !e.ctrlKey && !e.altKey) {
-	  handleResultClick(target);
+	let resultBN_id = row.dataset.id;
+	if (showSrcRow && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+	  // Retrieve bookmark information in the result row (BN.id)
+	  // Then show it
+	  handleResultClick(resultBN_id);
 	}
 
 	// If close search option is set, close search pane now
@@ -2462,6 +2506,36 @@ function resultsMouseHandler (e) {
 	}
   }
   e.stopPropagation(); // Prevent handlers up the DOM chain on same event
+}
+
+/*
+ * Receive mouse down event on bookmarks table
+ *
+ * e is of type MouseEvent (click)
+ */
+function bkmkMouseDownHandler (e) {
+  let target = e.target; // Type depends ..
+  let className = target.className;
+//console.log("Bookmark mouse down event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" target: "+target+" class: "+className);
+  if ((className != undefined)
+	  && (className.length > 0)) {
+	// Find cell, for selection
+	let cell;
+	if (className.includes("fav")) {
+	  cell = target.parentElement.parentElement;
+	}
+	else if (className.startsWith("bkmkitem_") || className.startsWith("twistie")) {
+	  cell = target.parentElement;
+	}
+	else if (className.includes("brow")) {
+	  cell = target;
+	}
+
+	// Select bookmark item if recognized
+	if (cell != undefined) {
+	  setCellHighlight(cursor, cell, bkmkSelectIds);
+	}
+  }
 }
 
 /*
@@ -2478,6 +2552,7 @@ function bkmkMouseHandler (e) {
   // .bkmkitem_x div, .favseparator/.favseparatorend div, .favicon or .favttext
   // Act only if the user clicked on .twistieax img, .bkmkitem_x, .favicon or .favtext
   // If favicon or favtext, get parent instead to handle click
+  // Cannot be scrollbars when left mouse click
   let twistie;
   if (className.includes("fav")) {
 	target = target.parentElement;
@@ -2552,15 +2627,6 @@ function bkmkMouseHandler (e) {
 	handleFolderClick(target);
   }
 
-  // Highlight bookmark
-  let cell;
-  if (className.includes("brow")) {
-	cell = target;
-  }
-  else {
-	cell = target.parentElement;
-  }
-  setCellHighlight(cell);
   e.stopPropagation(); // Prevent handlers up the DOM chain on same event
 }
 
@@ -2571,27 +2637,31 @@ function bkmkMouseHandler (e) {
  */
 function resultsAuxHandler (e) {
   let target = e.target; // Type depends ..
-  let cell;
   let className = target.className;
-//  trace("Result aux event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" phase: "+e.eventPhase+" target: "+target+" class: "+className);
+//console.log("Result aux event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" phase: "+e.eventPhase+" target: "+target+" class: "+className);
   // Be careful, button 2 (contextmenu) also ends up here :-(
   if ((e.button == 1)
 	  && (className != undefined)
 	  && (className.length > 0)) {
 	// The click target is one of .brow cell,
-	// .bkmkitem_x div or anchor, .favicon img or .favttext span
+	// .rbkmkitem_x div or anchor, .favicon img or .favttext span
 	// Handle click, and go to the parent row
+	let row;
 	if (className.includes("fav")) { // <div>, <img> or <span>
-	  target = target.parentElement;
+	  row = (target = target.parentElement).parentElement.parentElement;
 	  className = target.className;
 	}
-	else if (className.includes("brow")) {
-	  if (target.parentElement.dataset.type == "bookmark") {
+	else if (className.startsWith("rbkmkitem_") || (className == "rtwistieac")) {
+	  row = target.parentElement.parentElement;
+	}
+	else { // .brow
+	  row = target.parentElement;
+	  if (row.dataset.type == "bookmark") {
 		target = target.firstElementChild;
 		className = target.className;
 	  }
 	}
-	if (className == "bkmkitem_b") { // An HTMLAnchorElement
+	if (className == "rbkmkitem_b") { // An HTMLAnchorElement
 	  e.preventDefault(); // We prevent default behavior and handle ourselves ..
 	  let href = target.href;
 	  if ((href != undefined) && (href.length > 0)) {
@@ -2606,26 +2676,11 @@ function resultsAuxHandler (e) {
 		  }
 		);
 	  }
-
-	  target = (cell = target.parentElement).parentElement;
 	}
-	else if (className == "bkmkitem_f") {
-	  target = (cell = target.parentElement).parentElement;
-	}
-	else { // Presumably the .brow cell
-	  target = (cell = target).parentElement;
-	}
-
-	// Make the source object visible .. and scroll to it
-//	handleResultClick(target);
 
 	// If close search option is set, close search pane now
 	if (closeSearch_option) {
 	  clearSearchTextHandler();
-	}
-	else {
-	  // Highlight result item
-	  cell.focus();
 	}
   }
   e.stopPropagation(); // Prevent handlers up the DOM chain on same event
@@ -2682,7 +2737,6 @@ function bkmkAuxHandler (e) {
 	else {
 	  cell = target.parentElement;
 	}
-	setCellHighlight(cell);
 	cell.focus();
   }
   e.stopPropagation(); // Prevent handlers up the DOM chain on same event
@@ -2797,7 +2851,7 @@ function clearMenu () {
     myMGlassMenu_open = false;
   }
 
-  myMenu_open = false;
+  myMenu_open = isResultMenu = false;
   return(menuClosed);
 }
 
@@ -2813,27 +2867,31 @@ function resultsContextHandler (e) {
   // If there is a previous menu, clear it
   clearMenu();
 
-  let isShowMenu = !advancedClick_option; // If not advanced, always "Show bookmark" by default
-  if ((target.className != undefined)
+  let isShowBkmkMenu = !advancedClick_option; // If not advanced, always "Show bookmark" by default
+  let className = target.className;
+  if ((className != undefined)
 	  && (target.className.length > 0)) {
 	// Go up to the row level, and store the rowIndex and type in the menu as data- attribute
-	let className = target.className;
 	let row;
 	let cell;
 	if(className.includes("fav")) {
 	  row = (cell = target.parentElement.parentElement).parentElement;
 	}
-	else if (className.startsWith("bkmkitem_") || (className == "twistieac")) {
+	else if (className.startsWith("rbkmkitem_") || (className == "rtwistieac")) {
 	  row = (cell = target.parentElement).parentElement;
 	}
 	else { // .brow
 	  row = (cell = target).parentElement;
 	  if (advancedClick_option)
-	  isShowMenu = true;
+		isShowBkmkMenu = true;
 	}
 
-	// Make the source object visible .. and scroll to it
-//    handleResultClick(row);
+/*
+	// Retrieve bookmark information in the result row (BN.id)
+	// Then show it
+	handleResultClick(resultBN_id);
+*/
+
 	// Highlight the result item
 	cell.focus();
 
@@ -2845,17 +2903,17 @@ function resultsContextHandler (e) {
 //trace("Row: "+row+" rowIndex: "+rowIndex+" type: "+type);
 	if (beforeFF64) { // Use our built-in menus
 	  if (type == "bookmark") {
-		if (isShowMenu) {
-		  myMenu_open = myRShowBkmkMenu_open = true;
+		if (isShowBkmkMenu) {
+		  myMenu_open = isResultMenu = myRShowBkmkMenu_open = true;
 		  menu = MyRShowBkmkMenu;
 		}
 		else {
-		  myMenu_open = myRBkmkMenu_open = true;
+		  myMenu_open = isResultMenu = myRBkmkMenu_open = true;
 		  menu = MyRBkmkMenu;
 		}
 	  }
 	  else { // Menu for "folder"
-		myMenu_open = myRFldrMenu_open = true;
+		myMenu_open = isResultMenu = myRFldrMenu_open = true;
 		menu = MyRFldrMenu;
 
 		// Disable "Go parent folder" if this is one of the top level folders (i.e. parent is root, not visible)
@@ -2880,7 +2938,7 @@ function resultsContextHandler (e) {
 	  let goparentEnabled = true;
 	  let BN_id = row.dataset.id;
 	  if (type == "bookmark") {
-		if (isShowMenu) {
+		if (isShowBkmkMenu) {
 		  menu = Menu_rshowbkmk;
 		}
 		else {
@@ -2897,7 +2955,7 @@ function resultsContextHandler (e) {
 	  }
 
 	  updateBSP2ContextMenu(menu, false, goparentEnabled);
-	  myMenu_open = true; // Remember that this instance opened the menu when processing the onClicked event
+	  myMenu_open = isResultMenu = true; // Remember that this instance opened the menu when processing the onClicked event
 	  browser.menus.overrideContext({
 		context: "bookmark",
 		bookmarkId: BN_id
@@ -2908,12 +2966,33 @@ function resultsContextHandler (e) {
 }
 
 /*
+ * Check whether a rowIndex is within a zone or not
+ * 
+ * rowIndex is index of row to check
+ * a_zone is an array of zones (zone = [min index, max index], itself an array)
+ *
+ * Returns Boolean: true = is within zone.
+ */
+function isInZone (rowIndex, a_zone) {
+  let len = a_zone.length;
+  let is_inZone = false;
+  let zone;
+  for (let i=0; i<len ; i++) {
+	zone = a_zone[i];
+	if ((rowIndex >= zone[0]) && (rowIndex <= zone[1])) {
+	  is_inZone = true;
+	  break;
+	}
+  }
+  return (is_inZone);
+}
+
+/*
  * Receive event from right clicks on bookmarks table, and display context menu
  * 
  * e is of type MouseEvent (contextmenu)
  */
-let noPasteMinRowIndex = -1;
-let noPasteMaxRowIndex = -1;
+let noPasteZone = new ZoneDesc ();
 function bkmkContextHandler (e) {
   let target = e.target; // Type depends ..
 //console.log("Bookmark context event: "+e.type+" target: "+target+" class: "+target.classList);
@@ -2921,19 +3000,18 @@ function bkmkContextHandler (e) {
   // Go up to the row level
   let className = target.className;
   let row;
+  let cell;
   if(className.includes("fav")) {
-	row = target.parentElement.parentElement.parentElement;
+	row = (cell = target.parentElement.parentElement).parentElement;
   }
   else if (className.startsWith("bkmkitem_") || className.startsWith("twistie")) {
-	row = target.parentElement.parentElement;
+	row = (cell = target.parentElement).parentElement;
   }
   else { // .brow
-	row = target.parentElement;
+	row = (cell = target).parentElement;
   }
 
   // Highlight bookmark item
-  let cell = row.firstElementChild;
-  setCellHighlight(cell);
   cell.focus();
 
   // If there is a previous menu, clear it
@@ -2956,14 +3034,13 @@ function bkmkContextHandler (e) {
 		// Check if we are on an highlighted result row which is hidden
 		if (!openTree_option && row.firstElementChild.classList.contains(Reshidden)) {
 		  menu = MyBResBkmkMenu;
-		  if ((bkmkClipboard != undefined)
-			  && ((rowIndex <= noPasteMinRowIndex) || (rowIndex > noPasteMaxRowIndex))) {
-			if (MyBResBkmkMenuPaste.className == "menudisabled")
-			  MyBResBkmkMenuPaste.className = "menupaste";
-		  }
-		  else {
+		  if ((bkmkClipboard.length > 0) && noPasteZone.isInZone(rowIndex)) {
 			if (MyBResBkmkMenuPaste.className == "menupaste")
 			  MyBResBkmkMenuPaste.className = "menudisabled";
+		  }
+		  else {
+			if (MyBResBkmkMenuPaste.className == "menudisabled")
+			  MyBResBkmkMenuPaste.className = "menupaste";
 		  }
 		  if (disableFavicons_option) {
 			MyBResBkmkMenuFavicon.className = "menudisabled";
@@ -2975,14 +3052,13 @@ function bkmkContextHandler (e) {
 		}
 		else {
 		  menu = MyBBkmkMenu;
-		  if ((bkmkClipboard != undefined)
-			  && ((rowIndex <= noPasteMinRowIndex) || (rowIndex > noPasteMaxRowIndex))) {
-			if (MyBBkmkMenuPaste.className == "menudisabled")
-			  MyBBkmkMenuPaste.className = "menupaste";
-		  }
-		  else {
+		  if ((bkmkClipboard.length > 0) && noPasteZone.isInZone(rowIndex)) {
 			if (MyBBkmkMenuPaste.className == "menupaste")
 			  MyBBkmkMenuPaste.className = "menudisabled";
+		  }
+		  else {
+			if (MyBBkmkMenuPaste.className == "menudisabled")
+			  MyBBkmkMenuPaste.className = "menupaste";
 		  }
 		  if (disableFavicons_option) {
 			MyBBkmkMenuFavicon.className = "menudisabled";
@@ -2997,14 +3073,13 @@ function bkmkContextHandler (e) {
 	else if (type == "folder") {
 	  if (row.dataset.protect == "true") { // Protected row
 		menu = MyBProtFMenu;
-		if ((bkmkClipboard != undefined)
-			&& ((rowIndex < noPasteMinRowIndex) || (rowIndex > noPasteMaxRowIndex))) {
-		  if (MyBProtFMenuPasteInto.className == "menudisabled")
-			MyBProtFMenuPasteInto.className = "menupasteinto";
-		}
-		else {
+		if ((bkmkClipboard.length > 0) && noPasteZone.isInZone(rowIndex)) {
 		  if (MyBProtFMenuPasteInto.className == "menupasteinto")
 			MyBProtFMenuPasteInto.className = "menudisabled";
+		}
+		else {
+		  if (MyBProtFMenuPasteInto.className == "menudisabled")
+			MyBProtFMenuPasteInto.className = "menupasteinto";
 		}
 		myMenu_open = myBProtFMenu_open = true;
 	  }
@@ -3012,51 +3087,48 @@ function bkmkContextHandler (e) {
 		// Check if we are on an highlighted result row which is hidden
 		if (!openTree_option && row.firstElementChild.classList.contains(Reshidden)) {
 		  menu = MyBResFldrMenu;
-		  if ((bkmkClipboard != undefined)
-			  && ((rowIndex < noPasteMinRowIndex) || (rowIndex > noPasteMaxRowIndex))) {
-			if (MyBResFldrMenuPaste.className == "menudisabled")
-			  MyBResFldrMenuPaste.className = "menupaste";
-			if (MyBResFldrMenuPasteInto.className == "menudisabled")
-			  MyBResFldrMenuPasteInto.className = "menupasteinto";
-		  }
-		  else {
+		  if ((bkmkClipboard.length > 0) && noPasteZone.isInZone(rowIndex)) {
 			if (MyBResFldrMenuPaste.className == "menupaste")
 			  MyBResFldrMenuPaste.className = "menudisabled";
 			if (MyBResFldrMenuPasteInto.className == "menupasteinto")
 			  MyBResFldrMenuPasteInto.className = "menudisabled";
 		  }
+		  else {
+			if (MyBResFldrMenuPaste.className == "menudisabled")
+			  MyBResFldrMenuPaste.className = "menupaste";
+			if (MyBResFldrMenuPasteInto.className == "menudisabled")
+			  MyBResFldrMenuPasteInto.className = "menupasteinto";
+		  }
 		  myMenu_open = myBResFldrMenu_open = true;
 		}
 		else {
 		  menu = MyBFldrMenu;
-		  if ((bkmkClipboard != undefined)
-			  && ((rowIndex < noPasteMinRowIndex) || (rowIndex > noPasteMaxRowIndex))) {
-			if (MyBFldrMenuPaste.className == "menudisabled")
-			  MyBFldrMenuPaste.className = "menupaste";
-			if (MyBFldrMenuPasteInto.className == "menudisabled")
-			  MyBFldrMenuPasteInto.className = "menupasteinto";
-		  }
-		  else {
+		  if ((bkmkClipboard.length > 0) && noPasteZone.isInZone(rowIndex)) {
 			if (MyBFldrMenuPaste.className == "menupaste")
 			  MyBFldrMenuPaste.className = "menudisabled";
 			if (MyBFldrMenuPasteInto.className == "menupasteinto")
 			  MyBFldrMenuPasteInto.className = "menudisabled";
 		  }
+		  else {
+			if (MyBFldrMenuPaste.className == "menudisabled")
+			  MyBFldrMenuPaste.className = "menupaste";
+			if (MyBFldrMenuPasteInto.className == "menudisabled")
+			  MyBFldrMenuPasteInto.className = "menupasteinto";
+		  }
 		  myMenu_open = myBFldrMenu_open = true;
 		}
 	  }
 	}
-	else if (type == "separator") {
+	else { // Separator
 	  if (row.dataset.protect != "true") { // Non protected row
 		menu = MyBSepMenu;
-		if ((bkmkClipboard != undefined)
-			&& ((rowIndex < noPasteMinRowIndex) || (rowIndex > noPasteMaxRowIndex))) {
-		  if (MyBSepMenuPaste.className == "menudisabled")
-			MyBSepMenuPaste.className = "menupaste";
-		}
-		else {
+		if ((bkmkClipboard.length > 0) && noPasteZone.isInZone(rowIndex)) {
 		  if (MyBSepMenuPaste.className == "menupaste")
 			MyBSepMenuPaste.className = "menudisabled";
+		}
+		else {
+		  if (MyBSepMenuPaste.className == "menudisabled")
+			MyBSepMenuPaste.className = "menupaste";
 		}
 		myMenu_open = myBSepMenu_open = true;
 	  }
@@ -3077,72 +3149,46 @@ function bkmkContextHandler (e) {
 		menu = Menu_bprot;
 	  }
 	  else { // Non protected row
+		pasteEnabled = ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex));
 		// Check if we are on an highlighted result row which is hidden
 		if (!openTree_option && row.firstElementChild.classList.contains(Reshidden)) {
 		  menu = Menu_bresbkmk;
-		  if ((bkmkClipboard != undefined)
-			  && ((rowIndex <= noPasteMinRowIndex) || (rowIndex > noPasteMaxRowIndex))) {
-			pasteEnabled = true;
-		  }
-		  if (disableFavicons_option) {
-			MyBResBkmkMenuFavicon.className = "menudisabled";
-		  }
 		}
 		else {
 		  menu = Menu_bbkmk;
-		  if ((bkmkClipboard != undefined)
-			  && ((rowIndex <= noPasteMinRowIndex) || (rowIndex > noPasteMaxRowIndex))) {
-			pasteEnabled = true;
-		  }
-		  if (disableFavicons_option) {
-			MyBBkmkMenuFavicon.className = "menudisabled";
-		  }
 		}
 	  }
 	}
 	else if (type == "folder") {
+	  pasteEnabled = ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex));
 	  if (row.dataset.protect == "true") { // Protected row
 		menu = Menu_bprotf;
-		if ((bkmkClipboard != undefined)
-			&& ((rowIndex < noPasteMinRowIndex) || (rowIndex > noPasteMaxRowIndex))) {
-		  pasteEnabled = true;
-		}
 	  }
 	  else { // Non protected row
 		// Check if we are on an highlighted result row which is hidden
 		if (!openTree_option && row.firstElementChild.classList.contains(Reshidden)) {
 		  menu = Menu_bresfldr;
-		  if ((bkmkClipboard != undefined)
-			  && ((rowIndex < noPasteMinRowIndex) || (rowIndex > noPasteMaxRowIndex))) {
-			pasteEnabled = true;
-		  }
 		}
 		else {
 		  menu = Menu_bfldr;
-		  if ((bkmkClipboard != undefined)
-			  && ((rowIndex < noPasteMinRowIndex) || (rowIndex > noPasteMaxRowIndex))) {
-			pasteEnabled = true;
-		  }
 		}
 	  }
 	}
-	else if (type == "separator") {
+	else { // Separator
 	  if (row.dataset.protect == "true") { // Protected row
 		e.preventDefault(); // No menu on protected separators
 //		menu = Menu_bprots;
 	  }
 	  else { // Non protected row
+		pasteEnabled = ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex));
 		menu = Menu_bsep;
-		if ((bkmkClipboard != undefined)
-			&& ((rowIndex < noPasteMinRowIndex) || (rowIndex > noPasteMaxRowIndex))) {
-		  pasteEnabled = true;
-		}
 	  }
 	}
 
 	if (menu != undefined) {
-	  updateBSP2ContextMenu(menu, pasteEnabled);
+	  updateBSP2ContextMenu(menu, pasteEnabled, !disableFavicons_option);
 	  myMenu_open = true; // Remember that this instance opened the menu when processing the onClicked event
+	  // Open menu
 	  browser.menus.overrideContext({
 		context: "bookmark",
 		bookmarkId: row.dataset.id
@@ -3455,22 +3501,53 @@ function handleRsltDragScroll (eventId, e) {
 
 /*
  * Setup drag operation and contents
+ *
+ * selectedIds = list (Array) of ids of selected bookmark items
+ * dt = event DataTransfer object to set
+ *
+ * Sets global variable dtSignature
  */
-function setDragTransfer (BN_id, rowDragged, dt) {
-  // Get dragged BN
-  let BNDragged = curBNList[BN_id];
+let noDropZone; // ZoneDexc to identify where we cannot drop a BSP2 or native bookmark drag
+let dtSignature; // Used to verify if a drag operation is always the same, to calculate no drop zone only once
+				 // (both isBkmkItemDragged and isRsltItemDragged are false when not an internal drag)
+function setDragTransfer (selectedIds, dt) {
+  // Set dragged BNs
+  let BN, BNDragged;
+  let bnId, bnIdDragged;
+  bkmkDragIds = [];
+  bkmkDrag = [];
+  let len = selectedIds.length;
+  for (let i=0 ; i<len ; i++) {
+	bnId = selectedIds[i];
+	BN = curBNList[bnId];
+	if (BNDragged == undefined) { // text/x-moz-place<-xxx> can (for now) only hold one bookmark = first one  
+	  BNDragged = BN;
+	  bnIdDragged = bnId;
+	}
+	uniqueListAddBN(bnId, BN, bkmkDragIds, bkmkDrag);
+  }
+  // Set no drop zone
+  noDropZone = new ZoneDesc ();
+  len = bkmkDragIds.length;
+  for (let i=0 ; i<len ; i++) {
+	zoneAddBN(noDropZone, bkmkDragIds[i], bkmkDrag[i]);
+  }
 
   // Set the event dataTransfer
   // For a bookmark:	application/x-bookmark and text/x-moz-place,text/x-moz-url,text/plain,text/html
   // For a folder:		application/x-bookmark and text/x-moz-place-container,text/x-moz-url,text/plain,text/html
   // For a separator:	application/x-bookmark and text/x-moz-place-separator,text/plain,text/html
 
-  // Data for BSP2 bookmark object
-  dt.setData("application/x-bookmark", BN_id);
-
+  // Data for BSP2 bookmark object = unique list (Array) of bookmark ids
+  let json = JSON.stringify(bkmkDragIds);
+  dt.setData("application/x-bookmark", dtSignature = json);
+//console.log("selectedIds: "+selectedIds);
+//console.log("bkmkDragIds: "+bkmkDragIds);
+//console.log("dtSignature: "+dtSignature);
   // application/x-bookmark is for BSP2 internal drag & drops.
+  //
   // Rest is:
-  // text/x-moz-place<-xxx>:
+  // text/x-moz-place<-xxx> (native Bookmark sidebar):
   // Native Bookmark data like  {"title":"Nouveau dossier","id":2238,"itemGuid":"VQ8ulNGyfXk0","instanceId":"jvwImUhXA2rV","parent":2099,"parentGuid":"CLSASmpIpBmQ",
   // 							 "dateAdded":1536393478662000,"lastModified":1536393478662000,"type":"text/x-moz-place-container"}
   //							{"title":"_  New bookmark","id":2350,"itemGuid":"JE2j0D-5tnpT","instanceId":"jvwImUhXA2rV","parent":2028,"parentGuid":"XmOZ-HAGbfEM",
@@ -3478,25 +3555,28 @@ function setDragTransfer (BN_id, rowDragged, dt) {
   //							{"title":"","id":2239,"itemGuid":"gORenOTsYJdk","instanceId":"jvwImUhXA2rV","parent":2028,"parentGuid":"XmOZ-HAGbfEM",
   //							 "dateAdded":1536396421579000,"lastModified":1551022707690000,"type":"text/x-moz-place-separator"}
   // text/plain:
-  // Native Bookmark data like  New folder3\nabout:blank\n--------------------\nabout:blank
+  // Native Bookmark data like  New folder3
+  //								about:blank
+  //								--------------------
   //							about:blank
   //							--------------------
   // text/html:
   // Native Bookmark data like  <DL><DT>New folder3</DT><DD><A HREF="about:blank">New bookmark5</A></DD><DD><HR></DD><DD><A HREF="about:blank">New bookmark4</A></DD></DL>
-  //							<A HREF="about:blank">_  New bookmark</A>
-  //							<HR>
+  //							<BR/><A HREF="about:blank">_  New bookmark</A>
+  //							<BR/><HR>
   //
-  // Note: there is also this one, not used by BSP2 currently:
-  // text/x-moz-url:
-  // Native Bookmark data like  about:blank\nNew bookmark5\nabout:blank\nNew bookmark4
-  //							about:blank\n_  New bookmark
+  // text/x-moz-url: documented in https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XPCOM/Reference/Interface/nsITransferable
+  //	a text string containing the URL, a newline (\n), then the title of the page
+  //		about:blank\nNew bookmark44
+  //	No support for folders nor separator, no support for multiple bookmarks
+
+  // Data for native bookmark object = first bookmark only for now
   let type = BNDragged.type;
   let isFolder = (type == "folder");
-  let json;
   if (isFolder) {
 	json = JSON.stringify(
 	  {title: BNDragged.title,
-	   itemGuid: BN_id,
+	   itemGuid: bnIdDragged,
 	   parentGuid: BNDragged.parentId,
 	   dateAdded: BNDragged.dateAdded,
 	   lastModified: BNDragged.lastModified,
@@ -3507,7 +3587,7 @@ function setDragTransfer (BN_id, rowDragged, dt) {
   else if (type == "separator") {
 	json = JSON.stringify(
 	  {title: "",
-	   itemGuid: BN_id,
+	   itemGuid: bnIdDragged,
 	   parentGuid: BNDragged.parentId,
 	   dateAdded: BNDragged.dateAdded,
 	   lastModified: BNDragged.lastModified,
@@ -3516,37 +3596,43 @@ function setDragTransfer (BN_id, rowDragged, dt) {
 	);
   }
   else { // Bookmark
+	let title = BNDragged.title;
+	let url = BNDragged.url;
 	json = JSON.stringify(
-	  {title: BNDragged.title,
-	   itemGuid: BN_id,
+	  {title: title,
+	   itemGuid: bnIdDragged,
 	   parentGuid: BNDragged.parentId,
 	   dateAdded: BNDragged.dateAdded,
 	   lastModified: BNDragged.lastModified,
 	   type: "text/x-moz-place",
-	   uri: BNDragged.url
+	   uri: url
 	  }
 	);
+	// Shortcut URLs dragged to system can only be for bookmarks
+	let shortcutUrl = url+"\n"+title;
+	dt.setData("text/x-moz-url", shortcutUrl);
   }
   dt.setData("text/x-moz-place", json);
-//  let xmozurl;
-  let plain = BN_toPlain(BNDragged);
-  dt.setData("text/plain", plain);
-  let html = BN_toHTML(BNDragged);
-  dt.setData("text/html", html);
-  dt.effectAllowed = "move";
 
-  // Set drop forbidden zone
-  let rowIndex = rowDragged.rowIndex;
-  if (isFolder) {
-	noDropMinRowIndex = rowIndex;
-	// Find last child / grand child of BN (itself if no child)
-	let lastBN = BN_lastDescendant(BNDragged);
-	let row = curRowList[lastBN.id];
-	noDropMaxRowIndex = row.rowIndex; // Can be at end of bookmarks table
+  // Data for plain text and HTML
+  len = bkmkDrag.length;
+  let plain = "";
+  let html = "";
+  let plain_sep = ""; 
+  let html_sep = "";
+//  let xmozurl;
+  for (let i=0 ; i<len ; i++) {
+	BN = bkmkDrag[i];
+	plain += plain_sep + BN_toPlain(BN); 
+	html += html_sep + BN_toHTML(BN);
+	if (i == 0) { // Separator for next objects
+	  plain_sep = "\n"; 
+ 	  html_sep = "<BR/>";
+	}
   }
-  else {
-	noDropMinRowIndex = noDropMaxRowIndex = rowIndex;
-  }
+  dt.setData("text/plain", plain);
+  dt.setData("text/html", html);
+  dt.effectAllowed = "copyMove";
 }
 
 /*
@@ -3554,21 +3640,16 @@ function setDragTransfer (BN_id, rowDragged, dt) {
  * 
  * e = DragEvent
  * 
- * Sets global variables rowDragged (HTMLRowElmeent) and BNDragged (BookmarkNode),
- * as well as the index min/max range indicating the no drop zone.
+ * Sets global variables noDropZone, isBkmkItemDragged and dtSignature
  */
-let noDropMinRowIndex = -1;
-let noDropMaxRowIndex = -1;
 function bkmkDragStartHandler (e) {
   let rowDragged = e.target; // Should always be a [object HTMLTableRowElement] by construction
 //console.log("Drag start event: "+e.type+" target: "+rowDragged+" class: "+rowDragged.classList);
 //console.log("Draggable: "+rowDragged.draggable+" Protected: "+rowDragged.dataset.protect);
-  let BN_id = rowDragged.dataset.id;
-//console.log("BN_id: "+BN_id);
+//console.log("BN_id: "+rowDragged.dataset.id);
   if (rowDragged.dataset.protect != "true") {
 	isBkmkItemDragged = true; // Signal we are dragging an internal item to prevent scrolling
-	let dt = e.dataTransfer;
-	setDragTransfer(BN_id, rowDragged, dt);
+	setDragTransfer(bkmkSelectIds, e.dataTransfer); // This sets dtSignature
   }
 }
 
@@ -3576,6 +3657,8 @@ function bkmkDragStartHandler (e) {
  * Drag end event handler. This is on the element which was in Drag start = HTMLTableRowElement
  * 
  * e = DragEvent
+ *
+ * Sets global variables noDropZone and isBkmkItemDragged
  */
 function bkmkDragEndHandler (e) {
   // Signal we stopped dragging an internal item
@@ -3583,9 +3666,10 @@ function bkmkDragEndHandler (e) {
   isBkmkDragActive = false;
   refBkmkScrollLeft = refBkmkScrollTop = -1;
 
-//  let target = e.target;
+//let target = e.target;
 //console.log("Drag end event: "+e.type+" target: "+target+" class: "+target.classList);
-  noDropMinRowIndex = noDropMaxRowIndex = -1;
+  dtSignature = undefined; // Forget dragged signature
+  noDropZone = undefined;
 }
 
 /*
@@ -3593,25 +3677,18 @@ function bkmkDragEndHandler (e) {
  * 
  * e = DragEvent
  * 
- * Sets global variables rowDragged (HTMLRowElmeent) and BNDragged (BookmarkNode),
- * as well as the index min/max range indicating the no drop zone.
+ * Sets global variables noDropZone, isRsltItemDragged and dtSignature
  */
 function resultsDragStartHandler (e) {
   // Inhibit result pane scrolling
   disableRsltScroll();
-  isRsltItemDragged = true; // Signal we are dragging an internal item
-
   let rowDragged = e.target; // Should always be a [object HTMLTableRowElement] by construction
 //console.log("Drag start event: "+e.type+" target: "+rowDragged+" class: "+rowDragged.classList);
 //console.log("Draggable: "+rowDragged.draggable+" Protected: "+rowDragged.dataset.protect);
-
-  // Go to the original row, this will be the one really dragged
-  let BN_id = rowDragged.dataset.id;
-//console.log("BN_id: "+BN_id);
-  rowDragged = curRowList[BN_id];
+//console.log("BN_id: "+rowDragged.dataset.id);
   if (rowDragged.dataset.protect != "true") {
-	let dt = e.dataTransfer;
-	setDragTransfer(BN_id, rowDragged, dt);
+	isRsltItemDragged = true; // Signal we are dragging an internal item
+	setDragTransfer(rbkmkSelectIds, e.dataTransfer); // This sets dtSignature
   }
 }
 
@@ -3619,6 +3696,8 @@ function resultsDragStartHandler (e) {
  * Drag end event handler. This is on the element which was in Drag start = HTMLTableRowElement
  * 
  * e = DragEvent
+ *
+ * Sets global variables noDropZone and isRsltItemDragged
  */
 function resultsDragEndHandler (e) {
   // Enable result pane scrolling again
@@ -3630,7 +3709,8 @@ function resultsDragEndHandler (e) {
 
 //let target = e.target;
 //console.log("Drag end event: "+e.type+" target: "+target+" class: "+target.classList);
-  noDropMinRowIndex = noDropMaxRowIndex = -1;
+  dtSignature = undefined; // Forget dragged signature
+  noDropZone = undefined;
 }
 
 /*
@@ -3694,15 +3774,85 @@ function rsltDragExitHandler (e) {
 }
 
 /*
+ * Trace dt content for debug
+ * 
+ * dt = DataTransfer
+ */
+function traceDt (dt) {
+  console.log("-------------------");
+  console.log("Items length : "+dt.items.length);
+  for (let i=0 ; i<dt.items.length; i++) {
+	console.log("... items["+i+"].kind = "+dt.items[i].kind + "; type = "+dt.items[i].type);
+  }
+  let itemCount;
+  let mozItemCount = dt.mozItemCount;
+  if (mozItemCount != undefined) {
+	itemCount = mozItemCount;
+  }
+  else {
+	itemCount = 1;
+  }
+  console.log("mozItemCount : "+mozItemCount);
+  console.log("itemCount    : "+itemCount);
+  let types;
+  let type;
+  let data;
+  let files, file;
+  let len_t, len_f;
+  for (let i=0 ; i<itemCount ; i++) {
+	if (i == 0) {
+	  types = dt.types;
+	}
+	else {
+	  // Convert from a DOMStringList to an Array of DOMString
+	  types = dt.mozTypesAt(i);
+	}
+	len_t = types.length;
+	console.log("Types["+i+"] length : "+len_t);
+	for (let j=0 ; j<len_t; j++) {
+	  type = types[j];
+	  console.log("... types["+i+", "+j+"] = "+type);
+	  files = dt.files;
+	  len_f = files.length;
+	  console.log("...... files.length = "+len_f);
+	  if ((type == "application/x-moz-file") || (type == "Files")) {
+		if (j == 0) { // Do it only once, as not indexed by type
+		  for (let k=0 ; k<len_f; k++) {
+			file = files.item(k);
+			if (file == null) {
+			  console.log("...... files["+i+", "+k+"] is null ");
+			}
+			else {
+			  console.log("...... files["+i+", 0, "+k+"].name = "+file.name);
+			  console.log("...... files["+i+", 0, "+k+"].size = "+file.size);
+			  console.log("...... files["+i+", 0, "+k+"].type = "+file.type);
+			  console.log("...... files["+i+", 0, "+k+"].webkitRelativePath = "+file.webkitRelativePath);
+			}
+		  }
+		}
+	  }
+	  else {
+		if (i == 0) {
+		  data = dt.getData(type);
+		}
+		else {
+		  data = dt.mozGetDataAt(type, i);
+		}
+		console.log("...... data["+i+", "+type+"] = <<"+data+">>");
+	  }
+	}
+  }
+}
+
+/*
  * Check if we support drag and drop of the source element
  * 
  * dt = DataTransfer
  * 
  * Return Boolean = true if supported, else false
+ * Updates dtSignature, bkmkDragIds, bkmkDrag and noDropZone when not an internal drag (both isBkmkItemDragged and isRsltItemDragged false)
  */
 function checkDragType (dt) {
-  let isSupported = false;
-
   // When the dragged element is one of our bookmarks its dt.types will be
   //   dt.types        : application/x-bookmark,[text/uri-list,]text/plain
   // When it is a native Bookmark, it will be
@@ -3723,13 +3873,130 @@ function checkDragType (dt) {
   //   dt.types        : text/x-moz-url,text/x-moz-url-data,text/x-moz-url-desc,text/uri-list,text/_moz_htmlcontext,text/_moz_htmlinfo,text/html,text/plain
   // When it ia a selected text in HTML page:
   //   dt.types        : text/_moz_htmlcontext,text/_moz_htmlinfo,text/html,text/plain
-  if (dt.types.includes("application/x-bookmark")
-	  || dt.types.includes("text/x-moz-place")
-	  || dt.types.includes("text/x-moz-text-internal")
-	  || dt.types.includes("text/uri-list")
-	  || dt.types.includes("text/x-moz-url")
-	 ) {
+  // When it is a Windows Explorer bookmark (.URL file):
+  //   dt.types		   : application/x-moz-file, Files
+  //		with bookmark name in files[index].name (minus .URL)
+  //		and content in file: 	[InternetShortcut]
+  //								URL=https://microsoftnews.msn.com/en-us/news/elections-2020?ocid=msedgdhp
+  // When it is a Linux x-desktop link (.desktop file):
+  //   dt.types		   : application/x-moz-file, Files
+  //		with bookmark name in files[index].name (minus .desktop)
+  //		and content in file: 	[Desktop Entry]
+  //								Encoding=UTF-8
+  //								Name=Link to Overview - xxx
+  //								Type=Link
+  //								URL=https://xxx
+  //								Icon=mate-fs-bookmark
+  // When it is a Linux x-desktop link (.webloc file):
+  //   dt.types		   : application/x-moz-file, Files
+  //		with bookmark name in files[index].name (minus .webloc)
+  //		and content in file: 	<?xml version="1.0" encoding="UTF-8"?>
+  //								<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+  //								<plist version="1.0">
+  //								<dict>
+  //									<key>URL</key>
+  //									<string>https://support.mozilla.org/en-US/products/firefox</string>
+  //								</dict>
+  //								</plist>
+//traceDt(dt);
+  let isSupported;
+  let format, data;
+  if (dt.types.includes(format = "application/x-bookmark")) { // BSP2 drag
+	// If not internal drag ()can be another BSP2 panel instance), update bkmkDragIds, bkmkDrag and noDropZone if needed
+	// (trigerred by different dtSignature)
+	if (!isBkmkItemDragged && !isRsltItemDragged && (dtSignature != (data = dt.getData(format)))) {
+//console.log("dtSignature: "+dtSignature+" - data: "+data);
+	  dtSignature = data;
+	  // Data for a BSP2 bookmark drag = unique list (Array) of bookmark ids
+	  bkmkDragIds = JSON.parse(data);
+	  // Build bkmkDrag and noDropzone
+	  bkmkDrag = [];
+	  noDropZone = new ZoneDesc ();
+	  let BN;
+	  let bnId;
+	  let len = bkmkDragIds.length;
+	  for (let i=0 ; i<len ; i++) {
+		BN = curBNList[bnId = bkmkDragIds[i]];
+		bkmkDrag.push(BN);
+		zoneAddBN(noDropZone, bnId, BN);
+	  }
+	}
 	isSupported = true;
+  }
+  else if (dt.types.includes(format = "text/x-moz-place")) { // Native FF Bookmark sidebar drag
+	// Cannot be an internal drag, build signature to compare with stored one (only manipulate as String to be quick)
+	// Handle multiple items drag -- GECKO SPECIFIC !! -- No more supported as of FF71, didn't find an alternative yet :-(
+	let itemCount;
+	let mozItemCount = dt.mozItemCount;
+	if (mozItemCount != undefined) {
+	  itemCount = mozItemCount;
+	}
+	else {
+	  itemCount = 1;
+	}
+	// Note: FF native bookmark sidebar doesn't set getData() until the drop is effective,
+	// so we cannot build and check the noDropZone until last moment :-( !! 
+	if (itemCount == 1) {
+	  data = "[" + dt.getData(format) + "]";
+	}
+	else {
+	  data = "[";
+	  for (let i=0 ; i<itemCount ; i++) { // Get each dragged item
+		if (i>0)   data += ",";
+		data +=	dt.mozGetDataAt(format, i);
+	  }
+	  data += "]";
+	}
+	// If different dtSignature, update bkmkDragIds, bkmkDrag and noDropZone 
+	if (dtSignature != data) {
+//console.log("dtSignature: "+dtSignature+" - data: "+data);
+	  dtSignature = data;
+//traceDt(dt);
+
+	  let a_bookmark = JSON.parse(data);
+	  // Build bkmkDragIds and bkmkDrag as unique lists
+	  let bnId;
+	  let BN;
+	  bkmkDragIds = [];
+	  bkmkDrag = [];
+	  let len = a_bookmark.length;
+	  for (let i=0 ; i<len ; i++) {
+		bnId = a_bookmark[i].itemGuid;
+		BN = curBNList[bnId];
+		if ((BN == undefined) && (bnId != MobileBookmarks)) { // Desynchro !! => reload bookmarks from FF API
+		  // Signal reload to background, and then redisplay to all
+		  sendAddonMessage("reloadFFAPI_auto");
+		}
+		else {
+		  uniqueListAddBN(bnId, BN, bkmkDragIds, bkmkDrag);
+		}
+	  }
+	  // Set no drop zone
+	  noDropZone = new ZoneDesc ();
+	  len = bkmkDragIds.length;
+	  for (let i=0 ; i<len ; i++) {
+		zoneAddBN(noDropZone, bkmkDragIds[i], bkmkDrag[i]);
+	  }
+	}
+	isSupported = true;
+  }
+  else if (dt.types.includes("text/x-moz-text-internal")
+		   || dt.types.includes("text/uri-list")
+		   || dt.types.includes("text/x-moz-url")
+		  ) { // Other type of drag
+	isSupported = true;
+  }
+  else if (dt.types.includes(format = "application/x-moz-file")
+		  ) { // Drag from windows explorer
+	let data = format + "-" + dt.files.length;
+	if (dtSignature != data) {
+//console.log("dtSignature: "+dtSignature+" - data: "+data);
+	  dtSignature = data;
+//traceDt(dt);
+	}
+	isSupported = true;
+  }  else {
+	isSupported = false;	
   }
 
   return(isSupported);
@@ -4030,14 +4297,13 @@ function bkmkDragEnterHandler (e) {
 //console.log("Drag enter event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
   // Handle drag scrolling inhibition
   handleBkmkDragScroll(EnterEvent, e);
-  if (checkDragType(dt)
-	  && ((target.className == undefined)  // When on Text, className and classList are undefined.
-		  || (target.className.length > 0) // For some reason, when the mouse is over the lifts,
-		  								   // an HTMLDivElement is returned which is none of what
-		  								   // is inside BookmarksTree :-(
-	     )
+  if (((target.className == undefined)  // When on Text, className and classList are undefined.
+	   || (target.className.length > 0)
+	  )
+	  && checkDragType(dt)
     ) {
 	// Get the enclosing row and bkmkitem_x inside it which we will highlight
+	// Note: when the mouse is over the lifts, an HTMLDivElement is returned
 	let row = getDragToRow(target);
 //console.log("Enter row: "+row+" class: "+row.classList+" BN_id: "+row.dataset.id);
 //console.log("Bkmkitem_x: "+bkmkitem_x+" class: "+bkmkitem_x.classList);
@@ -4045,8 +4311,8 @@ function bkmkDragEnterHandler (e) {
 	  dt.dropEffect = "none"; // Signal drop not allowed
 	}
 	else {
-	  let index = row.rowIndex;
-	  if ((index >= noDropMinRowIndex) && (index <= noDropMaxRowIndex)
+	  let is_ctrlKey = e.ctrlKey;
+	  if ((!is_ctrlKey && (noDropZone != undefined) && noDropZone.isInZone(row.rowIndex))
 		  || (isProtected && !isTopItem) // Protection, can't drop on non top draggable elements = specials
 	     ) {
 		dt.dropEffect = "none"; // Signal drop not allowed
@@ -4054,6 +4320,7 @@ function bkmkDragEnterHandler (e) {
 	  else {
 		e.preventDefault(); // Allow drop
 		highlightInsert(e);
+		dt.dropEffect = (is_ctrlKey ? "copy" : "move");
 	  }
 	}
   }
@@ -4077,14 +4344,13 @@ function bkmkDragOverHandler (e) {
 //console.log("Drag over event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
   // Handle drag scrolling inhibition
   handleBkmkDragScroll(OverEvent, e);
-  if (checkDragType(dt)
-	  && ((target.className == undefined)  // When on Text, className and classList are undefined.
-		  || (target.className.length > 0) // For some reason, when the mouse is over the lifts,
-		  								   // an HTMLDivElement is returned which is none of what
-		  								   // is inside BookmarksTree :-(
-	     )
-  	 ) {
+  if (((target.className == undefined)  // When on Text, className and classList are undefined.
+	   || (target.className.length > 0)
+	  )
+	  && checkDragType(dt)
+    ) {
 	// Get the enclosing row
+	// Note: when the mouse is over the lifts, an HTMLDivElement is returned
 	let row = getDragToRow(target);
 //console.log("Over row: "+row+" class: "+row.classList+" BN_id: "+row.dataset.id);
 //console.log("Bkmkitem_x: "+bkmkitem_x+" class: "+bkmkitem_x.classList);
@@ -4092,8 +4358,8 @@ function bkmkDragOverHandler (e) {
 	  dt.dropEffect = "none"; // Signal drop not allowed
 	}
 	else {
-	  let index = row.rowIndex;
-	  if ((index >= noDropMinRowIndex) && (index <= noDropMaxRowIndex)
+	  let is_ctrlKey = e.ctrlKey;
+	  if ((!is_ctrlKey && (noDropZone != undefined) && noDropZone.isInZone(row.rowIndex))
 		  || (isProtected && !isTopItem) // Protection, can't drop on non top draggable elements = specials
 	     ) {
 		dt.dropEffect = "none"; // Signal drop not allowed
@@ -4101,6 +4367,7 @@ function bkmkDragOverHandler (e) {
 	  else {
 		e.preventDefault(); // Allow drop
 		highlightInsert(e);
+		dt.dropEffect = (is_ctrlKey ? "copy" : "move");
 	  }
 	}
   }
@@ -4121,29 +4388,27 @@ function bkmkDragLeaveHandler (e) {
   // Handle drag scrolling inhibition
   handleBkmkDragScroll(LeaveEvent, e);
   let targetType = Object.prototype.toString.call(target).slice(8, -1);
-  if (checkDragType(dt)
-	  && (targetType != "HTMLDocument") // When we drop on a dropEffect=none zone (drop not fired)
+  if ((targetType != "HTMLDocument") // When we drop on a dropEffect=none zone (drop not fired, but leave or exit)
 	  && ((target.className == undefined)  // When on Text, className and classList are undefined.
-		  || (target.className.length > 0) // For some reason, when the mouse is over the lifts,
-		  								   // an HTMLDivElement is returned which is none of what
-		  								   // is inside BookmarksTree :-(
-	     )
+	 	  || (target.className.length > 0)
+		 )
+	  && checkDragType(dt)
     ) {
 	// Get the enclosing row
+	// Note: when the mouse is over the lifts, an HTMLDivElement is returned
 	let row = getDragToRow(target);
 //console.log("Leave row: "+row+" class: "+row.classList+" BN_id: "+row.dataset.id);
 	if (row == undefined) { // We are on the scrollbars for example
 	  dt.dropEffect = "none"; // Signal drop not allowed
 	}
 	else {
-	  let index = row.rowIndex;
-	  if (((index < noDropMinRowIndex) || (index > noDropMaxRowIndex))
-		  && (!isProtected || isTopItem) // Protection, can't drop on non top draggable elements = specials
-	     ) {
-		highlightRemove(e);
-	  }
+	  dt.dropEffect = (e.ctrlKey ? "copy" : "move");
 	}
   }
+  else {
+	dt.dropEffect = "none"; // Signal drop not allowed
+  }
+  highlightRemove(e);
 }
 
 /*
@@ -4158,29 +4423,207 @@ function bkmkDragExitHandler (e) {
   // Handle drag scrolling inhibition
   handleBkmkDragScroll(ExitEvent, e);
   let targetType = Object.prototype.toString.call(target).slice(8, -1);
-  if (checkDragType(dt)
-	  && (targetType != "HTMLDocument") // When we drop on a dropEffect=none zone (drop not fired)
+  if ((targetType != "HTMLDocument") // When we drop on a dropEffect=none zone (drop not fired, but leave or exit)
 	  && ((target.className == undefined)  // When on Text, className and classList are undefined.
-		  || (target.className.length > 0) // For some reason, when the mouse is over the lifts,
-		  								   // an HTMLDivElement is returned which is none of what
-		  								   // is inside BookmarksTree :-(
-	     )
+	 	  || (target.className.length > 0)
+		 )
+	  && checkDragType(dt)
     ) {
 	// Get the enclosing row
+	// Note: when the mouse is over the lifts, an HTMLDivElement is returned
 	let row = getDragToRow(target);
 //console.log("Exit row: "+row+" class: "+row.classList+" BN_id: "+row.dataset.id);
 	if (row == undefined) { // We are on the scrollbars for example
 	  dt.dropEffect = "none"; // Signal drop not allowed
 	}
 	else {
-	  let index = row.rowIndex;
-	  if (((index < noDropMinRowIndex) || (index > noDropMaxRowIndex))
-		  && (!isProtected || isTopItem) // Protection, can't drop on non top draggable elements = specials
-	     ) {
-		highlightRemove(e);
-	  }
+	  dt.dropEffect = (e.ctrlKey ? "copy" : "move");
 	}
   }
+  else {
+	dt.dropEffect = "none"; // Signal drop not allowed
+  }
+  highlightRemove(e);
+}
+
+/*
+ * Upon Bookmark creation menu event, open Window to let the user enter values in fields
+ * 
+ * BTN is of type BookmarkTreeNode (promise from browser.bookmarks.create())
+ */
+function createBookmark (BTN) {
+  // Truncate title to just before "?" if it has one
+  let title = BTN.title;
+  let paramPos = title.indexOf("?");
+  if (paramPos != -1) {
+	title = title.slice(0, paramPos);
+  }
+  let path = BN_path(BTN.parentId);
+  openPropPopup("new", BTN.id, path, BTN.type, title, BTN.url);
+
+  // Don't call refresh search, it is already called through bkmkCreatedHandler
+}
+
+/*
+ * Upon Folder creation menu event, open Window to let the user enter values in fields
+ * 
+ * BTN is of type BookmarkTreeNode (promise from browser.bookmarks.create())
+ */
+function createFolder (BTN) {
+  let path = BN_path(BTN.parentId);
+  openPropPopup("new", BTN.id, path, BTN.type, BTN.title, undefined);
+
+  // Don't call refresh search, it is already called through bkmkCreatedHandler
+}
+
+/*
+ * Handle FF API call for bookmark creation
+ * 
+ * parentId = String identifying the folder inside which to insert
+ * insertIndex = position in parent folder where to insert (undefined if append at end)
+ * title = String, title of created bookmark
+ * url = String, URL of created bookmark (undefined if folder)
+ * type = String, "bookmark", "folder" or "separator"
+ * is_openProperties = Boolean, if true, open a property window after creation to edit new bookmark item
+ */
+function createBkmkItem (parentId, insertIndex, title, url, type, is_openProperties = false) {
+  let creating;
+  if (insertIndex == undefined) { // Create in a folder, at end
+	if (beforeFF57) {
+	  if (type == "separator") { // Cannot create separators in FF 56
+		creating = new Promise (
+		  (resolve, reject) => {
+			resolve(); // Send promise for anybody waiting ..
+		  }
+		);
+	  }
+	  else {
+		creating = browser.bookmarks.create(
+		  {parentId: parentId,
+		   title: title,
+		   url: url
+		  }
+		);
+	  }
+	}
+	else {
+	  creating = browser.bookmarks.create(
+		{parentId: parentId,
+		 title: title,
+		 type: type,
+		 url: url
+		}
+	  );
+	}
+  }
+  else { // Create before of after a bookmark item
+	if (beforeFF57) {
+	  if (type == "separator") { // Cannot create separators in FF 56
+		creating = new Promise (
+		  (resolve, reject) => {
+			resolve(); // Send promise for anybody waiting ..
+		  }
+		);
+	  }
+	  else {
+		creating = browser.bookmarks.create(
+		  {index: insertIndex,
+		   parentId: parentId,
+		   title: title,
+		   url: url
+		  }
+		);
+	  }
+	}
+	else {
+	  creating = browser.bookmarks.create(
+		{index: insertIndex,
+		 parentId: parentId,
+		 title: title,
+		 type: type,
+		 url: url
+		}
+	  );
+	}
+  }
+  if (is_openProperties) { // Open the Properties window
+	creating.then(createBookmark);
+  }
+}
+
+/*
+ * Handle FF API call for bookmark creation - async function
+ * 
+ * parentId = String identifying the folder inside which to insert
+ * insertIndex = position in parent folder where to insert (undefined if append at end)
+ * title = String, title of created bookmarkf
+ * url = String, URL of created bookmark (undefined if folder)
+ * type = String, "bookmark", "folder" or "separator"
+ *
+ * Returns created BTN
+ */
+async function createBkmkItem_async (parentId, insertIndex, title, url, type) {
+  let creating;
+  if (insertIndex == undefined) { // Create in a folder, at end
+	if (beforeFF57) {
+	  if (type == "separator") { // Cannot create separators in FF 56
+		creating = new Promise (
+		  (resolve, reject) => {
+			resolve(); // Send promise for anybody waiting ..
+		  }
+		);
+	  }
+	  else {
+		creating = browser.bookmarks.create(
+		  {parentId: parentId,
+		   title: title,
+		   url: url
+		  }
+		);
+	  }
+	}
+	else {
+	  creating = browser.bookmarks.create(
+		{parentId: parentId,
+		 title: title,
+		 type: type,
+		 url: url
+		}
+	  );
+	}
+  }
+  else { // Create before of after a bookmark item
+	if (beforeFF57) {
+	  if (type == "separator") { // Cannot create separators in FF 56
+		creating = new Promise (
+		  (resolve, reject) => {
+			resolve(); // Send promise for anybody waiting ..
+		  }
+		);
+	  }
+	  else {
+		creating = browser.bookmarks.create(
+		  {index: insertIndex,
+		   parentId: parentId,
+		   title: title,
+		   url: url
+		  }
+		);
+	  }
+	}
+	else {
+	  creating = browser.bookmarks.create(
+		{index: insertIndex,
+		 parentId: parentId,
+		 title: title,
+		 type: type,
+		 url: url
+		}
+	  );
+	}
+  }
+  let newBTN = await creating; // Created BookmarkTreeNode
+  return(newBTN);
 }
 
 /*
@@ -4188,7 +4631,11 @@ function bkmkDragExitHandler (e) {
  * 
  * e = DragEvent
  */
-function bkmkDropHandler (e) {
+const PatternTYPE = /type\s*=\s*(.+)/i;
+const PatternNAME = /name\s*=\s*(.+)/i;
+const PatternURL = /url\s*=\s*(.+)/i;
+const PatternMacOSURL = /\<string\>s*(.+)s*\<\/string\>/i;
+async function bkmkDropHandler (e) {
   e.preventDefault(); // Prevent browser to interpret the drop by itself (like open a page for a URL/bookmark drop)
   let target = e.target;
   let dt = e.dataTransfer;
@@ -4201,27 +4648,40 @@ console.log("dt.types        : "+dt.types);
 */
   // Stop scrolling inhibition
   resetBkmkDragScroll();
-  if (checkDragType(dt)
-	  && ((target.className == undefined)  // When on Text, className and classList are undefined.
-		  || (target.className.length > 0) // For some reason, when the mouse is over the lifts,
-		  								   // an HTMLDivElement is returned which is none of what
-		  								   // is inside BookmarksTree :-(
-	     )
-     ) {
+  if (((target.className == undefined)  // When on Text, className and classList are undefined.
+	   || (target.className.length > 0)
+	  )
+	  && checkDragType(dt)
+    ) {
+	// Highlight one last time to make sure we get latest insert position, then remove highlight,
+	// in particular to handle case of FF native bookmark sidebar originated drag, droppping inside
+	// noDropZone which is only active at the moment of Drop because it doesn't give the dragged data
+	// before :-( !
+	let insertPos = highlightInsert(e);
+	highlightRemove(e);
+
 	// Get the enclosing row
+	// Note: when the mouse is over the lifts, an HTMLDivElement is returned
 	let row = getDragToRow(target);
 //console.log("Drop on row: "+row+" class: "+row.classList+" BN_id: "+row.dataset.id);
+//traceDt(dt);
 
 	// Can't happen when in a dropEffect=none zone .. but in case, let's protect against it
-	let index = row.rowIndex;
-	if ((index < noDropMinRowIndex) || (index > noDropMaxRowIndex)) {
-	  // Highlight one last time to make sure we get latest insert position, then remove highlight
-	  let insertPos = highlightInsert(e);
-	  highlightRemove(e);
-
+	let is_ctrlKey = e.ctrlKey; // When Ctrl is pressed, this is a copy, no protection
+	if (is_ctrlKey || (noDropZone == undefined) || !noDropZone.isInZone(row.rowIndex)) {
+	  // Drop allowed, forget dragged signature
+	  dtSignature = undefined;
 	  // Now, get target BookmarkNode
 	  let BN_id = row.dataset.id;
 	  let BN = curBNList[BN_id];
+	  let is_infolder = (insertPos == 0);
+	  let bnIndex;
+	  if (!is_infolder) { // If not drop to a folder, insert before or after BN
+		bnIndex = BN_getIndex(BN);
+		if (insertPos == 1) { // Create just after target row
+		  bnIndex++;
+		}
+	  }
 
 	  // Get data to drop, and insert / move it 
 	  // When the dragged element is one of our bookmarks its dt.types will be
@@ -4232,137 +4692,55 @@ console.log("dt.types        : "+dt.types);
 	  //   dt.types        : text/x-moz-text-internal
 	  // When it is a link in an HTML page, or in the address bar:
 	  //   dt.types        : text/x-moz-url,text/x-moz-url-data,text/x-moz-url-desc,text/uri-list,text/_moz_htmlcontext,text/_moz_htmlinfo,text/html,text/plain
-
-	  // Handle multiple items drag -- GECKO SPECIFIC !! -- No more supported as of FF71, didn't find an alternative yet :-(
-	  let mozItemCount = dt.mozItemCount;
-	  let itemCount;
-	  if (mozItemCount != undefined) {
-		itemCount = mozItemCount;
-	  }
-	  else {
-		itemCount = 1;
-	  }
-	  let types;
+	  let types = dt.types;
 	  let type;
-
-/*
-let typesLength;
-let data;
-console.log("-------------------");
-console.log("InsertPos: "+insertPos);
-console.log("Items length : "+dt.items.length);
-for (let i=0 ; i<dt.items.length; i++) {
-  console.log("... items["+i+"].kind = "+dt.items[i].kind + "; type = "+dt.items[i].type);
-}
-console.log("mozItemCount : "+mozItemCount);
-console.log("itemCount    : "+itemCount);
-for (let i=0 ; i<itemCount ; i++) {
-  if (i == 0) {
-	types = dt.types;
-  }
-  else {
-	// Convert from a DOMStringList to an Array of DOMString
-	types = Array.from(dt.mozTypesAt(i));
-//	let list = Array.from(dt.mozTypesAt(i));
-//	let len = list.length;
-//	types = new Array (len);
-//	for (let i=0 ; i<len ; i++) {
-//	  types[i] = list.item(i);
-//	}
-  }
-  console.log("Types length : "+types.length);
-  for (let j=0 ; j<types.length; j++) {
-	type = types[j];
-	console.log("... types["+i+", "+j+"] = "+type);
-	if (i == 0) {
-	  data = dt.getData(type);
-	}
-	else {
-	  data = dt.mozGetDataAt(type, i);
-	}
-	console.log("...... data["+i+", "+type+"] = <<"+data+">>");
-  }
-}
-*/
-
-	  let bnIndex = BN_getIndex(BN);
-	  if (insertPos == 1) { // Create just after target row
-		bnIndex++;
+	  if (types.includes(type = "application/x-bookmark")	// Move or copy the dragged bookmark
+		  || types.includes(type = "text/x-moz-place")		// Dragging a native Bookmark to us
+		 ) {
+		if (is_ctrlKey) { // Copy
+		  copyBkmk(bkmkDrag, (is_infolder ? BN_id : BN.parentId), bnIndex);
+		}
+		else { // Move
+		  moveBkmk(bkmkDrag, (is_infolder ? BN_id : BN.parentId), bnIndex);
+		}
 	  }
-	  for (let i=itemCount-1 ; i>=0 ; i--) { // Do it for each dragged item, reverse order as always inserting at same index
-		if (i == 0) {
-		  types = dt.types;
+	  else if (types.includes(type = "text/x-moz-text-internal")) { // Dragging one or multiple tabs to us
+		let gettingTabs;
+		// Handle multiple items drag -- GECKO SPECIFIC !! -- No more supported as of FF71
+		// Workaround: use highlighted tabs in the query, as it seems we can retrieve  all the tabs being dragged
+		// in returned a_tabs
+		// Use lastFocusedWindow: true instead of windowId: myWindowId, to allow dragging from other FF windows
+		gettingTabs = browser.tabs.query({lastFocusedWindow: true, highlighted: true});
+		gettingTabs.then(
+		  function (a_tabs) {
+			// Create all highlighted (= supposed dragged) tabs, in reverse order to keep current position
+			// Note: working even when appending at end of folder .. it seems like when queueing multiple requests
+			//       to the API, this is transforming to the last known index in folder at time of queueing (bug ?)
+			let droppedTab;
+			let tgtBN_id = (is_infolder ? BN_id : BN.parentId);
+			let len = a_tabs.length;
+//console.log("tabs length: "+len);
+			for (let i=len-1 ; i>=0 ; i--) {
+			  droppedTab =  a_tabs[i];
+			  // Create new bookmark at insertion point
+			  let title = droppedTab.title;
+			  let url = droppedTab.url;
+			  // Create new bookmark item and open properties if Alt key is pressed at same time than drop
+			  createBkmkItem(tgtBN_id, bnIndex, title, url, "bookmark", e.altKey);
+			}
+		  }
+		);
+/*
+		let url;
+		let itemCount;
+		let mozItemCount = dt.mozItemCount;
+		if (mozItemCount != undefined) {
+		  itemCount = mozItemCount;
 		}
 		else {
-//		  types = dt.mozTypesAt(i);
-		  types = Array.from(dt.mozTypesAt(i));
+		  itemCount = 1;
 		}
-		if (types.includes(type = "application/x-bookmark")	 // Move or copy the dragged bookmark
-			|| types.includes(type = "text/x-moz-place") 	 // Dragging a native Bookmark to us
-		   ) {
-		  let draggedBN_id;
-		  if (i == 0) {
-			draggedBN_id = dt.getData(type);
-		  }
-		  else {
-			draggedBN_id = dt.mozGetDataAt(type, i);
-		  }
-		  if (type == "text/x-moz-place") {
-			// data is like {"title":"Nouveau dossier","id":2238,"itemGuid":"VQ8ulNGyfXk0","instanceId":"jvwImUhXA2rV","parent":2099,"parentGuid":"CLSASmpIpBmQ",
-		    //               "dateAdded":1536393478662000,"lastModified":1536393478662000,"type":"text/x-moz-place-container"}
-		    //				{"title":"_  New bookmark","id":2350,"itemGuid":"JE2j0D-5tnpT","instanceId":"jvwImUhXA2rV","parent":2028,"parentGuid":"XmOZ-HAGbfEM",
-		    //				 "dateAdded":1550944109935000,"lastModified":1551218607521000,"type":"text/x-moz-place","uri":"about:blank"}
-		    //				{"title":"","id":2239,"itemGuid":"gORenOTsYJdk","instanceId":"jvwImUhXA2rV","parent":2028,"parentGuid":"XmOZ-HAGbfEM",
-		    //				 "dateAdded":1536396421579000,"lastModified":1551022707690000,"type":"text/x-moz-place-separator"}
-			let bookmark = JSON.parse(draggedBN_id);
-			draggedBN_id = bookmark.itemGuid;
-		  }
-		  let BNDragged = curBNList[draggedBN_id];
-		  let rowDragged = curRowList[draggedBN_id];
-
-		  if (insertPos == 0) { // Drop to a folder, add at end
-			if (e.ctrlKey) { // Copy
-			  pasteBkmk(BNDragged, BN);
-			}
-			else { // Move
-			  browser.bookmarks.move(draggedBN_id,
-				  					 {parentId: BN_id
-				  					 }
-			  );
-			}
-		  }
-		  else { // Drop before of after a bookmark item
-			if (e.ctrlKey) { // Copy
-			  // Retrieve parent of that bookmark item as we have to insert just before that BN
-			  let parentBN = curBNList[BN.parentId];
-			  pasteBkmk(BNDragged, parentBN, bnIndex);
-			}
-			else { // Move
-			  // Do nothing if we insert just after rowDragged and same parent == no move !
-			  if ((BNDragged.parentId != BN.parentId)
-				  || ((insertPos == -1) && (index != rowDragged.rowIndex+1))
-				  || ((insertPos == 1) && (index != rowDragged.rowIndex-1))
-			     ) {
-				// Be careful (not documented ...), if the bookmark is moved after itself
-				// under the same parent, the insertion index is to be numbered without it
-				// => decrease target index by 1 (basically, the index is used after delete ..)
-				let adjust = 0;
-				if ((BNDragged.parentId == BN.parentId) // Same parent, so moving inside parent
-					&& (BN_getIndex(BNDragged) < bnIndex)
-				   ) {
-				  adjust = -1;
-				}
-				browser.bookmarks.move(rowDragged.dataset.id,
-									   {parentId: BN.parentId,
-				  						index: bnIndex + adjust
-									   }
-				);
-			  }
-			}
-		  }
-		}
-		else if (types.includes(type = "text/x-moz-text-internal")) { // Dragging a tab to us
-		  let url;
+		for (let i=itemCount-1 ; i>=0 ; i--) { // Do it for each dragged item, reverse order to always insert at same index
 		  if (i == 0) {
 			url = dt.getData(type);
 		  }
@@ -4370,16 +4748,15 @@ for (let i=0 ; i<itemCount ; i++) {
 			url = dt.mozGetDataAt(type, i);
 		  }
 		  // If this is an "about:reader?url=" URL, cannot use the matching pattern form as it does not find "about:" tabs
-		  // Trying a work around using "active" tabs .. seems to work and return only 1 tab ..
-		  // => Maybe I should switch to it for any kind of URL ?
-		  let isAboutReaderUrl = url.startsWith("about:reader?url=");
-		  let gettingTabs;
-		  if (isAboutReaderUrl) { // Remember the initial form, and decode the url for retrieval
-			gettingTabs = browser.tabs.query({windowId: myWindowId, active: true});
+		  // Trying a work around using "highlighted" tabs .. seems to work and to return all selected tabs under drag ..
+		  // => Switching to that trick for any dragged tab, with any kind of URL
+		  let urlSearch;
+		  if (url.startsWith("about:reader?url=")) { // Remember the initial form, and decode the url for retrieval
+			urlSearch = decodeURIComponent(url.substr(17)); // Does not work ! Matching on URL must be full URL from start
 		  }
 		  else {
 			// browser.tabs.query() only uses special a limited pattern matching form ..
-			// So lets remove the parts it cannot support .. at the risk of getting several tabs, so need to triage later
+			// So remove the parts it cannot support .. at the risk of getting several tabs, to triage later
 			let urlObj = new URL (url);
 			let protocol = urlObj.protocol;
 //			let host = urlObj.host;
@@ -4388,22 +4765,24 @@ for (let i=0 ; i<itemCount ; i++) {
 			let pathname = urlObj.pathname;
 			let search = urlObj.search;
 //			let hash = urlObj.hash;
-			let urlSearch = protocol + "//" + hostname + pathname + search;
-//console.log("Query tab for url: "+url+" urlSearch: "+urlSearch);
-			// Get tab corresponding to url
-			gettingTabs = browser.tabs.query({windowId: myWindowId, url: urlSearch});
+			urlSearch = protocol + "//" + hostname + pathname + search;
 		  }
-		  gettingTabs.then (
+		  // Get all tabs corresponding to url
+console.log("Query tab for url: "+url+" urlSearch: "+urlSearch);
+//		  gettingTabs = browser.tabs.query({windowId: myWindowId, url: urlSearch});
+		  // Use lastFocusedWindow: true instead of windowId: myWindowId, to allow dragging from other FF windows
+		  gettingTabs = browser.tabs.query({lastFocusedWindow: true, highlighted: true});
+		  gettingTabs.then(
 			function (a_tabs) {
-			  // In case of multiple tabs because of the shortened url .. retrieve the good one
 			  let len = a_tabs.length;
-//console.log("tabs length: "+len);
+console.log("tabs length: "+len);
+			  // In case of multiple tabs because of the shortened url .. retrieve the good one
 			  let droppedTab;
 			  if (len > 1) {
-				let i;
+				let k;
 				for (let j=0 ; j<len ; j++) {
-				  if ((i = a_tabs[j]).url == url) {
-					droppedTab = i;
+				  if ((k = a_tabs[j]).url == url) {
+					droppedTab = k;
 					break;
 				  }
 				}
@@ -4412,316 +4791,235 @@ for (let i=0 ; i<itemCount ; i++) {
 				droppedTab = a_tabs[0];
 			  }
 			  // Create new bookmark at insertion point
-			  uglyHackTabFavIconUrl = droppedTab.favIconUrl;
 			  let title = droppedTab.title;
-//let url = droppedTab.url;
-			  let creating;
-			  if (insertPos == 0) { // Drop to a folder, add at end
-				if (beforeFF57) {
-				  creating = browser.bookmarks.create(
-					{parentId: BN_id,
-					 title: title,
-					 url: url
-					}
-				  );
-				}
-				else {
-				  creating = browser.bookmarks.create(
-					{parentId: BN_id,
-					 title: title,
-					 type: "bookmark",
-					 url: url
-					}
-				  );
-				}
-			  }
-			  else { // Drop before of after a bookmark item
-				if (beforeFF57) {
-				  creating = browser.bookmarks.create(
-					{index: bnIndex,
-					 parentId: BN.parentId,
-					 title: title,
-					 url: url
-					}
-				  );
-				}
-				else {
-				  creating = browser.bookmarks.create(
-					{index: bnIndex,
-					 parentId: BN.parentId,
-					 title: title,
-					 type: "bookmark",
-					 url: url
-					}
-				  );
-				}
-			  }
-			  if (e.altKey == true) { // If Alt key was pressed when dropping, then open the Properties window
-				creating.then(createBookmark);
-			  }
+			  url = droppedTab.url;
+			  // Create new bookmark item and open properties if Alt key is pressed at same time than drop
+			  createBkmkItem((is_infolder ? BN_id : BN.parentId), bnIndex, title, url, "bookmark", e.altKey);
 			}
 		  );
 		}
-		else if (types.includes(type = "text/uri-list")		// Dragging a page link or (i) in the location bar to us
-				 || types.includes(type = "text/x-moz-url")	// Dragging the location bar URL address
-			    ) {
-		  let url;
-		  let title;
-		  let titleType = "text/x-moz-url-desc";
-		  if (i == 0) {
-			url = dt.getData(type);
-			title = dt.getData(titleType);
-			if (title.length == 0) {
-			  title = dt.getData("text/x-moz-url");
-			}
-		  }
-		  else {
-			url = dt.mozGetDataAt(type, i);
-			title = dt.mozGetDataAt(titleType, i);
-			if (title.length == 0) {
-			  title = dt.mozGetDataAt("text/x-moz-url", i);
-			}
-		  }
-		  let splitIndex = url.indexOf("\n"); // Remove any "\n" and following part if there is in URL 
-		  if (splitIndex > 0) {
-			url = url.slice(0, splitIndex);
-		  }
-		  if (title.length == 0) { // If title is empty, use the URL as title
-			title = url;
-		  }
-		  else { // If there is an "\n", keep the part after
-			splitIndex = title.indexOf("\n");
-			title = title.slice(splitIndex+1);
-		  }
-
-		  // Create new bookmark at insertion point
-		  let creating;
-		  if (insertPos == 0) { // Drop to a folder, add at end
-			if (beforeFF57) {
-			  creating = browser.bookmarks.create(
-				{parentId: BN_id,
-				 title: title,
-				 url: url
+*/
+	  }
+	  else if (types.includes(type = "application/x-moz-file")) {	// Dragging one or more bookmark from Windows Explorer
+		let files = dt.files;
+		let file;
+		let tgtBN_id = (is_infolder ? BN_id : BN.parentId);
+		// Create all dragged URL shortcuts in reverse order to keep current position
+		// Note: working even when appending at end of folder .. it seems like when queueing multiple requests
+		//       to the API, this is transforming to the last known index in folder at time of queueing (bug ?)
+		let len = files.length;
+//console.log("...... files.length = "+len);
+		for (let i=0 ; i<len ; i++) { // We will use await to guarantee order of creation
+		  file = files.item(i);
+		  if (file != null) {
+			let name = file.name;
+//console.log("...... files["+i+"].name = "+name);
+//console.log("...... files["+i+"].size = "+file.size);
+//console.log("...... files["+i+"].type = "+file.type);
+			let lowerName = name.toLowerCase();
+			// Verify this a URL file, and get its title
+			let pos;
+			if ((pos = lowerName.lastIndexOf(".url")) > 0) { // This should be a Windows Explorer URL shortcurt
+			  let title = name.slice(0, pos);
+//console.log("...... URL title = "+title);
+			  // Get content of the URL file
+			  let text = await file.text();
+//console.log("...... URL file content = "+text);
+			  if (text.startsWith("[InternetShortcut]")) { // Yes, this is a Windows Explorer URL shortcurt
+				let a_url = text.match(PatternURL);
+				// See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/match
+				// for format of the return value of match()
+				// Get the address 
+				let url = a_url[1]; // 0 is the full matched string, 1 is the first () group matched
+//console.log("...... URL address = "+url);
+				// Create new bookmark item and open properties if Alt key is pressed at same time than drop
+				if (bnIndex == undefined) {
+				  await createBkmkItem_async(tgtBN_id, undefined, title, url, "bookmark", e.altKey);
 				}
-			  );
-			}
-			else {
-			  creating = browser.bookmarks.create(
-				{parentId: BN_id,
-				 title: title,
-				 type: "bookmark",
-				 url: url
+				else {
+				  await createBkmkItem_async(tgtBN_id, bnIndex++, title, url, "bookmark", e.altKey);
 				}
-			  );
+			  }
 			}
-		  }
-		  else { // Drop before of after a bookmark item
-			if (beforeFF57) {
-			  creating = browser.bookmarks.create(
-				{index: bnIndex,
-				 parentId: BN.parentId,
-				 title: title,
-				 url: url
+//			else if (file.type == "application/x-desktop") { // This should be a Linux link
+			else if ((pos = lowerName.lastIndexOf(".desktop")) > 0) { // This should be a Linux link
+			  let title = name.slice(0, pos);
+//console.log("...... URL title = "+title);
+			  // Get content of the link file
+			  let text = await file.text();
+//console.log("...... Link file content = "+text);
+			  if (text.startsWith("[Desktop Entry]")) { // Looks like it so far
+				let a_url = text.match(PatternTYPE);
+				if (a_url[1] == "Link") { // Yes, this is a Linux link
+//				  a_url = text.match(PatternNAME);
+//				  let title = a_url[1];
+//console.log("...... URL title = "+title);
+				  a_url = text.match(PatternURL);
+				  let url = a_url[1];
+//console.log("...... URL address = "+url);
+				  // Create new bookmark item and open properties if Alt key is pressed at same time than drop
+				  if (bnIndex == undefined) {
+					await createBkmkItem_async(tgtBN_id, undefined, title, url, "bookmark", e.altKey);
+				  }
+				  else {
+					await createBkmkItem_async(tgtBN_id, bnIndex++, title, url, "bookmark", e.altKey);
+				  }
 				}
-			  );
+			  }
 			}
-			else {
-			  creating = browser.bookmarks.create(
-				{index: bnIndex,
-				 parentId: BN.parentId,
-				 title: title,
-				 type: "bookmark",
-				 url: url
+			else if ((pos = lowerName.lastIndexOf(".webloc")) > 0) { // This should be a MacOS URL shortcurt
+			  let title = name.slice(0, pos);
+//console.log("...... URL title = "+title);
+			  // Get content of the URL file
+			  let text = await file.text();
+//console.log("...... URL file content = "+text);
+			  if (text.toLowerCase().includes("<key>url</key>")) { // Yes, this is a MacOS URL shortcurt
+				let a_url = text.match(PatternMacOSURL);
+				// See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/match
+				// for format of the return value of match()
+				// Get the address 
+				let url = a_url[1]; // 0 is the full matched string, 1 is the first () group matched
+//console.log("...... URL address = "+url);
+				// Create new bookmark item and open properties if Alt key is pressed at same time than drop
+				if (bnIndex == undefined) {
+				  await createBkmkItem_async(tgtBN_id, undefined, title, url, "bookmark", e.altKey);
 				}
-			  );
+				else {
+				  await createBkmkItem_async(tgtBN_id, bnIndex++, title, url, "bookmark", e.altKey);
+				}
+			  }
 			}
-		  }
-		  if (e.altKey == true) { // If Alt key was pressed when dropping, then open the Properties window
-			creating.then(createBookmark);
 		  }
 		}
 	  }
+	  else if (types.includes(type = "text/uri-list")		// Dragging a page link or (i) in the location bar to us
+			   || types.includes(type = "text/x-moz-url")	// Dragging the location bar URL address
+			  ) {
+		let url = dt.getData(type);
+		let title = dt.getData("text/x-moz-url-desc");
+		if (title.length == 0) {
+		  title = dt.getData("text/x-moz-url");
+		}
+
+		let splitIndex = url.indexOf("\n"); // Remove any "\n" and following part if there is in URL 
+		if (splitIndex > 0) {
+		  url = url.slice(0, splitIndex);
+		}
+		if (title.length == 0) { // If title is empty, use the URL as title
+		  title = url;
+		}
+		else { // If there is an "\n", keep the part after
+		  splitIndex = title.indexOf("\n");
+		  title = title.slice(splitIndex+1);
+		}
+		// Create new bookmark item and open properties if Alt key is pressed at same time than drop
+		createBkmkItem((is_infolder ? BN_id : BN.parentId), bnIndex, title, url, "bookmark", e.altKey);
+	  }
+	  e.preventDefault(); // We accepted the drop
+	}
+	else {
+	  dt.dropEffect = "none"; // Signal drop not allowed (if it has any cancellation effect ..)
+	}
+  }
+  else {
+	dt.dropEffect = "none"; // Signal drop not allowed (if it has any cancellation effect ..)
+  }
+}
+
+/*
+ * Paste (create as copy) bookmark contents (recursively because can only create one by one) at the
+ * designated place.
+ * 
+ * a_BN = array of BookmarkNodes to paste (copy)
+ * parentId = String, Id of new parent to paste into
+ * index = integer position in parent (undefined if at end)
+ */
+async function pasteBkmk (a_BN, parentId, index = undefined) {
+//let t1 = new Date();
+//trace(t1.getTime()+" Paste BN: "+BN+" Parent: "+parentBN+" index: "+index+" recur: "+recurLevel);
+  let len = a_BN.length;
+  let BN;
+  for (let i=0 ; i<len ; i++) { // Go through list of BookmarkNodes
+	BN = a_BN[i];
+	let newBTN;
+	// If index is undefined, we are pasting into a folder => at end
+	if (index == undefined) {
+	  // Create BTN at end of parent folder
+	  newBTN = await createBkmkItem_async(parentId, undefined, BN.title, BN.url, BN.type);
+	}
+	else {
+	  newBTN = await createBkmkItem_async(parentId, index++, BN.title, BN.url, BN.type);
+    }
+//let t2 = new Date();
+//trace(t2.getTime()+" Paste node creation delay: "+(t2.getTime() - t1.getTime()));
+	let children = BN.children;
+	if ((children != undefined) && (children.length > 0)) { // There are children to copy ...
+	  // Recursively call pasteBkmk on children
+	  await pasteBkmk(children, newBTN.id);
 	}
   }
 }
 
 /*
- * Paste bookmark contents (recursively because can only create one by one) at the
- * designated place.
+ * Copy bookmark contents at the designated place.
  * 
- * BN = BookmarkNode to paste - If it is undefined, it signals last sibling reached at
- *      current recursion level.
- * newParentBN = BookmarkNode of new parent to paste into
- * index = integer position in parent
- * recurLevel (optional, default 0) = relative recursion level to initial paste - used to detect
- *                                    when to end
- * 
- * Relies on stackBN, stackNewBN and stackIndex global arrays to execute the recursion without
- * synchronous returns.
+ * a_BN = array of BookmarkNodes to paste (copy)
+ * parentId = String, Id of new parent to paste into
+ * index = integer position in parent (undefined if at end)
  */
-let stackBN;
-let stackNewBN;
-let stackIndex
-function pasteBkmk (BN, newParentBN, index = undefined, recurLevel = 0) {
-//  let t1 = new Date();
-//  trace(t1.getTime()+" Paste BN: "+BN+" Parent: "+newParentBN+" index: "+index+" recur: "+recurLevel);
-  if (BN != undefined) { // Initial call or recursive call
-	if (recurLevel == 0) { // First and only node at top
-	  stackBN = [];
-	  stackNewBN = [];
-	  stackIndex = [];
-	}
-	// If index is undefined, we are pasting into a folder => at end
-	let creating;
-	let type = BN.type;
-	let url = BN.url;
-	if (index == undefined) {
-	  // Create BTN at end of parent folder
-	  if (beforeFF57) {
-		if (type == "separator") { // Cannot create separators in FF 56
-		  creating = new Promise (
-			(resolve, reject) => {
-			  resolve(); // Send promise for anybody waiting ..
-			}
-		  );
-		}
-		else {
-		  creating = browser.bookmarks.create(
-			{parentId: newParentBN.id,
-			 title: BN.title,
-			 url: url
-			}
-		  );
-		}
-	  }
-	  else {
-		creating = browser.bookmarks.create(
-		  {parentId: newParentBN.id,
-		   title: BN.title,
-		   type: type,
-		   url: url
-		  }
-		);
-	  }
-	}
-	else {
-	  // Create BTN at designated place
-	  if (beforeFF57) {
-		if (type == "separator") { // Cannot create separators in FF 56
-		  creating = new Promise (
-			(resolve, reject) => {
-			  resolve(); // Send promise for anybody waiting ..
-			}
-		  );
-		}
-		else {
-		  creating = browser.bookmarks.create(
-			{index: index,
-			 parentId: newParentBN.id,
-			 title: BN.title,
-			 url: url
-			}
-		  );
-		}
-	  }
-	  else {
-		creating = browser.bookmarks.create(
-		  {index: index,
-		   parentId: newParentBN.id,
-		   title: BN.title,
-		   type: type,
-		   url: url
-		  }
-		);
-	  }
-	}
-	creating.then(
-	  function (newBTN) { // Created BookmarkTreeNode
-//let t2 = new Date();
-//trace(t2.getTime()+" Paste node creation delay: "+(t2.getTime() - t1.getTime()));
-		let children = BN.children;
-		if ((children != undefined) && (children.length > 0)) { // There are children to copy ...
-		  stackBN.push(BN); // Remember it for when we go up from depth first exploration
-		  stackNewBN.push(newParentBN);
-		  stackIndex.push(index);
-		  let newBN = curBNList[newBTN.id]; // We are supposing the creation cycle was complete
-		  									// and a BN was created for this new node
-		  if (newBN == undefined)
-			deadbeef = null; // Scream if not !!
-		  pasteBkmk(children[0], newBN, 0, recurLevel+1);
-		}
-		else if (recurLevel > 0) { // There can be siblings to copy also at that recursion level
-		  let parentBN = stackBN[stackBN.length-1];
-		  children = parentBN.children;
-		  if (++index < children.length) { // There are siblings ..
-			pasteBkmk(children[index], newParentBN, index, recurLevel);
-		  }
-		  else if (recurLevel > 1) { // It was the last child of its parent,
-									 // and parent may have more siblings to explore
-			// Go back one level and get next sibling of parent
-			pasteBkmk(undefined, undefined, undefined, recurLevel-1);
-		  }
-		}
-	  }
-	);
-  }
-  else { // Return from lower level recursion
-		 // Note that if we get here, recurLevel >= 1 by construction
-	BN = stackBN.pop();
-	let parentBN = stackBN[stackBN.length-1];
-	newParentBN = stackNewBN.pop();
-	index = stackIndex.pop();
-
-	// See if there are siblings at that level
-	let children = parentBN.children;
-	if (++index < children.length) { // There are siblings ..
-	  pasteBkmk(children[index], newParentBN, index, recurLevel);
-	}
-	else if (recurLevel > 1) { // It was the last child of its parent,
-	  						   // and parent may have more siblings to explore
-	  // Go back one level and get next sibling of parent
-	  pasteBkmk(undefined, undefined, undefined, recurLevel-1);
-	}
-  }
+async function copyBkmk (a_BN, parentId, index = undefined) {
+  // Create a copy of the source as list to paste, in case we are copiying inside source, to avoid
+  // an infinite loop because of source being itslef modified by the paste 
+  await pasteBkmk(uniqueListCopy(a_BN), parentId, index);
 }
 
 /*
  * Move bookmark at the designated place.
  * 
- * BN = BookmarkNode to move
- * newParentBN = BookmarkNode of new parent to paste into
- * newIndex = integer position in parent
+ * a_BN = Array of BookmarkNodes to move
+ * newParentId = String, Id of new parent to move into
+ * newIndex = integer position in parent (undefined if at end)
  * 
  * Return true if moved, else false. 
  */
-function moveBkmk (BN, newParentBN, newIndex = undefined) {
-//  trace("Move BN: "+BN.id+" Parent: "+newParentBN.id+" index: "+newIndex);
+async function moveBkmk (a_BN, newParentId, newIndex = undefined) {
   if (newIndex == undefined) { // Cut and pasting into a folder, at end
-	// Move BTN at end of folder
-	browser.bookmarks.move(
-	  BN.id,
-	  {parentId: newParentBN.id
-	  }
-	);
+	let len = a_BN.length;
+	let BN;
+	for (let i=0 ; i<len ; i++) {
+	  BN = a_BN[i];
+//trace("Move BN id: "+BN.id+" to Parent id: "+newParentId+" at index: "+newIndex);
+	  // Move BTN at end of folder. Do that synchronously to avoid mess when processing multiple BNs
+	  await browser.bookmarks.move(
+		BN.id,
+		{parentId: newParentId
+		}
+	  );
+	}
   }
   else {
-    // If designated place is under same parent and after, some special handling ..
-    if (BN.parentId == newParentBN.id) {
-	  // If moved after, need to decrease index by 1 to represent position without moved item ..
-	  // This is not documented properly on https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/bookmarks/move
-      let index = BN_getIndex(BN);
-	  if (newIndex > index)   newIndex--;
-	  if (newIndex == index) { // No move
-	    return;
+	let len = a_BN.length;
+	let BN;
+	for (let i=0 ; i<len ; i++) {
+	  BN = a_BN[i];
+      // If designated place is under same parent and after, some special handling ..
+	  if (BN.parentId == newParentId) {
+		// If moved after, need to decrease index by 1 to represent position without moved item ..
+		// This is not documented properly on https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/bookmarks/move
+		let index = BN_getIndex(BN);
+		if (newIndex > index)   newIndex--;
+		if (newIndex == index) { // No move
+		  continue;
+		}
 	  }
-    }
-	// Move BTN at designated place
-	browser.bookmarks.move(
-	  BN.id,
-	  {parentId: newParentBN.id,
-	   index: newIndex
-	  }
-	);
+	  // Move BTN at designated place. Do that synchronously to avoid mess when processing multiple BNs
+	  await browser.bookmarks.move(
+		BN.id,
+		{parentId: newParentId,
+		 index: newIndex++
+		}
+	  );
+	}
   }
 }
 
@@ -4759,152 +5057,6 @@ function getMenuRow (item) {
 }
 
 /*
- * Open bookmark Property popup with given title
- * 
- * propType = "new" or "prop", to indicate creation of a new item, or editing its properties
- * BN_id = String identifying the bookmark item to edit
- */
-function openPropPopup (popupType, BN_id, path, type, title, url) {
-  // Open popup on bookmark item
-  let titlePreface;
-  let popupUrl;
-//  let popupURL = browser.extension.getURL("sidebar/popup.html");
-  // Did not find a good way to get a modal dialog so far :-(
-  // 1) let sign = prompt("What's your sign?");
-  //    creates a modal inside the sidebar, half hidden if the sidebar is not large enough. 
-  // 2) It appears window.open works outside of the .then, but not inside !!
-  //    I do not understand why ..
-  //    window.open(popupURL, "_blank", "dialog,modal,height=200,width=200");
-  //    Anyway, "modal" is ignored, and I can't figure how to get the UniversalBrowserWrite privilege so far .. :-(
-  // So using browser.windows instead, which is not modal, and which is resizeable.
-  if (type == "folder") {
-	let winType;
-	if (popupType == "new") {
-	  winType = "newfldr";
-	  titlePreface = "New folder";
-	}
-	else {
-	  winType = "propfldr";
-	  titlePreface = "Properties of « "+title+" »";
-	}
-	popupUrl = PopupURL+"?type="+winType+"&id="+BN_id+"&path="+encodeURIComponent(path)+"&title="+encodeURIComponent(title)+"&url=null";
-  }
-  else { // Bookmark
-	let winType;
-	if (popupType == "new") {
-	  winType = "newbkmk";
-	  titlePreface = "New bookmark";
-	}
-	else {
-	  winType = "propbkmk";
-	  titlePreface = "Properties of « "+title+" »";
-	}
-	popupUrl = PopupURL+"?type="+winType+"&id="+BN_id+"&path="+encodeURIComponent(path)+"&title="+encodeURIComponent(title)+"&url="+encodeURIComponent(url);
-  }
-  popupUrl = encodeURI(popupUrl);
-  let gettingItem = browser.storage.local.get(
-	{popuptop_option: 300,
-	 popupleft_option: 300
-	}
-  );
-  gettingItem.then((res) => {
-	// Open popup window where it was last. If it was in another screen than
-	// our current screen, then center it.
-	// This avoids having the popup out of screen and unreachable, in case
-	// the previous screen went off, or display resolution changed.
-	let top = res.popuptop_option;
-	let left = res.popupleft_option;
-//console.log("openPropPopup() - top="+top+" left="+left);
-	let scr = window.screen;
-	let adjust = false;
-	// Also, protect if possible against privacy.resistFingerprinting which does not return the screen size,
-	// but the sidebar size instead !! :-(
-	let al = scr.availLeft;
-	let aw = scr.availWidth;
-	if ((PopupWidth < aw) // If wider than the reported screen width, do not adjust
-		&& ((left < al) || (left >= al + aw))
-	   ) {
-	  adjust = true;
-	  left = al + Math.floor((aw - PopupWidth) / 2);
-	}
-	let at = scr.availTop;
-	let ah = scr.availHeight;
-	if ((PopupHeight < ah) // If higher than the reported screen height, do not adjust
-		&& ((top < at) || (top >= at + ah))
-	   ) {
-	  adjust = true;
-	  top = at + Math.floor((ah - PopupHeight) / 2);
-	}
-	if (adjust) { // Save new position values
-	  browser.storage.local.set({
-		popuptop_option: top,
-		popupleft_option: left
-	  });
-//console.log("openPropPopup() - had to adjust position top="+top+" left="+left);
-	}
-  
-	browser.windows.create(
-	  {titlePreface: titlePreface,
-	   type: "popup",
-//		 type: "detached_panel",
-	   // Using a trick with URL parameters to tell the window which type
-	   // it is, which bookmark id, .. etc .. since titlePreface doesn't appear to work
-	   // and there appears to be no way to pass parameters to the popup by the call. 
-	   url: popupUrl,
-//----- Workaround for top and left position parameters being ignored for panels and bug on popups (since panel is an alias for popup) -----
-// Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
-//     https://bugzilla.mozilla.org/show_bug.cgi?id=1271047
-//Make the start size as small as possible so that it briefly flashes in its initial
-//position in the least conspicuous way.
-//Note: 1,1 does not work, this sets the window in a state reduced to the bar, and no
-//internal resize seems to work after that.
-//Also tried to start minimized, but the window pops in a big size first before being minimized,
-//even less pretty.			   .
-//=> .. FF does not seem very clean on all this .. :-( 
-//       height: PopupHeight,
-//       width: PopupWidth,
-	   height: 40,
-	   width: 40,
-//	     left: left,
-//		 top: top,
-//----- End of position ignored workaround -----
-	   allowScriptsToClose: true
-	  }
-	);
-  });
-}
-
-/*
- * Upon Bookmark creation menu event, open Window to let the user enter values in fields
- * 
- * BTN is of type BookmarkTreeNode (promise from browser.bookmarks.create())
- */
-function createBookmark (BTN) {
-  // Truncate title to just before "?" if it has one
-  let title = BTN.title;
-  let paramPos = title.indexOf("?");
-  if (paramPos != -1) {
-	title = title.slice(0, paramPos);
-  }
-  let path = BN_path(BTN.parentId);
-  openPropPopup("new", BTN.id, path, BTN.type, title, BTN.url);
-
-  // Don't call refresh search, it is already called through bkmkCreatedHandler
-}
-
-/*
- * Upon Folder creation menu event, open Window to let the user enter values in fields
- * 
- * BTN is of type BookmarkTreeNode (promise from browser.bookmarks.create())
- */
-function createFolder (BTN) {
-  let path = BN_path(BTN.parentId);
-  openPropPopup("new", BTN.id, path, BTN.type, BTN.title, undefined);
-
-  // Don't call refresh search, it is already called through bkmkCreatedHandler
-}
-
-/*
  * Receive event from keyboard anywhere in the sidebar panel, and also handle
  * menu actions
  * 
@@ -4914,9 +5066,11 @@ function keyHandler (e) {
   let target = e.target; // Type depends ..
   let classList = target.classList;
   let key = e.key;
+  let ctrlKey = e.ctrlKey;
 //console.log("Key event: "+e.type+" key: "+key+" char: "+e.char+" target: "+target+" classList: "+classList);
 
-  let isResultRow = classList.contains("brow"); // Note: classList is an Array, not a string => exact match
+  let row = target.parentElement;
+  let isResultRow = (row.dataset.rslt == "true");
   if (key == "Escape") {
 	// Clear any menu when Esc is pressed
 	let menuClosed = clearMenu();
@@ -4944,9 +5098,7 @@ function keyHandler (e) {
 	  e.preventDefault();
 	}
   }
-  else if (classList.contains(Selhighlight) || isResultRow) { // Keyboard actions on an highlighted (=> focused) cell
-	let row = target.parentElement;
-
+  else if (classList.contains(SelectHighlight)) { // Keyboard actions on an highlighted (=> focused) cell
 	if (key == "ArrowDown") {
 	  if (!myMenu_open) {
 		// Find next visible row and highlight it
@@ -4954,8 +5106,11 @@ function keyHandler (e) {
 		while (((nextRow = nextRow.nextElementSibling) != null) && (nextRow.hidden));
 		if (nextRow != null) { // We got one
 		  let cell = nextRow.firstElementChild;
-		  if (!isResultRow) {
-			setCellHighlight(cell);
+		  if (isResultRow) { // Set result cursor and selection if in search panel
+			setCellHighlight(rcursor, cell, rbkmkSelectIds);
+		  }
+		  else { // Set cursor and selection in main panel
+			setCellHighlight(cursor, cell, bkmkSelectIds);
 		  }
 		  cell.focus();
 		}
@@ -4969,8 +5124,11 @@ function keyHandler (e) {
 		while (((previousRow = previousRow.previousElementSibling) != null) && (previousRow.hidden));
 		if (previousRow != null) { // We got one
 		  let cell = previousRow.firstElementChild;
-		  if (!isResultRow) {
-			setCellHighlight(cell);
+		  if (isResultRow) { // Set result cursor and selection if in search panel
+			setCellHighlight(rcursor, cell, rbkmkSelectIds);
+		  }
+		  else { // Set cursor and selection in main panel
+			setCellHighlight(cursor, cell, bkmkSelectIds);
 		  }
 		  cell.focus();
 		}
@@ -5019,8 +5177,11 @@ function keyHandler (e) {
 		} while (--intItems > 0);
 		if (nextRow != row) { // We got one
 		  let cell = nextRow.firstElementChild;
-		  if (!isResultRow) {
-			setCellHighlight(cell);
+		  if (isResultRow) { // Set result cursor and selection if in search panel
+			setCellHighlight(rcursor, cell, rbkmkSelectIds);
+		  }
+		  else { // Set cursor and selection in main panel
+			setCellHighlight(cursor, cell, bkmkSelectIds);
 		  }
 		  cell.focus();
 		}
@@ -5069,8 +5230,11 @@ function keyHandler (e) {
 		} while (--intItems > 0);
 		if (previousRow != row) { // We got one
 		  let cell = previousRow.firstElementChild;
-		  if (!isResultRow) {
-			setCellHighlight(cell);
+		  if (isResultRow) { // Set result cursor and selection if in search panel
+			setCellHighlight(rcursor, cell, rbkmkSelectIds);
+		  }
+		  else { // Set cursor and selection in main panel
+			setCellHighlight(cursor, cell, bkmkSelectIds);
 		  }
 		  cell.focus();
 		}
@@ -5082,19 +5246,23 @@ function keyHandler (e) {
 		// Find last visible row and highlight it
 		let len;
 		let lastRow;
+		let cell;
 		if (isResultRow) {
 		  len = resultsTable.rows.length; // Start from end of table
 		  lastRow = resultsTable.rows[len-1];
+		  cell = lastRow.firstElementChild;
+		  // Set result cursor and selection
+		  setCellHighlight(rcursor, cell, rbkmkSelectIds);
 		}
 		else {
 		  len = bookmarksTable.rows.length; // Start from end of table
 		  lastRow = bookmarksTable.rows[len-1];
-		  if (lastRow.hidden)
+		  if (lastRow.hidden) {
 			while ((lastRow = lastRow.previousElementSibling).hidden);
-		}
-		let cell = lastRow.firstElementChild;
-		if (!isResultRow) {
-		  setCellHighlight(cell);
+		  }
+		  cell = lastRow.firstElementChild;
+		  // Set cursor and selection in main panel
+		  setCellHighlight(cursor, cell, bkmkSelectIds);
 		}
 		cell.focus();
 	  }
@@ -5104,15 +5272,18 @@ function keyHandler (e) {
 	  if (!myMenu_open) {
 		// Find next visible row and highlight it
 		let firstRow;
+		let cell;
 		if (isResultRow) {
 		  firstRow = resultsTable.rows[0]; // Always visible
+		  cell = firstRow.firstElementChild;
+		  // Set result cursor and selection
+		  setCellHighlight(rcursor, cell, rbkmkSelectIds);
 		}
 		else {
 		  firstRow = bookmarksTable.rows[0]; // Always visible
-		}
-		let cell = firstRow.firstElementChild;
-		if (!isResultRow) {
-		  setCellHighlight(cell);
+		  cell = firstRow.firstElementChild;
+		  // Set cursor and selection in main panel
+		  setCellHighlight(cursor, cell, bkmkSelectIds);
 		}
 		cell.focus();
 	  }
@@ -5130,14 +5301,14 @@ function keyHandler (e) {
 		  // Close it
 		  handleFolderClick(twistie);
 		}
-		else {
+		else { // Go to parent if not root
 		  let bnId = row.dataset.id;
 		  let BN = curBNList[bnId];
 		  bnId = BN.parentId;
 		  if (bnId != Root) {
 			row = curRowList[bnId];
 			let cell = row.firstElementChild;
-			setCellHighlight(cell);
+			setCellHighlight(cursor, cell, bkmkSelectIds);
 			cell.focus();
 		  }
 		}
@@ -5166,7 +5337,7 @@ function keyHandler (e) {
 			  bnId = children[0].id;
 			  row = curRowList[bnId];
 			  let cell = row.firstElementChild;
-			  setCellHighlight(cell);
+			  setCellHighlight(cursor, cell, bkmkSelectIds);
 			  cell.focus();
 			}
 		  }
@@ -5178,8 +5349,8 @@ function keyHandler (e) {
 	  if (!myMenu_open) {
 		if (row.dataset.protect != "true") { // Non protected row
 		  // Delete bookmark item in that row
-		  let BTN_id = row.dataset.id;
-		  browser.bookmarks.removeTree(BTN_id);
+		  let BN_id = row.dataset.id;
+		  browser.bookmarks.removeTree(BN_id);
 		}
 	  }
 	  e.preventDefault();
@@ -5187,8 +5358,11 @@ function keyHandler (e) {
 	else if (key == "Enter") {
 	  if (!myMenu_open) {
 		let type = row.dataset.type;
-		if (isResultRow && !e.ctrlKey && !e.shiftKey && !e.altKey) { // Show original bookmark item
-		  handleResultClick(row);
+		if (isResultRow && !ctrlKey && !e.shiftKey && !e.altKey) { // Show original bookmark item
+		  // Retrieve bookmark information in the result row (BN.id)
+		  let resultBN_id = row.dataset.id;
+		  // Then show it
+		  handleResultClick(resultBN_id);
 		}
 		else if (type == "bookmark") { // Bookmark default action
 		  let bkmkitem = target.firstElementChild;
@@ -5198,7 +5372,7 @@ function keyHandler (e) {
 			if (openBookmarksInNewTabs_option) { // If option set, open in new tab
 			  browser.tabs.create({url: href});
 			}
-			else if (e.ctrlKey) { // Open in new tab, referred by this tab to come back to it when closing
+			else if (ctrlKey) { // Open in new tab, referred by this tab to come back to it when closing
 			  // Get current active tab as opener id to come back to it when closing the new tab
 			  browser.tabs.query({windowId: myWindowId, active: true})
 			  .then (
@@ -5227,7 +5401,38 @@ function keyHandler (e) {
 	  }
 	  e.preventDefault();
 	}
-	else if ((key == "F2") && !isResultRow) {
+	else if ((key.toLowerCase() == "c") && ctrlKey) { // Copy
+	  if (!myMenu_open) {
+		if (isResultRow) { // A results table menu
+		  menuCopyBkmkItem(rbkmkSelectIds);
+		}
+		else {
+		  menuCopyBkmkItem(bkmkSelectIds);
+		}
+	  }
+	}
+	else if ((key.toLowerCase() == "x") && ctrlKey) { // Cut
+	  if (!myMenu_open) {
+		if (isResultRow) { // A results table menu
+		  menuCutBkmkItem(rbkmkSelectIds);
+		}
+		else {
+		  menuCutBkmkItem(bkmkSelectIds);
+		}
+	  }
+	}
+	else if ((key.toLowerCase() == "v") && ctrlKey) { // Paste
+	  let rowIndex = row.rowIndex;
+	  if (!myMenu_open && !isResultRow && (bkmkClipboard.length > 0)	// Paste only if there is something to paste
+		  && !noPasteZone.isInZone(rowIndex)							// Do not paste in the no paste zone
+		 ) {
+		let BN_id = row.dataset.id;
+		let type = row.dataset.type;
+		menuPasteBkmkItem(BN_id, (type == "folder")); // If folder, paste into it
+	  }
+	}
+/*
+	else if ((key == "F2") && !isResultRow) { // Attempt at in-place edit
 console.log("edit");
 	  let type = row.dataset.type;
 console.log("type: "+type);
@@ -5244,6 +5449,7 @@ console.log("type: "+type);
 	  span.focus();
 	  e.preventDefault();
 	}
+*/
   }
 //  else {
 //	SearchTextInput.focus(); // Focus on search box when a key is typed ...
@@ -5253,11 +5459,11 @@ console.log("type: "+type);
 /*
  * Handle show action on context menu
  * 
- * resultRow = HTMLTableRowElement in the results pane on which the context menu was open
+ * resultBN_id = id of bookmark to show in main pane
  */
-function menuShow (resultRow) {
+function menuShow (resultBN_id) {
   // Make the source object visible .. and scroll to it
-  handleResultClick(resultRow);
+  handleResultClick(resultBN_id);
 
   // If close search option is set, close search pane now
   if (closeSearch_option) {
@@ -5477,95 +5683,89 @@ function menuNewBkmkItem (BN_id, bkmkType) {
 }
 
 /*
- * Handle cut bookmark item action on context menu
+ * Handle cut bookmark item action to clipboard on context menu or shortcut key
  * 
- * BN_id = String identifying the bookmark item to cut
- * row = bookmarks table row which contains it
+ * selectedIds = list (Array) of ids of selected bookmark items to cut
  */
-function menuCutBkmkItem (BN_id, row) {
+function menuCutBkmkItem (selectedIds) {
   // Cancel previous cut if any
-  if (rowClipboard != undefined) {
-	rowClipboard.classList.remove("cut");
-	refreshCutSearch(bkmkClipboard.id, false);
-	noPasteMinRowIndex = noPasteMaxRowIndex = -1;
+  if (isClipboardOpCut == true) {
+	refreshCutPanel(bkmkClipboardIds, false);
+	refreshCutSearch(bkmkClipboardIds, false);
+	noPasteZone.clear();
   }
+  bkmkClipboardIds.length = bkmkClipboard.length = 0;
 
-  // Retrieve bookmark item in that row and its contents
-  bkmkClipboard = curBNList[BN_id]; // We are going to move, so clip the real one
-  rowClipboard = row; // Signal new cut
-  // Just dim the row being cut, do not remove it now
-  rowClipboard.classList.add("cut");
-  refreshCutSearch(BN_id, true);
-/*
-  trace("clipboard: "+bkmkClipboard.id+" "+bkmkClipboard.title+" "+bkmkClipboard.type+" "+bkmkClipboard.index+" "+bkmkClipboard.children+" "+bkmkClipboard.url);
-  if (bkmkClipboard.children != undefined)
-	for (let i of bkmkClipboard.children) {
-	  trace("clipboard: "+i.id+" "+i.title+" "+i.type+" "+i.index+" "+i.children+" "+i.url);
-	}
-*/
-  if (bkmkClipboard.type == "folder") { // If folder, set the no paste zone
-  	noPasteMinRowIndex = row.rowIndex;
-	// Find last child / grand child of bkmkClipboard (itself if no child)
-	let lastBN = BN_lastDescendant(bkmkClipboard);
-	row = curRowList[lastBN.id];
-	noPasteMaxRowIndex = row.rowIndex; // Can be at end of bookmarks table
+  let len = selectedIds.length;
+  let bnId;
+  for (let i=0 ; i<len ; i++) {
+	bnId = selectedIds[i];
+	// We are going to move, so clip the real ones
+	uniqueListAddBN(bnId, curBNList[bnId], bkmkClipboardIds, bkmkClipboard);
   }
-  else {
-	noPasteMinRowIndex = noPasteMaxRowIndex = -1;
+  // Set the no paste zone
+  len = bkmkClipboardIds.length;
+  for (let i=0 ; i<len ; i++) {
+	zoneAddBN(noPasteZone, bkmkClipboardIds[i], bkmkClipboard[i]);
   }
+  isClipboardOpCut = true;
+  // Just dim the row(s) being cut, do not remove it/them now
+  refreshCutPanel(bkmkClipboardIds, true);
+  refreshCutSearch(bkmkClipboardIds, true);
 }
 
 /*
- * Handle copy bookmark item action on context menu
+ * Handle copy bookmark item action to clipboard on context menu or shortcut key
  * 
- * BN_id = String identifying the bookmark item to copy
+ * selectedIds = list (Array) of ids of selected bookmark items to copy
  */
-function menuCopyBkmkItem (BN_id) {
+function menuCopyBkmkItem (selectedIds) {
   // Cancel previous cut if any
-  if (rowClipboard != undefined) {
-	rowClipboard.classList.remove("cut");
-	refreshCutSearch(bkmkClipboard.id, false);
-	noPasteMinRowIndex = noPasteMaxRowIndex = -1;
+  if (isClipboardOpCut == true) {
+	refreshCutPanel(bkmkClipboardIds, false);
+	refreshCutSearch(bkmkClipboardIds, false);
+	noPasteZone.clear();
   }
+  bkmkClipboardIds.length = bkmkClipboard.length = 0;
+  isClipboardOpCut = false; // Not a cut
 
-  // Retrieve bookmark item in that row and its contents
-  bkmkClipboard = BN_copy(curBNList[BN_id]); // Get a copy ! Let's not reinject the node itself
-  rowClipboard = undefined; // Not a cut
+  let len = selectedIds.length;
+  let bnId;
+  for (let i=0 ; i<len ; i++) {
+	bnId = selectedIds[i];
+	// Get a copy of nodes ! Let's not reinject the nodes themselves
+	uniqueListAddBN(bnId, curBNList[bnId], bkmkClipboardIds, bkmkClipboard, true);
+  }
 }
 
 /*
  * Handle bookmark clipboard paste action on context menu
  * 
- * BN_id = String identifying the bookmark item to paste to
+ * BN_id = String identifying the bookmark item to paste bkmkClipboard to
  * is_pasteInto = Boolean, false if paste before, and true if paste into (only on folders)
  */
 function menuPasteBkmkItem (BN_id, is_pasteInto) {
-  let insertBN = curBNList[BN_id];
+  let BN = curBNList[BN_id];
+  let bnIndex;
+  if (!is_pasteInto) { // If not paste to a folder, insert before BN
+	bnIndex = BN_getIndex(BN);
+  }
 
-  if (rowClipboard == undefined) { // This is a copy operation
-	if (is_pasteInto) { // Paste clipboard contents at end of insertBN folder
-	  pasteBkmk(bkmkClipboard, insertBN);
-	}
-	else { // Paste clipboard contents at insertBN.index (then just before insertBN) under its parent
-	  pasteBkmk(bkmkClipboard, curBNList[insertBN.parentId], BN_getIndex(insertBN));
-	}
-	bkmkClipboard = undefined; // Empty bkmkClipboard
-
+  if (isClipboardOpCut == true) { // This is a move operation
+	// Clear the cut flag everywhere
+	refreshCutPanel(bkmkClipboardIds, false);
+	refreshCutSearch(bkmkClipboardIds, false);
+	noPasteZone.clear();
+	moveBkmk(bkmkClipboard, (is_pasteInto ? BN_id : BN.parentId), bnIndex);
+  }
+  else { // This is a copy operation
+	copyBkmk(bkmkClipboard, (is_pasteInto ? BN_id : BN.parentId), bnIndex);
 	// Refresh search is handled thought bkmkCreatedHandler(), do not call it
   }
-  else { // This is a move operation
-	rowClipboard.classList.remove("cut"); // In case it stays at the same place = no move
-	refreshCutSearch(bkmkClipboard.id, false);
-	noPasteMinRowIndex = noPasteMaxRowIndex = -1;
-	if (is_pasteInto) { // Move clipboard contents at end of insertBN folder
-	  moveBkmk(bkmkClipboard, insertBN);
-	}
-	else { // Move clipboard contents at insertBN.index (then just before insertBN) under its parent
-	  moveBkmk(bkmkClipboard, curBNList[insertBN.parentId], BN_getIndex(insertBN));
-	}
-    bkmkClipboard = undefined; // Empty bkmkClipboard
-    rowClipboard = undefined;
-  }
+
+  // Empty the clipboard variable (array still in nmemory, until fully processed by one of the called async functions)
+  bkmkClipboard = [];
+  isClipboardOpCut = undefined;
 }
 
 /*
@@ -5579,10 +5779,11 @@ function menuRefreshFav (BN_id) {
   // Trigger asynchronous favicon retrieval process
   let url = BN.url;
   if ((url != undefined)
+   	  && !url.startsWith("file:")	  // file: has no favicon => no fetch
    	  && !url.startsWith("about:")) { // about: is protected - security error .. => no fetch
    	// This is a bookmark, so here no need for cloneBN(), there is no tree below
-//    faviconWorker.postMessage(["get2", BN_id, url, true]);
-	let postMsg = ["get2", BN_id, url, true];
+//    faviconWorker.postMessage(["get2", BN_id, url, enableCookies_option]);
+	let postMsg = ["get2", BN_id, url, enableCookies_option];
 	if (backgroundPage == undefined) {
 	  sendAddonMsgGetFavicon(postMsg);
 	}
@@ -5638,7 +5839,8 @@ function clickHandler (e) {
 	  									  // This can only happen in the results table
 	  menuAction = true;
 	  // Retrieve parent context menu, the rowIndex and row on which it is
-	  menuShow(resultsTable.rows[getMenuRowIndex(target)]);
+	  let row = resultsTable.rows[getMenuRowIndex(target)];
+	  menuShow(row.dataset.id);
 	}
 	else if (classList.contains("menuopen")) { // Open bookmark in active tab
 	  menuAction = true;
@@ -5701,38 +5903,22 @@ function clickHandler (e) {
 	else if (classList.contains("menucut")) { // Cut a bookmark item into bkmkClipboard
 	  // Retrieve parent context menu, the rowIndex and row on which it is
 	  menuAction = true;
-	  let menu = target.parentElement;
-	  let rowIndex = parseInt(menu.dataset.index, 10);
-	  let row;
-	  let BN_id;
-	  if (menu.id.startsWith("myr")) { // A results table menu
-		row = resultsTable.rows[rowIndex];
-		BN_id = row.dataset.id;
-		// Change to the original row
-		row = curRowList[BN_id];
+	  if (isResultMenu) { // A results table menu
+		menuCutBkmkItem(rbkmkSelectIds);
 	  }
-	  else { // A bookmarks table menu
-		row = bookmarksTable.rows[rowIndex]; 
-		BN_id = row.dataset.id;
+	  else {
+		menuCutBkmkItem(bkmkSelectIds);
 	  }
-	  menuCutBkmkItem(BN_id, row);
 	}
 	else if (classList.contains("menucopy")) { // Copy a bookmark item into bkmkClipboard
 	  // Retrieve parent context menu, and the rowIndex on which it is
 	  menuAction = true;
-	  let menu = target.parentElement;
-	  let rowIndex = parseInt(menu.dataset.index, 10);
-	  let row;
-	  let BN_id;
-	  if (menu.id.startsWith("myr")) { // A results table menu
-		row = resultsTable.rows[rowIndex];
-		BN_id = row.dataset.id;
+	  if (isResultMenu) { // A results table menu
+		menuCopyBkmkItem(rbkmkSelectIds);
 	  }
-	  else { // A bookmarks table menu
-		row = bookmarksTable.rows[rowIndex]; 
-		BN_id = row.dataset.id;
+	  else {
+		menuCopyBkmkItem(bkmkSelectIds);
 	  }
-	  menuCopyBkmkItem(BN_id);
 	}
 	else if (classList.contains("menupaste")) { // Paste bkmkClipboard contents before the row
 	  											// Clear bkmkClipboard after that, as we want
@@ -5740,7 +5926,7 @@ function clickHandler (e) {
 	  // Can only happen on bookmarks table row, retrieve the rowIndex from the menu
 	  menuAction = true;
 	  let row = bookmarksTable.rows[getMenuRowIndex(target)];
-	  // Retrieve bookmark item in that row
+	  // Paste before bookmark item in that row
 	  menuPasteBkmkItem(row.dataset.id, false);
 	}
 	else if (classList.contains("menupasteinto")) { // Paste bkmkClipboard contents in folder
@@ -5749,7 +5935,7 @@ function clickHandler (e) {
       // Can only happen on bookmarks table folder rows, retrieve the rowIndex from the menu
 	  menuAction = true;
 	  let row = bookmarksTable.rows[getMenuRowIndex(target)];
-      // Retrieve bookmark item in that row
+      // Paste inside bookmark item in that row
 	  menuPasteBkmkItem(row.dataset.id, true);
     }
 	else if (classList.contains("menudel")) { // Delete a bookmark item
@@ -5780,7 +5966,7 @@ function clickHandler (e) {
 	  let menu = target.parentElement;
 	  let rowIndex = parseInt(menu.dataset.index, 10);
 	  let row;
-	  if (menu.id.startsWith("myr")) { // A results table menu
+	  if (isResultMenu) { // A results table menu
 		row = resultsTable.rows[rowIndex];
 	  }
 	  else { // A bookmarks table menu
@@ -5791,88 +5977,18 @@ function clickHandler (e) {
 	}
 	else if (classList.contains("menuopenbsp2")) { // Open BSP2 in a new tab, full view
 	  menuAction = true;
-	  let href = SelfURL;
-	  // Open in new tab, referred by this tab to come back to it when closing
+	  // Open BSP2 in new tab, referred by this tab to come back to it when closing
 	  // Get current active tab as opener id to come back to it when closing the new tab
 	  browser.tabs.query({windowId: myWindowId, active: true})
 	  .then (
 		function (a_tabs) {
-		  if (beforeFF57)
-			browser.tabs.create({url: href});
-		  else
-			browser.tabs.create({url: href, openerTabId: a_tabs[0].id});
+		  openBsp2NewTab(a_tabs[0]);
 		}
 	  );
 	}
 	else if (classList.contains("menuhistory")) { // Open Bookmark history window
 	  menuAction = true;
-	  let href = HistoryURL;
-	  // Open in new window, like Properties popup
-	  // Open popup window where it was last. If it was in another screen than
-	  // our current screen, then center it.
-	  // This avoids having the popup out of screen and unreachable, in case
-	  // the previous screen went off, or display resolution changed.
-/*
-	  let top = res.historytop_option;
-	  let left = res.historyleft_option;
-	  let scr = window.screen;
-	  let adjust = false;
-	  if ((left < scr.availLeft) || (left >= scr.availLeft + scr.availWidth)) {
-		adjust = true;
-		left = scr.availLeft + Math.floor((scr.availWidth - PopupWidth) / 2);
-	  }
-	  if ((top < scr.availTop) || (top >= scr.availTop + scr.availHeight)) {
-		adjust = true;
-		top = scr.availTop + Math.floor((scr.availHeight - PopupHeight) / 2);
-	  }
-	  if (adjust) { // Save new values
-		browser.storage.local.set({
-		  historytop_option: top,
-		  historyleft_option: left
-		});
-	  }
-*/
-	  // Open Bookmark history window if not already open, else just focus on it
-	  browser.windows.getAll({populate: true, windowTypes: ["popup"]})
-	  .then(
-		function (a_Windowinfo) {
-		  let wi, openedWi;
-		  let wTitle = "("+selfName+") - Bookmark history -";
-		  for (wi of a_Windowinfo) {
-			if (wi.title.includes(wTitle)) {
-			  openedWi = wi; 
-			}
-		  }
-		  if (openedWi != undefined) {
-			browser.windows.update(openedWi.id, {focused: true});
-		  }
-		  else {
-			browser.windows.create(
-			  {titlePreface: "Bookmark history",
-			   type: "popup",
-			   url: href,
-			   //----- Workaround for top and left position parameters being ignored for panels -----
-			   //Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
-			   //Make the start size as small as possible so that it briefly flashes in its initial
-			   //position in the least conspicuous way.
-			   //Note: 1,1 does not work, this sets the window in a state reduced to the bar, and no
-			   //internal resize seems to work after that.
-			   //Also tried to start minimized, but the window pops in a big size first before being minimized,
-			   //even less pretty.			   .
-			   //=> .. FF does not seem very clean on all this .. :-( 
-//			   height: PopupHeight,
-//			   width: PopupWidth,
-			   height: 800,
-			   width: 800,
-//			   left: left,
-//			   top: top,
-			   //----- End of position ignored workaround -----
-			   allowScriptsToClose: true
-			  }
-			);
-		  }
-		}
-	  );
+	  openBsp2History();
 	}
 	else if (classList.contains("menusfboth")) { // Search options
 	  menuAction = true;
@@ -5947,74 +6063,97 @@ function onClickedContextMenuHandler (info, tab) {
 	let menuAction = menuItemId.substring(0, pos);
 	switch (menuAction) {
 	  case "bsp2show":
-		// Retrieve the row on which it is
-		menuShow(curResultRowList[bnId]);
+		// Show bookmark item in main pane
+		menuShow(bnId);
 		break;
 	  case "bsp2open":
-		// Retrieve the row on which it is
+		// Open in tab
 		menuOpen(curRowList[bnId], INTAB);
 		break;
 	  case "bsp2opentab":
-		// Retrieve the row on which it is
+		// Open in new tab
 		menuOpen(curRowList[bnId], NEWTAB);
 		break;
 	  case "bsp2openwin":
-		// Retrieve the row on which it is
+		// Open in new window
 		menuOpen(curRowList[bnId], NEWWIN);
 		break;
 	  case "bsp2openpriv":
-		// Retrieve the row on which it is
+		// Open in private window
 		menuOpen(curRowList[bnId], NEWPRIVWIN);
 		break;
 	  case "bsp2openall":
-		// Retrieve the folder row on which it is
+		// Open all bookmarks in folder
 		menuOpenAllInTabs(bnId);
 		break;
 	  case "bsp2opentree":
-		// Retrieve the .reshidden row on which it is
+		// Open parent folder of the .reshidden row
 		openResParents(curRowList[bnId]);
 		break;
 	  case "bsp2goparent":
-		// Retrieve the row on which it is
+		// Show parent of the row
 		goParent(curRowList[bnId]);
 		break;
 	  case "bsp2newb":
+		// New bookmark
 		menuNewBkmkItem(bnId, NEWB);
 		break;
 	  case "bsp2newf":
+		// New folder
 		menuNewBkmkItem(bnId, NEWF);
 		break;
 	  case "bsp2news":
+		// New separator
 		menuNewBkmkItem(bnId, NEWS);
 		break;
 	  case "bsp2cut":
-		menuCutBkmkItem(bnId, curRowList[bnId]);
+		// Cut selection to clipboard
+		if (isResultMenu) { // A results table menu
+		  menuCutBkmkItem(rbkmkSelectIds);
+		}
+		else {
+		  menuCutBkmkItem(bkmkSelectIds);
+		}
 		break;
 	  case "bsp2copy":
-		menuCopyBkmkItem(bnId);
+		// Copy selection to clipboard
+		if (isResultMenu) { // A results table menu
+		  menuCopyBkmkItem(rbkmkSelectIds);
+		}
+		else {
+		  menuCopyBkmkItem(bkmkSelectIds);
+		}
 		break;
 	  case "bsp2paste":
+		// Paste clipboard before current bookmark
 		menuPasteBkmkItem(bnId, false);
 		break;
 	  case "bsp2pasteinto":
+		// Paste clipboard into current folder
 		menuPasteBkmkItem(bnId, true);
 		break;
 	  case "bsp2del":
+		// Delete bookmark
 		browser.bookmarks.removeTree(bnId);
 		break;
 	  case "bsp2sort":
+		// Sort folder content
 		sendAddonMessage("sort:"+bnId);
 		break;
 	  case "bsp2refreshfav":
+		// Refresh favicon
 		menuRefreshFav(bnId);
 		break;
 	  case "bsp2collapseall":
+		// Close folder and all subfolders
 		collapseAll(bnId, curRowList[bnId]);
 		break;
 	  case "bsp2expandall":
+		// Open folder and all subfolders
 		expandAll(bnId, curRowList[bnId]);
 		break;
 	  case "bsp2prop":
+		// Show properties
 		menuProp(bnId);
 		break;
 	}
@@ -6225,9 +6364,11 @@ function handleAddonMessage (request, sender, sendResponse) {
 		let setColors_option_old = setColors_option;
 		let textColor_option_old = textColor_option;
 		let bckgndColor_option_old = bckgndColor_option;
-		let closeSibblingFolders_option_old = closeSibblingFolders_option;
+//		let closeSibblingFolders_option_old = closeSibblingFolders_option;
 		let altFldrImg_option_old = altFldrImg_option;
 		let useAltFldr_option_old = useAltFldr_option;
+		let altNoFavImg_option_old = altNoFavImg_option;
+		let useAltNoFav_option_old = useAltNoFav_option;
 		let traceEnabled_option_old = traceEnabled_option;
 
 		// Function to process option changes
@@ -6263,7 +6404,7 @@ function handleAddonMessage (request, sender, sendResponse) {
 		  // If set colors option changed, or if one of the colors changed while that option is set
 		  if (setColors_option_old != setColors_option
 			  || (setColors_option && ((textColor_option_old != textColor_option)
-				  					   || (bckgndColor_option_old = bckgndColor_option)
+				  					   || (bckgndColor_option_old != bckgndColor_option)
 				   					  )
 				 )
 			 ) {
@@ -6280,6 +6421,12 @@ function handleAddonMessage (request, sender, sendResponse) {
 			  || (useAltFldr_option_old != useAltFldr_option)
 		     ) {
 			setPanelFolderImg(useAltFldr_option, altFldrImg_option);
+		  }
+		  // If no-favicon image options changed
+		  if ((useAltNoFav_option && (altNoFavImg_option_old != altNoFavImg_option))
+			  || (useAltNoFav_option_old != useAltNoFav_option)
+		     ) {
+			setPanelNoFaviconImg(useAltNoFav_option, altNoFavImg_option);
 		  }
 		  // If trace option changed
 		  if (traceEnabled_option_old != traceEnabled_option) {
@@ -6500,7 +6647,11 @@ async function completeFavicons (BN = undefined) {
 	let row = curRowList[BN.id];
 	if (row != undefined) { // undefined may happen with most visited sites and recent bookmarks at add-on start
 	  let img = row.firstElementChild.firstElementChild.firstElementChild;
-	  img.src = BN.faviconUri;
+	  let uri = BN.faviconUri;
+//	  if ((uri != undefined) && (uri != "/icons/nofavicon.png")) {
+	  if (BN.fetchedUri || (uri != "/icons/nofavicon.png")) {
+		img.src = uri;
+	  }
 	}
   }
 }
@@ -6530,6 +6681,8 @@ function completeDisplay () {
 
 
   // Setup mouse handlers for bookmarks and results
+  SearchResult.addEventListener("mousedown", resultsMouseDownHandler);
+  Bookmarks.addEventListener("mousedown", bkmkMouseDownHandler);
   SearchResult.addEventListener("click", resultsMouseHandler);
   Bookmarks.addEventListener("click", bkmkMouseHandler);
   SearchResult.addEventListener("contextmenu", resultsContextHandler);
@@ -6667,9 +6820,12 @@ async function exploreWidth (BTN, level) {
 	// If folder is open, get children now, else enqueue for later
 	if (curFldrOpenList[BTN.id]) {
       // Recursively display children
-      for (let i of children) {
+	  let len = children.length;
+	  let j;
+      for (let i=0 ; i<len ; i++) {
+		j = children[i];
     	// Need to await as an async function is returning a Promise by definition
-        await exploreWidth(i, level+1);
+        await exploreWidth(j, level+1);
       }
     }
 	else {
@@ -6692,9 +6848,12 @@ async function exploreWidth (BTN, level) {
  */
 /*
 async function delayLoadBkmkId (a_BTN, id, level) {
-  for (let i of a_BTN) {
-    if (i.id == id) {
-      await exploreWidth(i, level);
+  let len = a_BTN.length;
+  let j
+  for (let i=0 ; i<len ; i++) {
+	j = a_BTN[i];
+    if (j.id == id) {
+      await exploreWidth(j, level);
       break;
     }
   }
@@ -6951,6 +7110,25 @@ function setPanelFolderImg (useAltFldr_option, altFldrImg_option) {
 }
 
 /*
+ * Set no-favicon image as per options
+ */
+function setPanelNoFaviconImg (useAltNoFav_option, altNoFavImg_option) {
+  // Retrieve the CSS rules to modify
+  let a_ss = document.styleSheets;
+  let ss = a_ss[0];
+  let cssRules = ss.cssRules;
+  let cssStyleRule;
+  let style;
+
+  cssStyleRule = getStyleRule(cssRules, ".nofavicon");
+  style = cssStyleRule.style; // A CSSStyleDeclaration object
+  style.setProperty("background-image", (useAltNoFav_option ? "url(\""+altNoFavImg_option+"\")"
+	  														: "url(\"/icons/nofavicon.png\")"
+	  									)
+	  			   );
+}
+
+/*
  * Set UI overall fonts, sizes, spacing ..
  */
 function setupUI () {
@@ -7049,6 +7227,11 @@ function setupUI () {
   // Set folder image as per options
   if (useAltFldr_option) {
 	setPanelFolderImg(true, altFldrImg_option);
+  }
+
+  // Set no-favicon image as per options
+  if (useAltNoFav_option) {
+	setPanelNoFaviconImg(true, altNoFavImg_option);
   }
 }
 
@@ -7330,6 +7513,7 @@ Promise.all([p_platform, p_background, p_ffversion, p_getTab])
 	beforeFF57 = ((ffversion = info.version) < "57.0");
 	beforeFF58 = (ffversion < "58.0");
 	beforeFF64 = (ffversion < "64.0");
+	beforeFF71 = (ffversion < "71.0");
 
 	// In a private browsing window (incognito), this will be null
 	if (page != null) { // Not in a private browsing window

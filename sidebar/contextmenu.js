@@ -4,6 +4,12 @@
 /*
  * Constants
  */
+const PopupURL = browser.extension.getURL("sidebar/popup.html");
+const SelfURL = browser.extension.getURL("sidebar/panel.html");
+const HistoryURL = browser.extension.getURL("sidebar/history.html");
+const PopupWidth  = 380;
+const PopupHeight = 190;
+
 const BSP2UrlPattern = "moz-extension://" + window.location.host + "/*";
 const MainMenuId = "show-path";  // FF standard menu item on bookmarks
 const SubMenuPathId = "path-is"; // FF standard sub-menu item on bookmarks, to show path to bookmark
@@ -123,7 +129,8 @@ ContextMenu[BSP2AdvancedMenu] = {
 	title: "Ad&vanced"
 };
 ContextMenu["bsp2refreshfav"+Menu_bbkmk+Menu_bresbkmk] = {
-    parentId: BSP2AdvancedMenu,
+	parentId: BSP2AdvancedMenu,
+	is_refreshfav: true,
 	title: "&Refresh favicon"
 };
 ContextMenu["bsp2collapseall"+Menu_bfldr+Menu_bresfldr+Menu_bprotf] = {
@@ -154,6 +161,202 @@ ContextMenu["bsp2prop"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_rb
  * ---------
  */
 
+/*
+ * Open bookmark Property popup with given title
+ * 
+ * propType = "new" or "prop", to indicate creation of a new item, or editing its properties
+ * BN_id = String identifying the bookmark item to edit
+ */
+function openPropPopup (popupType, BN_id, path, type, title, url) {
+  // Open popup on bookmark item
+  let titlePreface;
+  let popupUrl;
+//  let popupURL = browser.extension.getURL("sidebar/popup.html");
+  // Did not find a good way to get a modal dialog so far :-(
+  // 1) let sign = prompt("What's your sign?");
+  //    creates a modal inside the sidebar, half hidden if the sidebar is not large enough. 
+  // 2) It appears window.open works outside of the .then, but not inside !!
+  //    I do not understand why ..
+  //    window.open(popupURL, "_blank", "dialog,modal,height=200,width=200");
+  //    Anyway, "modal" is ignored, and I can't figure how to get the UniversalBrowserWrite privilege so far .. :-(
+  // So using browser.windows instead, which is not modal, and which is resizeable.
+  if (type == "folder") {
+	let winType;
+	if (popupType == "new") {
+	  winType = "newfldr";
+	  titlePreface = "New folder";
+	}
+	else {
+	  winType = "propfldr";
+	  titlePreface = "Properties of « "+title+" »";
+	}
+	popupUrl = PopupURL+"?type="+winType+"&id="+BN_id+"&path="+encodeURIComponent(path)+"&title="+encodeURIComponent(title)+"&url=null";
+  }
+  else { // Bookmark
+	let winType;
+	if (popupType == "new") {
+	  winType = "newbkmk";
+	  titlePreface = "New bookmark";
+	}
+	else {
+	  winType = "propbkmk";
+	  titlePreface = "Properties of « "+title+" »";
+	}
+	popupUrl = PopupURL+"?type="+winType+"&id="+BN_id+"&path="+encodeURIComponent(path)+"&title="+encodeURIComponent(title)+"&url="+encodeURIComponent(url);
+  }
+  popupUrl = encodeURI(popupUrl);
+  let gettingItem = browser.storage.local.get(
+	{popuptop_option: 300,
+	 popupleft_option: 300
+	}
+  );
+  gettingItem.then((res) => {
+	// Open popup window where it was last. If it was in another screen than
+	// our current screen, then center it.
+	// This avoids having the popup out of screen and unreachable, in case
+	// the previous screen went off, or display resolution changed.
+	let top = res.popuptop_option;
+	let left = res.popupleft_option;
+//console.log("openPropPopup() - top="+top+" left="+left);
+	let scr = window.screen;
+	let adjust = false;
+	// Also, protect if possible against privacy.resistFingerprinting which does not return the screen size,
+	// but the sidebar size instead !! :-(
+	let al = scr.availLeft;
+	let aw = scr.availWidth;
+	if ((PopupWidth < aw) // If wider than the reported screen width, do not adjust
+		&& ((left < al) || (left >= al + aw))
+	   ) {
+	  adjust = true;
+	  left = al + Math.floor((aw - PopupWidth) / 2);
+	}
+	let at = scr.availTop;
+	let ah = scr.availHeight;
+	if ((PopupHeight < ah) // If higher than the reported screen height, do not adjust
+		&& ((top < at) || (top >= at + ah))
+	   ) {
+	  adjust = true;
+	  top = at + Math.floor((ah - PopupHeight) / 2);
+	}
+	if (adjust) { // Save new position values
+	  browser.storage.local.set({
+		popuptop_option: top,
+		popupleft_option: left
+	  });
+//console.log("openPropPopup() - had to adjust position top="+top+" left="+left);
+	}
+  
+	browser.windows.create(
+	  {titlePreface: titlePreface,
+	   type: "popup",
+//		 type: "detached_panel",
+	   // Using a trick with URL parameters to tell the window which type
+	   // it is, which bookmark id, .. etc .. since titlePreface doesn't appear to work
+	   // and there appears to be no way to pass parameters to the popup by the call. 
+	   url: popupUrl,
+//----- Workaround for top and left position parameters being ignored for panels and bug on popups (since panel is an alias for popup) -----
+// Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
+//     https://bugzilla.mozilla.org/show_bug.cgi?id=1271047
+//Make the start size as small as possible so that it briefly flashes in its initial
+//position in the least conspicuous way.
+//Note: 1,1 does not work, this sets the window in a state reduced to the bar, and no
+//internal resize seems to work after that.
+//Also tried to start minimized, but the window pops in a big size first before being minimized,
+//even less pretty.			   .
+//=> .. FF does not seem very clean on all this .. :-( 
+//       height: PopupHeight,
+//       width: PopupWidth,
+	   height: 40,
+	   width: 40,
+//	     left: left,
+//		 top: top,
+//----- End of position ignored workaround -----
+	   allowScriptsToClose: true
+	  }
+	);
+  });
+}
+
+/*
+ * Open BSP2 Bookmark History window
+ * 
+ * tab = referring tab
+ */
+function openBsp2History () {
+  let href = HistoryURL;
+  // Open in new window, like Properties popup
+  // Open popup window where it was last. If it was in another screen than
+  // our current screen, then center it.
+  // This avoids having the popup out of screen and unreachable, in case
+  // the previous screen went off, or display resolution changed.
+/*
+  let top = res.historytop_option;
+  let left = res.historyleft_option;
+  let scr = window.screen;
+  let adjust = false;
+  if ((left < scr.availLeft) || (left >= scr.availLeft + scr.availWidth)) {
+	adjust = true;
+	left = scr.availLeft + Math.floor((scr.availWidth - PopupWidth) / 2);
+  }
+  if ((top < scr.availTop) || (top >= scr.availTop + scr.availHeight)) {
+	adjust = true;
+	top = scr.availTop + Math.floor((scr.availHeight - PopupHeight) / 2);
+  }
+  if (adjust) { // Save new values
+	browser.storage.local.set({
+	  historytop_option: top,
+	  historyleft_option: left
+	});
+  }
+*/
+  // Open Bookmark history window if not already open, else just focus on it
+  browser.windows.getAll({populate: true, windowTypes: ["popup"]})
+  .then(
+	function (a_Windowinfo) {
+	  let wi, openedWi;
+	  let wTitle = "("+selfName+") - Bookmark history -";
+	  for (wi of a_Windowinfo) {
+		if (wi.title.includes(wTitle)) {
+		  openedWi = wi; 
+		}
+	  }
+	  if (openedWi != undefined) {
+		browser.windows.update(openedWi.id, {focused: true});
+	  }
+	  else {
+		browser.windows.create(
+		  {titlePreface: "Bookmark history",
+		   type: "popup",
+		   url: href,
+		   //----- Workaround for top and left position parameters being ignored for panels -----
+		   //Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
+		   //Make the start size as small as possible so that it briefly flashes in its initial
+		   //position in the least conspicuous way.
+		   //Note: 1,1 does not work, this sets the window in a state reduced to the bar, and no
+		   //internal resize seems to work after that.
+		   //Also tried to start minimized, but the window pops in a big size first before being minimized,
+		   //even less pretty.			   .
+		   //=> .. FF does not seem very clean on all this .. :-( 
+//		   height: PopupHeight,
+//		   width: PopupWidth,
+		   height: 800,
+		   width: 800,
+//		   left: left,
+//		   top: top,
+		   //----- End of position ignored workaround -----
+		   allowScriptsToClose: true
+		  }
+		);
+	  }
+	}
+  );
+}
+
+/*
+ * Open BSP2 in new tab, referring to current tab
+ * 
+ * tab = referring tab
+ */
 /*
  * Create our own sidebar overriding context menu, with all possible options in one.
  * Called once by background task.
@@ -207,8 +410,9 @@ function createBSP2ContextMenu () {
  * menu = String to filter which elements are visible
  * pasteEnabled = Boolean to enable (true) or disable (false) the paste menu items
  * goparentEnabled = Boolean to enable (true) or disable (false / undefined) the go parent menu items
+ * refreshfavEnabled = Boolean to enable (true) or disable (false / undefined) the refresh favicon menu items
  */
-function updateBSP2ContextMenu (menu, pasteEnabled, goparentEnabled) {
+function updateBSP2ContextMenu (menu, pasteEnabled, goparentEnabled, refreshfavEnabled) {
   let menuIds = Object.keys(ContextMenu);
   let menuItem;
   let id;
@@ -219,7 +423,8 @@ function updateBSP2ContextMenu (menu, pasteEnabled, goparentEnabled) {
 	if (id.includes(menu)) {
 	  browser.menus.update(
 		id,
-		{enabled: (!menuItem.is_paste || pasteEnabled) && (!menuItem.is_goparent || goparentEnabled),
+		{enabled: (!menuItem.is_paste || pasteEnabled) && (!menuItem.is_goparent || goparentEnabled)
+				  && (!menuItem.is_refreshfav || refreshfavEnabled),
 		 visible: true
 		}
 	  );
