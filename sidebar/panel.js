@@ -418,7 +418,7 @@ let bkmkDrag = []; // Unique list of dragged BookmarkNode(s), [] if empty
 
 // Declared in BookmarkNode.js
 //var countBookmarks, countFolders, countSeparators, countOddities, countFetchFav;
-//var mostVisitedBNId, mostVisitedBN, recentTagBNId, recentTagBN, recentBkmkBNId, recentBkmkBN;
+//var mostVisitedBNId, recentTagBNId, recentBkmkBNId;
 
 let startTime, endLoadTime, endGetTreetime, endDisplayTime;
 let loadDuration, treeLoadDuration, treeBuildDuration, saveDuration;
@@ -1685,7 +1685,7 @@ function removeBkmks (row, cleanup) {
  * bnId = id of BookmarkNode subtree to remove.
  */
 function bkmkRemoved (bnId) {
-//  trace("Remove event on: "+id+" title: <<"+removeInfo.node.title+">> type: "+removeInfo.node.type);
+//console.log("Remove event on: "+bnId);
   if (!isDisplayComplete) // If we get an event while not yet ready, ignore
 	return;
 
@@ -1699,9 +1699,13 @@ function bkmkRemoved (bnId) {
   // Retrieve position of removed item in the bookmarks table
   let row = curRowList[bnId];
 
-  // Remove item and its children from display, and from the appropriate display lists
-  // The returned value is the row which took its place in the table (or none if at end).
-  row = removeBkmks(row, true);
+  if (row != undefined) { // If non existing, do not try to remove
+						  // Can happen for example on restore bookmarks, on our special "place:xxx"
+						  // BNs unders the special most recent or most visited folders
+	// Remove item and its children from display, and from the appropriate display lists
+	// The returned value is the row which took its place in the table (or none if at end).
+	row = removeBkmks(row, true);
+  }
 
   // Save new current info
   // A folder delete can presumably delete bookmarks, and a bookmark delete can
@@ -3901,7 +3905,8 @@ function checkDragType (dt) {
 //traceDt(dt);
   let isSupported;
   let format, data;
-  if (dt.types.includes(format = "application/x-bookmark")) { // BSP2 drag
+  let types = dt.types;
+  if (types.includes(format = "application/x-bookmark")) { // BSP2 drag
 	// If not internal drag ()can be another BSP2 panel instance), update bkmkDragIds, bkmkDrag and noDropZone if needed
 	// (trigerred by different dtSignature)
 	if (!isBkmkItemDragged && !isRsltItemDragged && (dtSignature != (data = dt.getData(format)))) {
@@ -3923,7 +3928,7 @@ function checkDragType (dt) {
 	}
 	isSupported = true;
   }
-  else if (dt.types.includes(format = "text/x-moz-place")) { // Native FF Bookmark sidebar drag
+  else if (types.includes(format = "text/x-moz-place")) { // Native FF Bookmark sidebar drag
 	// Cannot be an internal drag, build signature to compare with stored one (only manipulate as String to be quick)
 	// Handle multiple items drag -- GECKO SPECIFIC !! -- No more supported as of FF71, didn't find an alternative yet :-(
 	let itemCount;
@@ -3980,9 +3985,9 @@ function checkDragType (dt) {
 	}
 	isSupported = true;
   }
-  else if (dt.types.includes("text/x-moz-text-internal")
-		   || dt.types.includes("text/uri-list")
-		   || dt.types.includes("text/x-moz-url")
+  else if (types.includes("text/x-moz-text-internal")
+		   || types.includes("text/uri-list")
+		   || types.includes("text/x-moz-url")
 		  ) { // Other type of drag
 	isSupported = true;
   }
@@ -4308,6 +4313,7 @@ function bkmkDragEnterHandler (e) {
 //console.log("Enter row: "+row+" class: "+row.classList+" BN_id: "+row.dataset.id);
 //console.log("Bkmkitem_x: "+bkmkitem_x+" class: "+bkmkitem_x.classList);
 	if (row == undefined) { // We are on the scrollbars for example
+	  highlightRemove(e);
 	  dt.dropEffect = "none"; // Signal drop not allowed
 	}
 	else {
@@ -4315,16 +4321,20 @@ function bkmkDragEnterHandler (e) {
 	  if ((!is_ctrlKey && (noDropZone != undefined) && noDropZone.isInZone(row.rowIndex))
 		  || (isProtected && !isTopItem) // Protection, can't drop on non top draggable elements = specials
 	     ) {
+		highlightRemove(e);
 		dt.dropEffect = "none"; // Signal drop not allowed
 	  }
 	  else {
 		e.preventDefault(); // Allow drop
 		highlightInsert(e);
-		dt.dropEffect = (is_ctrlKey ? "copy" : "move");
+		if (isBkmkItemDragged) { // For internal drags, take Ctrl key into account to change visual feedback
+		  dt.dropEffect = (is_ctrlKey ? "copy" : "move");
+		}
 	  }
 	}
   }
   else {
+	highlightRemove(e);
 	dt.dropEffect = "none"; // Signal drop not allowed
   }
 }
@@ -4355,6 +4365,7 @@ function bkmkDragOverHandler (e) {
 //console.log("Over row: "+row+" class: "+row.classList+" BN_id: "+row.dataset.id);
 //console.log("Bkmkitem_x: "+bkmkitem_x+" class: "+bkmkitem_x.classList);
 	if (row == undefined) { // We are on the scrollbars for example
+	  highlightRemove(e);
 	  dt.dropEffect = "none"; // Signal drop not allowed
 	}
 	else {
@@ -4362,16 +4373,20 @@ function bkmkDragOverHandler (e) {
 	  if ((!is_ctrlKey && (noDropZone != undefined) && noDropZone.isInZone(row.rowIndex))
 		  || (isProtected && !isTopItem) // Protection, can't drop on non top draggable elements = specials
 	     ) {
+		highlightRemove(e);
 		dt.dropEffect = "none"; // Signal drop not allowed
 	  }
 	  else {
 		e.preventDefault(); // Allow drop
 		highlightInsert(e);
-		dt.dropEffect = (is_ctrlKey ? "copy" : "move");
+		if (isBkmkItemDragged) { // For internal drags, take Ctrl key into account to change visual feedback
+		  dt.dropEffect = (is_ctrlKey ? "copy" : "move");
+		}
 	  }
 	}
   }
   else {
+	highlightRemove(e);
 	dt.dropEffect = "none"; // Signal drop not allowed
   }
 }
@@ -4402,7 +4417,9 @@ function bkmkDragLeaveHandler (e) {
 	  dt.dropEffect = "none"; // Signal drop not allowed
 	}
 	else {
-	  dt.dropEffect = (e.ctrlKey ? "copy" : "move");
+	  if (isBkmkItemDragged) { // For internal drags, take Ctrl key into account to change visual feedback
+		dt.dropEffect = (is_ctrlKey ? "copy" : "move");
+	  }
 	}
   }
   else {
@@ -4437,7 +4454,9 @@ function bkmkDragExitHandler (e) {
 	  dt.dropEffect = "none"; // Signal drop not allowed
 	}
 	else {
-	  dt.dropEffect = (e.ctrlKey ? "copy" : "move");
+	  if (isBkmkItemDragged) { // For internal drags, take Ctrl key into account to change visual feedback
+		dt.dropEffect = (is_ctrlKey ? "copy" : "move");
+	  }
 	}
   }
   else {
@@ -6543,6 +6562,15 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  else if (msg.startsWith("bkmkReordered")) {
 		bkmkReordered(request.bnId, request.reorderInfo);
 	  }
+	  else if (msg.startsWith("recentBkmkBNId")) { // Recreated (typically on restore bookmarks), so note the id
+		recentBkmkBNId = request.bnId;
+	  }
+	  else if (msg.startsWith("mostVisitedBNId")) { // Recreated (typically on restore bookmarks), so note the id
+		mostVisitedBNId = request.bnId;
+	  }
+	  else if (msg.startsWith("recentTagBNId")) { // Recreated (typically on restore bookmarks), so note the id
+		recentTagBNId = request.bnId;
+	  }
 	}
 
 	// Answer
@@ -7248,12 +7276,6 @@ function initialize2 () {
 	rootBN = BN_deserialize(curBNList);
 	curBNList = {};
 	rebuildBNList(curBNList, rootBN);
-	if (mostVisitedBNId != undefined)
-	  mostVisitedBN = curBNList[mostVisitedBNId];
-	if (recentTagBNId != undefined)
-	  recentTagBN = curBNList[recentTagBNId]; 
-	if (recentBkmkBNId != undefined)
-	  recentBkmkBN = curBNList[recentBkmkBNId];
   }
   else { // Get values directly from background which is now ready
 	// Get stats
@@ -7276,11 +7298,8 @@ function initialize2 () {
 	countSeparators = backgroundPage.countSeparators;
 	countOddities = backgroundPage.countOddities;
 	mostVisitedBNId = backgroundPage.mostVisitedBNId;
-	mostVisitedBN = backgroundPage.mostVisitedBN;
 	recentTagBNId = backgroundPage.recentTagBNId;
-	recentTagBN = backgroundPage.recentTagBN; 
 	recentBkmkBNId = backgroundPage.recentBkmkBNId;
-	recentBkmkBN = backgroundPage.recentBkmkBN;
 
 	// Get options and curBNList / rootBN
 	refreshOptionsBgnd(backgroundPage);

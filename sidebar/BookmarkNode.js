@@ -396,29 +396,46 @@ function BN_delete (BN, parentId = undefined, real = true, bnList = curBNList, r
   }
   // Remove from parent node children 
   let parentBN;
-  if (removeFromParent                                // Do not remove from parent if not told to
-	  && ((parentBN = bnList[parentId]) != undefined) // Plan for no parent error case, for robustness..
-     ) {
-	let index = parentBN.children.indexOf(BN);
+  let children;
+  if (removeFromParent								   // Do not remove from parent if not told to
+	  && ((parentBN = bnList[parentId]) != undefined)  // Plan for no parent error case, for robustness..
+	  && ((children = parentBN.children) != undefined) // Plan for no children error case, for robustness..
+	 ) {
+	let index = children.indexOf(BN);
 	if (index != -1) {
-	  parentBN.children.splice(index, 1);
+	  children.splice(index, 1);
 	}
   }
-  // Recursively remove from bnList if real 
+
+  let bnId = BN.id;
+  // Recursively remove from bnList if real
   if (real) {
 	let type = BN.type;
 	if (type == "folder") {
-	  let children = BN.children;
+	  children = BN.children;
 	  if (children != undefined) {
 		let len = children.length;
 		for (let i=0 ; i<len ; i++) {
-		  BN_delete(children[i], BN.id, true, bnList, false); // Do not remove from parent since we are taking care
-		  													  // of things here .. else that would perturb the loop
+		  BN_delete(children[i], bnId, true, bnList, false); // Do not remove from parent since we are taking care
+		  													 // of things here .. else that would perturb the loop
 		}
 	  }
 	}
 	decrCounters(BN, type); // Keep counters up to date
-	delete bnList[BN.id];
+	delete bnList[bnId];
+	// Maintain global shortcut Id/pointers up to date
+	if (bnId == recentBkmkBNId) {
+	  recentBkmkBNId = undefined;
+	  recentBkmkBN = undefined;
+	}
+	else if (bnId == mostVisitedBNId) {
+	  mostVisitedBNId = undefined;
+	  mostVisitedBN = undefined;
+	}
+	else if (bnId == recentTagBNId) {
+	  recentTagBNId = undefined;
+	  recentTagBN = undefined;
+	}
   }
 }
 
@@ -1053,17 +1070,17 @@ function scanBNTree (BN, faviconWorker, doStats = true) {
 //BN.type = "bookmark";
 		if (doStats)
 		  countBookmarks++;
-		if (url.includes(MostVisitedSort)) {
+		if (url.includes(RecentBkmkSort)) {
+		  recentBkmkBNId = bnId;
+		  recentBkmkBN = BN;
+		}
+		else if (url.includes(MostVisitedSort)) {
 		  mostVisitedBNId = bnId;
 		  mostVisitedBN = BN;
 		}
 		else if (url.includes(RecentTagSort)) {
 		  recentTagBNId = bnId;
 		  recentTagBN = BN;
-		}
-		else if (url.includes(RecentBkmkSort)) {
-		  recentBkmkBNId = bnId;
-		  recentBkmkBN = BN;
 		}
 	  }
 	}

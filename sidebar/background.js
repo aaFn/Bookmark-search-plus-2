@@ -657,10 +657,12 @@ function refreshMostVisited (a_MVU) {
   }
 
   // Refresh all children of mostVisitedBN with that list
-  refreshChildren(mostVisitedBN, listBN);
-
-  // Now, fetch favicons if needed (but no stats update !)
-  scanBNTree(mostVisitedBN, faviconWorkerPostMessage, false);
+  if (mostVisitedBN != undefined) { // undefined can happen when mostVisitedBN is deleted and scheduling
+									// is made before the node disappeared, but is dispatched after
+	refreshChildren(mostVisitedBN, listBN);
+	// Now, fetch favicons if needed (but no stats update !)
+	scanBNTree(mostVisitedBN, faviconWorkerPostMessage, false);
+  }
 }
 
 /*
@@ -693,10 +695,12 @@ function refreshRecentBkmks (a_BTN) {
   }
 
   // Refresh all children of recentBkmkBN with that list
-  refreshChildren(recentBkmkBN, listBN);
-
-  // Now, fetch favicons if needed (but no stats update !)
-  scanBNTree(recentBkmkBN, faviconWorkerPostMessage, false);
+  if (recentBkmkBN != undefined) { // undefined can happen when recentBkmkBN is deleted and scheduling
+								   // is made before the node disappeared, but is dispatched after
+	refreshChildren(recentBkmkBN, listBN);
+	// Now, fetch favicons if needed (but no stats update !)
+	scanBNTree(recentBkmkBN, faviconWorkerPostMessage, false);
+  }
 }
 
 /*
@@ -1848,8 +1852,49 @@ function bkmkCreatedHandler (id, BTN) {
 	index: index
   });
 
-  // Refresh list of recent bookmarks
+  // If we receive creation of the Recently bookmarked special folder (typically on restore bookmarks),
+  // then rebuild pointer
+  // Note on complete bookmark restore = the FF process appears to be as follows:
+  // - Delete of all bookmark items at level 2, under Bppkùarks Toolbar, Bookkmarks Menu, Other Bookmarks ..
+  //   (no delete of lower ones, they get included by the level 2 deleted folders).
+  // - Then re-create of all bookmarks one by one. This includes the special folders like Most Visited,
+  //   Recent Tags or Recently Bookmarked.
+  if (id == recentBkmkBNId) {
+	recentBkmkBN = curBNList[recentBkmkBNId];
+	// Notify open sidebars or ('possibly new) id'
+	sendAddonMsgComplex({
+	  source: "background",
+	  content: "recentBkmkBNId",
+	  bnId: recentBkmkBNId
+	});
+  }
+  // Refresh list of recent bookmarks (always)
   triggerRecentRefreshBkmks();
+
+  // If we receive creation of the Most recent special folder (typically on restore bookmarks),
+  // then rebuild pointer and refresh its content also
+  if (id == mostVisitedBNId) {
+	mostVisitedBN = curBNList[mostVisitedBNId];
+	triggerRefreshMostVisited();
+	// Notify open sidebars or ('possibly new) id'
+	sendAddonMsgComplex({
+	  source: "background",
+	  content: "mostVisitedBNId",
+	  bnId: mostVisitedBNId
+	});
+  }
+
+  // If we receive creation of the Recent tags special folder (typically on restore bookmarks),
+  // then rebuild pointer
+  if (id == recentTagBNId) {
+	recentTagBN = curBNList[recentTagBNId];
+	// Notify open sidebars or ('possibly new) id'
+	sendAddonMsgComplex({
+	  source: "background",
+	  content: "recentTagBNId",
+	  bnId: recentTagBNId
+	});
+  }
 }
 
 /*
@@ -1864,7 +1909,7 @@ function bkmkCreatedHandler (id, BTN) {
  */
 function bkmkRemovedHandler (id, removeInfo) {
   let parentId = removeInfo.parentId;
-//trace("Remove event on: "+id+" title: <<"+removeInfo.node.title+">> type: "+removeInfo.node.type);
+//console.log("Remove event on: "+id+" from "+parentId+" title: <<"+removeInfo.node.title+">> type: "+removeInfo.node.type);
   // Remove item and its children from curBNList
   let BN = curBNList[id];
   if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
