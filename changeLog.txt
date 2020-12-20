@@ -1,6 +1,14 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.85 Bugs and Improvements
+    - Added robustness and improved behavior to fully support a complete bookmark restore initiated from FF Bookmark Library
+      ("Import and Backup" menu, then "Restore"). This all should go smoothly now, or let me know.
+    - Corrected a 2.0.84 regression of not being able to drag and drop the address bar into the bookmark tree, due to
+      drop effect visual feedback changing from "copy" to "move".
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/167
+    - Corrected a regression of insertion line not being removed when stopping a drag on a no-drop protection zone
+      (e.g. on the dragged bookmark itself to cancel the drag).
 - 2.0.84 Bugs and Improvements
     - Introduced internal code support for multi-bookmarks selection and drag & drop, first phase before delivering
       the function in UI in a next release.
