@@ -1854,6 +1854,8 @@ function bkmkCreatedHandler (id, BTN) {
 
   // If we receive creation of the Recently bookmarked special folder (typically on restore bookmarks),
   // then rebuild pointer
+  // -> Cannot detect it otherwise since FF does not support bookmarks.onImportBegan and onImportEnded
+  //    (but Chrome does)
   // Note on complete bookmark restore = the FF process appears to be as follows:
   // - Delete of all bookmark items at level 2, under Bppkùarks Toolbar, Bookkmarks Menu, Other Bookmarks ..
   //   (no delete of lower ones, they get included by the level 2 deleted folders).

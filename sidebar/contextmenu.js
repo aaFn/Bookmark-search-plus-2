@@ -278,6 +278,18 @@ function openPropPopup (popupType, BN_id, path, type, title, url) {
 }
 
 /*
+ * Open BSP2 in a new tab, referring to current tab to come back to it when closing
+ * 
+ * tab = referring tab
+ */
+function openBsp2NewTab (tab) {
+  if (beforeFF57)
+	browser.tabs.create({url: SelfURL});
+  else
+	browser.tabs.create({url: SelfURL, openerTabId: tab.id});
+}
+
+/*
  * Open BSP2 Bookmark History window
  * 
  * tab = referring tab
