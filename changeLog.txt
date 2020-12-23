@@ -1,9 +1,13 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.86 Bugs
+    - Corrected a 2.0.84 regression where opening BSP2 in a tab was failing.
 - 2.0.85 Bugs and Improvements
     - Added robustness and improved behavior to fully support a complete bookmark restore initiated from FF Bookmark Library
-      ("Import and Backup" menu, then "Restore"). This all should go smoothly now, or let me know.
+      ("Import and Backup" menu, then "Restore"). Workaround since FF does not support bookmarks.onImportBegan and
+      onImportEnded (but Chrome does).
+      This all should go smoothly now, or let me know.
     - Corrected a 2.0.84 regression of not being able to drag and drop the address bar into the bookmark tree, due to
       drop effect visual feedback changing from "copy" to "move".
         https://github.com/aaFn/Bookmark-search-plus-2/issues/167
