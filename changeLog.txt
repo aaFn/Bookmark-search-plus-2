@@ -1,6 +1,21 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.87 Bugs & Improvements
+    - Corrected an exception on undefined variable in code on drag & drop event handling (no visible effect, but cleaner code).
+    - Do not execute action of opening bookmarks in current tab when BSP2 is in tab mode, to avoid inadvertently losing focus
+      on BSP2 (except if explicitely demanded through the context menu, or by key modifiers like Alt).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/171
+    - Made the Bookmark History retention duration configurable in days on the BSP2 options page (default = 30).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/168
+    - Added a "Clear history now" button in the Options page, to remove all history records.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/168
+    - Remove scrollbars when the sidebar width becomes very small (<= 40px), as they are not meaningful at such widths (content
+      is barely visible), and such widths can never be reached normally (there is a minimum width for sidebar by FF which is
+      much bigger), but this can help people using sidebar autohide CSS hacks in userChrome.css, when they are playing tricks
+      to overcome bad drag & drop support in such hacks. Quite convoluted .. but some users are ready to go through that as we
+      can see:
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/174
 - 2.0.86 Bugs
     - Corrected a 2.0.84 regression where opening BSP2 in a tab was failing.
 - 2.0.85 Bugs and Improvements
