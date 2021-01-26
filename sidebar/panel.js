@@ -491,9 +491,14 @@ function appendResult (BTN) {
   let BTN_id = row.dataset.id = BTN.id; // Keep unique id of bookmark in the data-id attribute
   row.dataset.rslt = "true"; // Mark that this is a result row for easy identification
   let BN = curBNList[BTN_id];
-  if ((BN == undefined) && (BTN_id != MobileBookmarks)) { // Desynchro !! => reload bookmarks from FF API
-	// Signal reload to background, and then redisplay to all
-	sendAddonMessage("reloadFFAPI_auto");
+  if (BN == undefined) {
+	if (BTN_id != MobileBookmarks) { // Desynchro !! => reload bookmarks from FF API
+	  // Signal reload to background, and then redisplay to all
+	  sendAddonMessage("reloadFFAPI_auto");
+	}
+	else {
+	  rc = true;
+	}
   }
   else {
 	curResultRowList[BTN_id] = row;
