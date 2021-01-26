@@ -1,6 +1,10 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.88 Bugs
+    - Corrected a bug where search result is including the Mobile bookmarks special folder, but it is not present in an
+      API load / reload from Firefox, breaking the search display with an exception, and so showing a never ending spinning wait
+      icon. Look like this is happening with fresh profiles, or more recent than my previous profile ...
 - 2.0.87 Bugs & Improvements
     - Corrected an exception on undefined variable in code on drag & drop event handling (no visible effect, but cleaner code).
     - Do not execute action of opening bookmarks in current tab when BSP2 is in tab mode, to avoid inadvertently losing focus
