@@ -2488,8 +2488,10 @@ function resultsMouseHandler (e) {
 		else if (e.shiftKey) { // Open in new window
 		  browser.windows.create({url: href});
 		}
-		else { // Open in current tab
-		  browser.tabs.update({url: href});
+		else { // Opein current tab, except if we are running BSP2 inside a tab and Alt is not pressed
+		  if (isInSidebar || e.altKey) {
+			browser.tabs.update({url: href});
+		  }
 		  showSrcRow = false; // Do not show row, we already got an action
 		}
 	  }
@@ -2575,7 +2577,7 @@ function bkmkMouseHandler (e) {
 	let href = target.href;
 	if ((href != undefined) && (href.length > 0)) {
 	  // Respect the about:config browser.tabs.loadBookmarksInTabs setting
-	  if (openBookmarksInNewTabs_option) { // If option set, open in new tab
+	  if (openBookmarksInNewTabs_option) { // If option set, open in new tab at end
 		browser.tabs.create({url: href});
 	  }
 	  else if (e.ctrlKey) { // Open in new tab, referred by this tab to come back to it when closing
@@ -2594,8 +2596,10 @@ function bkmkMouseHandler (e) {
 	  else if (e.shiftKey) { // Open in new window
 		browser.windows.create({url: href});
 	  }
-	  else { // Open in current tab
-		browser.tabs.update({url: href});
+	  else { // Opein current tab, except if we are running BSP2 inside a tab and Alt is not pressed
+		if (isInSidebar || e.altKey) {
+		  browser.tabs.update({url: href});
+		}
 	  }
 	}
   }
@@ -4351,7 +4355,7 @@ function bkmkDragOverHandler (e) {
 	curBkmkTarget = target;
 	curBkmkDt = dt;
   }
-//console.log("Drag over event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
+console.log("Drag over event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
   // Handle drag scrolling inhibition
   handleBkmkDragScroll(OverEvent, e);
   if (((target.className == undefined)  // When on Text, className and classList are undefined.
@@ -4418,7 +4422,7 @@ function bkmkDragLeaveHandler (e) {
 	}
 	else {
 	  if (isBkmkItemDragged) { // For internal drags, take Ctrl key into account to change visual feedback
-		dt.dropEffect = (is_ctrlKey ? "copy" : "move");
+		dt.dropEffect = (e.ctrlKey ? "copy" : "move");
 	  }
 	}
   }
@@ -4455,7 +4459,7 @@ function bkmkDragExitHandler (e) {
 	}
 	else {
 	  if (isBkmkItemDragged) { // For internal drags, take Ctrl key into account to change visual feedback
-		dt.dropEffect = (is_ctrlKey ? "copy" : "move");
+		dt.dropEffect = (e.ctrlKey ? "copy" : "move");
 	  }
 	}
   }
@@ -5406,8 +5410,10 @@ function keyHandler (e) {
 			else if (e.shiftKey) { // Open in new window
 			  browser.windows.create({url: href});
 			}
-			else {
-			  browser.tabs.update({url: href});
+			else { // Opein current tab, except if we are running BSP2 inside a tab and Alt is not pressed
+			  if (isInSidebar || e.altKey) {
+				browser.tabs.update({url: href});
+			  }
 			}
 		  }
 		}
@@ -6685,6 +6691,28 @@ async function completeFavicons (BN = undefined) {
 }
 
 /*
+ * Handle window size to remove scrollbars when the width is tiny (<= 20 px)
+ */
+let compStyles = window.getComputedStyle(Body);
+function windowSizeHandler() {
+  let realWidth = compStyles.getPropertyValue('width');
+  realWidth = realWidth.substring(0, realWidth.length-2);
+//console.log("width : "+window.width);
+//console.log("computed width : "+realWidth);
+  if (!isBkmkScrollInhibited && !isRsltScrollInhibited) { // Don't act when scrolling is inhibited by drag & drop handlers'
+	if (realWidth <= 40) { // Tiny => disable scroll bars
+//console.log("here");
+	  SearchResult.classList.replace(RScrollOk, RScrollKo);
+	  Bookmarks.classList.replace(BScrollOk, BScrollKo);
+	}
+	else { // Re-establish scrollbars if they were disabled
+	  SearchResult.classList.replace(RScrollKo, RScrollOk);
+	  Bookmarks.classList.replace(BScrollKo, BScrollOk);
+	}
+  }
+}
+
+/*
  * Complete the initial display of bookmarks table
  */
 function completeDisplay () {
@@ -6742,6 +6770,7 @@ function completeDisplay () {
   addEventListener("auxclick", noDefaultAction);
   addEventListener("blur", onBlur);
   addEventListener('wheel', onWheel, {capture: true}); // To disable zooming
+  addEventListener('resize', windowSizeHandler);
 
   if (!beforeFF64) { // Handle integrated FF menu items on sidebar
 	browser.menus.onClicked.addListener(onClickedContextMenuHandler);

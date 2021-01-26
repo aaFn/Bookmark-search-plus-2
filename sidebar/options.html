@@ -176,6 +176,14 @@
     <button type="button" id="resetcommand">Reset</button>
   </p>
   <p>
+    <b>Bookmark history:</b><br/>
+    <label for="historyretention">Bookmark history retention : </label>
+    <input type="number" id="historyretention" step="1" min="1" max="9999" required>
+    <span> days (default 30 - Pruning happens only at each Firefox or BSP2 restart)</span>
+    <br>
+    <button type="button" id="historyclear">Clear history now</button>
+  </p>
+  <p>
     <b>Traces / debug:</b><br/>
     <input type="checkbox" id="traceEnabled">
     <label for="traceEnabled">Activate traces</label>

@@ -55,6 +55,7 @@ const NBSP = "\xa0";
  * Initialize MapAction
  */
 MapAction[HNACTION_BSP2START]          = {nclass: "started", type: "meta", title: "BSP2 start"};
+MapAction[HNACTION_CLEARHISTORY]       = {nclass: "cleared", type: "meta", title: "History clear"};
 MapAction[HNACTION_RELOADFFAPI]        = {nclass: "reloaded", type: "meta", title: "BSP2 reload"};
 MapAction[HNACTION_AUTORELOADFFAPI]    = {nclass: "reloadeda", type: "meta", title: "BSP2 auto reload"};
 MapAction[HNACTION_BKMKCREATE]         = {nclass: "created", uclass: "created_u", rclass: "created_r", title: "create"};
@@ -1006,6 +1007,13 @@ function noDefaultAction (e) {
 }
 
 /*
+ * Add text in the log panel
+ */ 
+function appendLog (text) {
+  ALogTextArea.textContent += text + "\r\n";
+}
+
+/*
  * Get a particular CSSStyleRule from a CSSRuleList
  * 
  * cssRules = CSSRuleList to get a CSSStyleRule from
@@ -1187,6 +1195,10 @@ function handleAddonMessage (request, sender, sendResponse) {
 		if (cellHighlight != null) {
 		  displayHN(cellHighlight.parentElement.dataset.id);
 		}
+	  }
+	  else if (msg.startsWith("hnListClear")) { // History was cleared
+ 		// Reload ourselves
+		window.location.reload();
 	  }
 	}
 

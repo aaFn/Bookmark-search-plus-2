@@ -5,6 +5,7 @@
  * Constants
  */
 const HNACTION_BSP2START          = "bsp2start";
+const HNACTION_CLEARHISTORY       = "bsp2clearhist";
 const HNACTION_RELOADFFAPI        = "reloadffapi";
 const HNACTION_AUTORELOADFFAPI    = "autoreloadffapi";
 const HNACTION_BKMKCREATE         = "create";
@@ -237,6 +238,7 @@ function HistoryList (hnList = []) {
 	if ((action != HNACTION_BSP2START)
 		&& (action != HNACTION_RELOADFFAPI)
 		&& (action != HNACTION_AUTORELOADFFAPI)
+		&& (action != HNACTION_CLEARHISTORY)
 	   ) {
 	  break;
 	}
@@ -319,6 +321,7 @@ function historyListAdd (hl, action,
 		&& (action != HNACTION_BSP2START)
 		&& (action != HNACTION_RELOADFFAPI)
 		&& (action != HNACTION_AUTORELOADFFAPI)
+		&& (action != HNACTION_CLEARHISTORY)
 	   ) { // Set at end of list
 	  // Any active record between current activeIndex and this new one becomes inactive
 	  let curIndex = hl.activeIndex;
@@ -335,6 +338,7 @@ function historyListAdd (hl, action,
 			&& (tmpAction != HNACTION_BSP2START)
 			&& (tmpAction != HNACTION_RELOADFFAPI)
 			&& (tmpAction != HNACTION_AUTORELOADFFAPI)
+			&& (action != HNACTION_CLEARHISTORY)
 		   ) {
 		  tmpHn.state = HNSTATE_INACTIVEBRANCH;
 		}
@@ -381,7 +385,7 @@ function historyListAdd (hl, action,
 	  tmpHn.reversion = HNREVERSION_REDONE;
 	}
 
-	// Notfy the Bookmark history window that there is a change, it it is open
+	// Notify the Bookmark history window that there is a change, if it is open
 	sendAddonMessage("hnListAdd");
   }
 }
@@ -407,6 +411,21 @@ function historyListTrim (hl, retention) {
 	let activeIndex = hl.activeIndex - count;
 	hl.activeIndex = (activeIndex >= 0 ? activeIndex : undefined);
   }
+}
+
+/*
+ * Clear the History array to remove all nodes
+ * hl: HistoryList to trim
+ */
+function historyListClear (hl) {
+  let hnList = hl.hnList;
+  hnList.length = 0;
+  let hn = new HistoryNode (HNACTION_CLEARHISTORY);
+  hnList.push(hn);
+  hl.activeIndex = undefined;
+
+  // Notify the Bookmark history window of the clear, if it is open
+  sendAddonMessage("hnListClear");
 }
 
 /*

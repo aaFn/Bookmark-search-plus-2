@@ -36,7 +36,6 @@ const SaveMaxHysteresis = 25000; // Space saves during massive favicon operation
 const MaxNoSaveDuration = 300000; // In case of slow save, max 5 minutes for all pending saves to be delayed,
 								  // after that do one save to make sure we're not losing too much.
 const SidebarScanInterval = 1000; // Every 1 s
-const HistoryNodeRetention = 30; // In days
 //Declared in libstore.js
 //const VersionImg16 = "-img16"; // Signal that all favicons are in 16x16 format
 //const VersionBNList = "-bnlist"; // Signal that we are in BookmarkNode tree format
@@ -105,7 +104,6 @@ let privateSidebarsList = {};	// Track private windows sidebars
 let sidebarScanIntervalId = undefined; // To scan open private sidebars ...
 //let faviconWorker; // For background retrieval of favicons
 let migr16x16Open = true; // Set to false on the first signalMigrate16x16() received
-let historyNodeRetention = HistoryNodeRetention; // Duration to keep HistoryNode
 let startTime, endLoadTime, endTreeLoadTime, endTreeBuildTime, endSaveTime;
 
 
@@ -1138,6 +1136,11 @@ function handleAddonMessage (request, sender, sendResponse) {
 	else if (msg.startsWith("sort:")) { // Sort a folder contents by name
 	  let BN_id = msg.substring(5); // Get bookmark item Id
 	  sortFolder(BN_id);
+	}
+	else if (msg.startsWith("clearHistory")) { // Clear bookmark history, typically from History window
+	  historyListClear(curHNList);
+	  // Save new current info
+	  saveBNList();
 	}
  
 	// Answer
@@ -2832,7 +2835,7 @@ readFullLStore(false, trace)
 		savedHNList = undefined;
 	  }
 	  else {
-		historyListTrim(savedHNList, historyNodeRetention * 24 * 3600000);
+		historyListTrim(savedHNList, historyRetention_option * 24 * 3600000);
 	  }
 	}
 

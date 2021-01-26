@@ -130,6 +130,10 @@ tbody {
   background-image: url("/icons/started.png");
 }
 
+.cleared {
+  background-image: url("/icons/cleared.png");
+}
+
 .reloaded {
   background-image: url("/icons/reloaded.png");
 }

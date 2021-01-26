@@ -11,6 +11,7 @@ const DfltFontSize = 12; // 12px default
 const DfltSpaceSize = 0; // 0px default
 const DfltTextColor = "#222426"; // Default text color
 const DfltBckgndColor = "#ffffff"; // Default background color
+const DfltHistoryRetention = "30"; // 30 days default
 
 
 /*
@@ -46,6 +47,7 @@ var altNoFavImg_option; // String (data: URI)
 var useAltNoFav_option; // Boolean
 var lastcurbnid_option; // String
 var sidebarCommand_option; // String
+var historyRetention_option; // Integer
 var traceEnabled_option; // Boolean
 var searchField_option; // String
 var searchScope_option; // String
@@ -87,6 +89,7 @@ var altNoFavImg_option_file; // String (data: URI)
 var useAltNoFav_option_file; // Boolean
 var lastcurbnid_option_file; // String
 var sidebarCommand_option_file; // String
+var historyRetention_option_file; // Integer
 var traceEnabled_option_file; // Boolean
 var searchField_option_file; // String
 var searchScope_option_file; // String
@@ -185,6 +188,8 @@ function refreshOptionsBgnd(backgroundPage) {
 	lastcurbnid_option = backgroundPage.lastcurbnid_option;
 	sidebarCommand_option_file = backgroundPage.sidebarCommand_option_file;
 	sidebarCommand_option = backgroundPage.sidebarCommand_option;
+	historyRetention_option_file = backgroundPage.historyRetention_option_file;
+	historyRetention_option = backgroundPage.historyRetention_option;
 	traceEnabled_option_file = backgroundPage.traceEnabled_option_file;
 	traceEnabled_option = backgroundPage.traceEnabled_option;
 	searchField_option_file = backgroundPage.searchField_option_file;
@@ -243,6 +248,7 @@ function refreshOptionsLStore() {
 					, "searchscope_option"
 					, "searchmatch_option"
 					, "searchfilter_option"
+					, "historyretention_option"
 					, "traceEnabled_option"
 				]
 			);
@@ -512,6 +518,14 @@ function refreshOptionsLStore() {
 					searchScope_option = "all";
 				}
 
+				// -- Read HR option..
+				if ((historyRetention_option_file = res.historyretention_option) != undefined) {
+					historyRetention_option = historyRetention_option_file;
+				}
+				else {
+					historyRetention_option = undefined;
+				}
+
 				// -- Read trace option..
 				if ((traceEnabled_option_file = res.traceEnabled_option) != undefined) {
 					traceEnabled_option = traceEnabled_option_file;
@@ -651,6 +665,7 @@ function launchReadFullLStore(isSidebar) {
 				, "searchscope_option"
 				, "searchmatch_option"
 				, "searchfilter_option"
+				, "historyretention_option"
 				, "traceEnabled_option"
 				, "savedFldrOpenList"
 				, "structureVersion"
@@ -695,6 +710,7 @@ function launchReadFullLStore(isSidebar) {
 				, "searchscope_option"
 				, "searchmatch_option"
 				, "searchfilter_option"
+				, "historyretention_option"
 				, "traceEnabled_option"
 				, "fIndex"
 				, "fTime"
@@ -1041,6 +1057,14 @@ function readFullOptions(res, isSidebar, waitMsg) {
 	}
 	else {
 		searchFilter_option = "all";
+	}
+
+	waitMsg("Read HR option..");
+	if ((historyRetention_option_file = res.historyretention_option) != undefined) {
+		historyRetention_option = historyRetention_option_file;
+	}
+	else {
+		historyRetention_option = undefined;
 	}
 
 	waitMsg("Read trace option..");

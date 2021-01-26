@@ -62,6 +62,8 @@ const Opt4 = document.createElement("option");
 Opt4.value = Opt4.text = "MacCtrl";
 const Command3Select = document.querySelector("#command3");
 const ResetCommandButton = document.querySelector("#resetcommand");
+const HistoryRetentionInput = document.querySelector("#historyretention");
+const HistoryClearButton = document.querySelector("#historyclear"); // Assuming it is an HTMLButtonElement
 const TraceEnabledInput = document.querySelector("#traceEnabled");
 const ResetMigr16x16Button = document.querySelector("#resetmigr16x16");
 //Declared in libstore.js
@@ -70,6 +72,7 @@ const ResetMigr16x16Button = document.querySelector("#resetmigr16x16");
 //const DfltSpaceSize = 0; // 0px default
 //const DfltTextColor = "#222426"; // Default text color
 //const DfltBckgndColor = "white"; // Default background color
+//const DfltHistoryRetention = "30"; // 30 days default
 
 
 /*
@@ -194,6 +197,9 @@ function saveOptions (e) {
 	if (FontSizeInput.validity.valid) {
 	  fontSize = FontSizeInput.value;
 	}
+	else {
+	  FontSizeInput.value = DfltFontSize;
+	}
   }
   else {
 	FontSizeInput.value = DfltFontSize;
@@ -204,6 +210,9 @@ function saveOptions (e) {
   if (setspacesize) {
 	if (SpaceSizeInput.validity.valid) {
 	  spaceSize = SpaceSizeInput.value;
+	}
+	else {
+	  SpaceSizeInput.value = DfltSpaceSize;
 	}
   }
   else {
@@ -237,6 +246,13 @@ function saveOptions (e) {
 	altNoFavImgSrc = undefined;
   }
   let useAltNoFav = (!UseAltNoFavInput.disabled) && UseAltNoFavInput.checked;
+  let historyRetention = DfltHistoryRetention;
+  if (HistoryRetentionInput.validity.valid) {
+	historyRetention = HistoryRetentionInput.value;
+  }
+  else {
+	HistoryRetentionInput.value = DfltHistoryRetention;
+  }
 
   // Save options
   browser.storage.local.set({
@@ -268,6 +284,7 @@ function saveOptions (e) {
 	,altnofavimg_option: altNoFavImgSrc
 	,usealtnofav_option: useAltNoFav
 	,sidebarcommand_option: sidebarCommand
+	,historyretention_option: historyRetention
 	,traceEnabled_option: TraceEnabledInput.checked
   })
   .then(
@@ -697,6 +714,13 @@ function restoreOptions () {
 	ResetCommandButton.disabled = true;
   }
   
+  if (historyRetention_option_file != undefined) {
+	HistoryRetentionInput.value = historyRetention_option_file;
+  }
+  else {
+	HistoryRetentionInput.value = DfltHistoryRetention;
+  }
+
   if (traceEnabled_option_file) {
 	TraceEnabledInput.checked = true;
   }
@@ -748,7 +772,6 @@ function resetSizes  () {
  * Change size of characters
  */
 function changeFontSize () {
-//  console.log("changeFontSize: value sent");
   if (FontSizeInput.validity.valid) {
 	// Save new value
 	saveOptions(undefined);
@@ -762,17 +785,34 @@ function changeFontSize () {
  * Change spacing
  */
 function changeSpaceSize () {
-//  console.log("changeSpaceSize: value sent");
   if (SpaceSizeInput.validity.valid) {
-//let spaceSize = SpaceSizeInput.value;
-//console.log("changeSpaceSize: value "+spaceSize);
-
 	// Save new value
 	saveOptions(undefined);
   }
   else {
 	console.log("changeSpaceSize: invalid value");
   }
+}
+
+/*
+ * Change bookamark history retention
+ */
+function changeHistoryRetention () {
+  if (HistoryRetentionInput.validity.valid) {
+	// Save new value
+	saveOptions(undefined);
+  }
+  else {
+	console.log("changeHistoryRetention: invalid value");
+  }
+}
+
+/*
+ * Clear history action
+ */ 
+function historyClearHandler (e) {
+  // Demand clear to background
+  sendAddonMessage("clearHistory");
 }
 
 /*
@@ -796,7 +836,7 @@ function changeSidebarCommand () {
 }
 
 /*
- * Machanics to load image from specified alternative image files
+ * Mechanics to load image from specified alternative image files
  */
 let cvtUri;
 let cvtImg;
@@ -1057,7 +1097,7 @@ function resetMigr16x16 () {
   // Disable button
   ResetMigr16x16Button.disabled = true;
 
-  // Signal reset to nackground
+  // Signal reset to background
   sendAddonMessage("resetMigr16x16");
 }
 
@@ -1129,6 +1169,8 @@ function initialize2 () {
   Command2Select.addEventListener("change", changeSidebarCommand);
   Command3Select.addEventListener("change", changeSidebarCommand);
   ResetCommandButton.addEventListener("click", resetSidebarCommand);
+  HistoryRetentionInput.addEventListener("change", changeHistoryRetention);
+  HistoryClearButton.addEventListener("click", historyClearHandler);
   TraceEnabledInput.addEventListener("click", saveOptions);
   ResetMigr16x16Button.addEventListener("click", resetMigr16x16);
 }

@@ -22,6 +22,6 @@ textarea {
   width: 300px;
 }
 
-#fontsize, #spacesize {
+#fontsize, #spacesize, #historyretention {
   width: 4em;
 }
