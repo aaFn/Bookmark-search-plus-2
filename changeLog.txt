@@ -1,6 +1,14 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.89 Improvements
+    - When showing a row from a search result, unhide also all chidren of already open sub-folders on the path to that row : their
+      content is meant to be seen, for consistency with their twistie open state. So far, content of sibbling folders which were open
+      was not unhidden by the show action, forcing to click twice on twistie to close and open again to really see content.
+    - When showing bookmark from toolbar star icon, or when going to parent, add action "Open parent folder(s)" in the context
+      menu if the target was hidden, like with normal show bookmark action.
+    - Changed max font size in BSP2 options to 20 pixels instead of 16.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/175
 - 2.0.88 Bugs
     - Corrected a bug where search result is including the Mobile bookmarks special folder, but it is not present in an
       API load / reload from Firefox, breaking the search display with an exception, and so showing a never ending spinning wait
