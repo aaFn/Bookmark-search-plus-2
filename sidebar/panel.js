@@ -479,7 +479,7 @@ function appendResult (BTN) {
   let type = getType(BTN);
   if (((searchFilter_option == "fldr") && (type == "bookmark"))
 	  || ((searchFilter_option == "bkmk") && (type == "folder"))
-	 ) { // Filter out the result
+	 ) { // Filter out the result, but continue with next ones
 	return(true);
   }
 
@@ -496,7 +496,7 @@ function appendResult (BTN) {
 	  // Signal reload to background, and then redisplay to all
 	  sendAddonMessage("reloadFFAPI_auto");
 	}
-	else {
+	else { // Skip that one and continue with other results
 	  rc = true;
 	}
   }
@@ -1936,77 +1936,114 @@ function bkmkReordered (bnId, reorderInfo) {
 }
 
 /*
- * Show a bookmark row, making it visible if hidden (but not opening its parent then)
+ * Verify visiblity of a BookmarkNode
+ *
+ * BN_id is a String.
  * 
- * srcRow is an HTMLTableRowElement
+ * Return true if BN is visible, else false
+ * Set the global variable firstVisibleParentRow to the lowest visible ancestor, from root.
+ * Also set the global variable firstUnihiddenParentRow to the lowest unhidden ancestor (can
+ * be different if upper parts were already unhidden by a previous showRow()),
+ * and the global variable hiddenParentRowsPath to the list (Array) of hidden parents above BN. 
  */
-function showRow (srcRow) {
+let firstUnhiddenParentRow, hiddenParentRowsPath;
+function isVisible (BN_id) {
+  let visible;
+
+  // Get to parent row and check it
+  let BN = curBNList[BN_id];
+  let parentBN_id = BN.parentId;
+  if (parentBN_id == Root) {
+	// Root, which is not displayed, is always considered visible and open,
+    // since all its children folders are shown (= top level system folders).
+	// So we are visible, and there is no parent row.
+	visible = true;
+	firstUnhiddenParentRow = firstVisibleParentRow = undefined;
+	hiddenParentRowsPath = [];
+  }
+  else {
+	let parentVisible = isVisible(parentBN_id);
+
+	// If parent is not visible, we are not ...
+	if (!parentVisible) {
+	  visible = false;
+	  // Do not update firstVisibleParentRow anymore, but continue on firstUnhiddenParentRow as appropriate,
+	  // and grow hiddenParentRowsPath.
+	  let parentRow = curRowList[parentBN_id];
+	  if (parentRow.hidden) {
+		hiddenParentRowsPath.push(parentRow);
+	  }
+	  else {
+		firstUnhiddenParentRow = parentRow;
+	  }
+	}
+	else { // Parent is visible (and necessarily unhidden)
+	  firstUnhiddenParentRow = firstVisibleParentRow = curRowList[parentBN_id];
+	  // We are visible only if parent is open
+	  visible = curFldrOpenList[parentBN_id];
+	}
+  }
+
+  return (visible);
+}
+
+/*
+ * Show a bookmark row, making it visible if hidden (but not opening its parent then).
+ * Also sets the cursor on that row / cell.
+ * 
+ * srcBnId is a String (BookmarkNode id)
+ * srcRow is an HTMLTableRowElement
+ *
+ * Returns if row was visible or not (true / false)
+ */
+function showRow (srcBnId, srcRow) {
+  let wasRowVisible = isVisible(srcBnId); // Also sets firstUnhiddenParentRow and hiddenParentRowsPath
   let srcHidden = srcRow.hidden;
   if (srcHidden) {
-	// Unhide up to first ancestor already visible. Be careful to unhide only those
-	// items under same parent of higher level parents, but not intermediate items inside
-	// other folders on the path to the first open ancestor => strictly increasing level
-	// sequence.
-	let srcLevel = parseInt(srcRow.dataset.level, 10);
-	let level = srcLevel;
-	let row;
-	let rowLevel;
-	let twistie;
+	// Start from first unhidden ancestor already visible
+	// Open it if openTree_option is active
 	let BN_id;
-	(row = srcRow).hidden = false;
-	while ((row = row.previousElementSibling).hidden) {
-	  rowLevel = parseInt(row.dataset.level, 10);
-	  if (rowLevel == level) {
-		row.hidden = false;
-	  }
-	  else if (rowLevel < level) { // Cranking up one level in the tree
-		level = rowLevel;
-		row.hidden = false;
-		// That can only be a folder, but that doesn't hurt to check
-		// Open it if openTree_option is active
-		if (openTree_option && (row.dataset.type == "folder")) { // Set it to open state
-		  twistie = row.firstElementChild.firstElementChild;
-		  if (twistie.classList.contains("twistieac")) { // Open twistie
+	let twistie;
+	if (openTree_option) { // Set it to open state
+	  twistie = firstUnhiddenParentRow.firstElementChild.firstElementChild;
+	  // First unhidden means all under it is hidden so it is necessarily closed => Open twistie
+	  twistie.classList.replace("twistieac", "twistieao");
+	  BN_id = firstUnhiddenParentRow.dataset.id;
+	  curFldrOpenList[BN_id] = true;
+	}
+	// Now unhide all children under it, plus all folders which are already open or on the path
+	// to the row to show, and their children.
+	let topLevel = parseInt(firstUnhiddenParentRow.dataset.level, 10);
+	let row = firstUnhiddenParentRow.nextElementSibling;
+	let level;
+	while ((row != null)
+		   && row.hidden
+		   && ((level = parseInt(row.dataset.level, 10)) > topLevel)
+		  ) {
+	  // We are on an intended to be unhidden row
+	  row.hidden = false;
+	  // Check if this is a folder and if open, or meant to be open because on the path to srcBnId
+	  if ((row.dataset.type == "folder")
+		  && (row.firstElementChild.firstElementChild.classList.contains("twistieac"))
+		 ) { // This is a closed folder, check its intended state
+		if (hiddenParentRowsPath.indexOf(row) == -1) {
+		  // Should stay closed, then all its children stay hidden ..
+		  while ((row = row.nextElementSibling) != null) {
+			if (parseInt(row.dataset.level, 10) <= level)
+			  break; // Stop when lower or same level
+		  }
+		}
+		else { // It is on path to srcBnId, we need to unhide its children
+		  if (openTree_option) { // If option is true, set it to open state
+			twistie = row.firstElementChild.firstElementChild;
 			twistie.classList.replace("twistieac", "twistieao");
 			BN_id = row.dataset.id;
 			curFldrOpenList[BN_id] = true;
 		  }
-		}
+		  row = row.nextElementSibling;
+	    }
 	  }
-	}
-
-	// Retrieve the level of that first already visible parent
-	// Note that if row was null, then the loop would have stopped on the first row of the table.
-	// However,  this is a SNO (Should Not Occur) since the first row can never be hidden,
-	// so no test for that condition ..
-	let last_open_level = parseInt(row.dataset.level, 10);
-
-	// Open it if openTree_option is active
-	if (openTree_option && (row.dataset.type == "folder")) { // Set it to open state
-	  twistie = row.firstElementChild.firstElementChild;
-	  if (twistie.classList.contains("twistieac")) { // Open twistie
-		twistie.classList.replace("twistieac", "twistieao");
-		BN_id = row.dataset.id;
-		curFldrOpenList[BN_id] = true;
-	  }
-	}
-  
-	// And now, unhide down all hidden elements after the shown item, until we find a
-	// level < last_open_level or we reach end of table. Do that only on elements which are
-	// at the same level than an ancestor we had to open => strictly increasing level sequence.
-	row = srcRow;
-	level = srcLevel;
-	while (((row = row.nextElementSibling) != null)
-		   && row.hidden
-		   && ((rowLevel = parseInt(row.dataset.level, 10)) >= last_open_level)
-		  ) {
-	  if (rowLevel == level) {
-		row.hidden = false;
-	  }
-	  else if (rowLevel < level) {
-		level = rowLevel;
-		row.hidden = false;
-	  }
+	  else   row = row.nextElementSibling;
 	}
   }
 
@@ -2026,6 +2063,8 @@ function showRow (srcRow) {
   else {
 	srcRow.scrollIntoView({behavior: "auto", block: "center", inline: "nearest"});
   }
+
+  return(wasRowVisible);
 }
 
 /*
@@ -2040,12 +2079,14 @@ function goBkmkItem (bnId) {
 	row = curRowList[bnId];
 	if ((row == undefined) || row.hidden) {
 	  row = bookmarksTable.rows[0];
+	  bnId = row.dataset.id;
 	}
   }
   else {
 	row = bookmarksTable.rows[0];
+	bnId = row.dataset.id;
   }
-  showRow(row);
+  showRow(bnId, row); // We checked it was not hidden, so no modification to any folder state to save
 }
 
 /*
@@ -2059,7 +2100,17 @@ function goParent (row) {
   let BN = curBNList[BN_id]; // Get BookmarkNode
   let parentBN_id = BN.parentId;
   let parentRow = curRowList[parentBN_id]; // Get parent row
-  showRow(parentRow);
+  let wasRowVisible = showRow(parentBN_id, parentRow);
+  if (!wasRowVisible) {
+	// If we have the openTree_option active, then we necessarily changed some folder state
+	// => save it.
+	if (openTree_option) {
+	  saveFldrOpen();
+	}
+	else { // Else show special action on context menu
+	  cursor.cell.classList.add(Reshidden); // Show special menu to open parent folders
+	}
+  }
 }
 
 /*
@@ -2160,6 +2211,7 @@ let firstVisibleParentRow;
 function openResParents (row) {
   // Open up to first ancestor already visible as set by handleResultClick.
   // We open only ancestors => strictly increasing level sequence.
+  // Note that if this action is triggered, row was not visible, so firstVisibleParentRow is defined
   let level = parseInt(firstVisibleParentRow.dataset.level, 10);
   let BN_id = row.dataset.id;
   let BN = curBNList[BN_id]; // Get BookmarkNode
@@ -2170,13 +2222,13 @@ function openResParents (row) {
 	row = curRowList[BN_id]; // Get parent row
 
 	// That can only be a folder, but that doesn't hurt to check
-    if (row.dataset.type == "folder") { // Set it to open state
-      twistie = row.firstElementChild.firstElementChild;
-      if (twistie.classList.contains("twistieac")) { // Open twistie
-    	twistie.classList.replace("twistieac", "twistieao");
-        curFldrOpenList[BN_id] = true;
-      }
-    }
+ 	if (row.dataset.type == "folder") { // Set it to open state
+	  twistie = row.firstElementChild.firstElementChild;
+	  if (twistie.classList.contains("twistieac")) { // Open twistie
+		twistie.classList.replace("twistieac", "twistieao");
+		curFldrOpenList[BN_id] = true;
+	  }
+	}
   } while (BN.level > level); // The last ancestor is necessarily closed .. so do it also
   
   // Save new open state
@@ -2187,69 +2239,24 @@ function openResParents (row) {
 }
 
 /*
- * Verify visiblity of a BookmarkNode
- *
- * BN_id is a String.
- * 
- * Return true if BN is visible, else false and set the global variable firstVisibleParentRow
- * to the lowest visible ancestor, from root.
- */
-function isVisible (BN_id) {
-  let visible;
-
-  // Get to parent row and check it
-  let BN = curBNList[BN_id];
-  let parentBN_id = BN.parentId;
-  if (parentBN_id == Root) {
-	// Root, which is not displayed, is always considered visible and open,
-    // since all its children folders are shown (= top level system folders).
-	// So we are visible.
-	visible = true;
-  }
-  else {
-	let parentVisible = isVisible(parentBN_id);
-
-	// If parent is not visible, we are not ...
-	if (!parentVisible) {
-	  visible = false;
-	}
-	else { // Parent is visible
-	  // We are visible only if parent is open
-	  visible = curFldrOpenList[parentBN_id];
-	  // If we are not visible, we are the first one invisible since pour parent is visible,
-	  // so set firstVisibleParentRow to parent row
-	  firstVisibleParentRow = curRowList[parentBN_id];
-	}
-  }
-
-  return (visible);
-}
-
-/*
- * Handle clicks on results = show source row in bookmarks tree
+ * Handle clicks on results = show source row in bookmarks tree, and special menu to open
+ * parents if openTree_option is not set.
  *
  * resultBN_id is the id of the bookmark item to show
  */
 function handleResultClick (resultBN_id) {
-  // Verify the current visiblity of the row before potentially modifying its parent state
-  // if the openTree_option is set !
-  // If it is hidden (one of its parents is closed), we'll need to display the special
-  // "Open parents" action on context menu.
-  // Be careful that srcHidden is not reliable .. in case we already showed a result under
-  // same parent, then the row is already set to visible with that attribute, so have to check
-  // curFldrOpenList[].
-  // Also, if we already showed a result under an ancestor, the firstVisibleParentRow
-  // cannot be derived from the "opening" code itself.
-  // So we have to check visibility systematically.
-  let wasRowVisible = isVisible(resultBN_id);
-
-  // Make the source row of result visible if hidden
   let srcRow = curRowList[resultBN_id];
   if (srcRow != undefined) { // Protect against unlisted bookmarks, like "Tous les marques-pages"
 							 // which do not appear in getTree(), but appear in search() !!
 //trace("Row: "+srcRow+" resultBN_id: "+resultBN_id+" index: "+srcRow.rowIndex);
-	showRow(srcRow);
-
+	// Make the source row of result visible if hidden
+	// Verify the current visiblity of the row before potentially modifying its parent state.
+	// If it is hidden (one of its parents is closed), we'll need to display the special
+	// "Open parents" action on context menu (only if openTree_option is not set).
+	// Be careful that srcHidden is not reliable .. in case we already showed a result under
+	// same parent, then the row is already set to visible with that attribute, so have to check
+	// curFldrOpenList[] instead, which is done by showRow().
+	let wasRowVisible = showRow(resultBN_id, srcRow);
 	if (!wasRowVisible) {
 	  // If we have the openTree_option active, then we necessarily changed some folder state
 	  // => save it.
@@ -2257,7 +2264,7 @@ function handleResultClick (resultBN_id) {
 		saveFldrOpen();
 	  }
 	  else { // Else show special action on context menu
-		cursor.cell.classList.add(Reshidden); // Show special menu
+		cursor.cell.classList.add(Reshidden); // Show special menu to open parent folders
 	  }
 	}
   }
@@ -6555,7 +6562,17 @@ function handleAddonMessage (request, sender, sendResponse) {
 		  let bn = curBNList[bnId]; // We are protected already, by checking bnId before sending the message
 		  displayResults([bn]);
 		  let row = curRowList[bnId];
-		  showRow(row);
+		  let wasRowVisible = showRow(bnId, row);
+		  if (!wasRowVisible) {
+			// If we have the openTree_option active, then we necessarily changed some folder state
+			// => save it.
+			if (openTree_option) {
+			  saveFldrOpen();
+			}
+			else { // Else show special action on context menu
+			  cursor.cell.classList.add(Reshidden); // Show special menu to open parent folders
+			}
+		  }
 		}
 	  }
 	  else if (msg.startsWith("bkmkCreated")) { // Got a BN subtree to add to display
