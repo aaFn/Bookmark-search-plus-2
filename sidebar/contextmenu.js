@@ -37,14 +37,14 @@ const ContextMenu = {};
 //   Folders    olgbfstcpadrvi
 //   Separators gbfstcpdv
 ContextMenu["bsp2show"+Menu_rshowbkmk] = {
-	title: "<S&how bookmark>"
+	title: "<S&how Bookmark>"
 };
 ContextMenu["bsp2show"+Menu_rfldr] = {
-	title: "<S&how folder>"
+	title: "<S&how Folder>"
 };
 ContextMenu["bsp2goparent"+Menu_rshowbkmk+Menu_rfldr] = {
 	is_goparent: true,
-	title: "&Go parent folder"
+	title: "&Go Parent Folder"
 };
 ContextMenu["bsp2sep0"+Menu_rshowbkmk+Menu_rfldr] = {
 	type: "separator"
@@ -56,41 +56,41 @@ ContextMenu["bsp2open"+Menu_rshowbkmk] = {
 	title: "Op&en"
 };
 ContextMenu["bsp2opentab"+Menu_bbkmk+Menu_bresbkmk+Menu_bprot+Menu_rbkmk+Menu_rshowbkmk] = {
-	title: "Open in ne&w tab"
+	title: "Open in Ne&w Tab"
 };
 ContextMenu["bsp2openwin"+Menu_bbkmk+Menu_bresbkmk+Menu_bprot+Menu_rbkmk+Menu_rshowbkmk] = {
-	title: "Open in &new window"
+	title: "Open in &New Window"
 };
 ContextMenu["bsp2openpriv"+Menu_bbkmk+Menu_bresbkmk+Menu_bprot+Menu_rbkmk+Menu_rshowbkmk] = {
-	title: "Open in priv&ate window"
+	title: "Open in Priv&ate Window"
 };
 ContextMenu["bsp2openall"+Menu_bfldr+Menu_bresfldr+Menu_bprotf+Menu_rfldr] = {
-	title: "&Open all in tabs"
+	title: "&Open All in Tabs"
 };
 ContextMenu["bsp2sep1"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bprot+Menu_bprotf+Menu_rbkmk+Menu_rshowbkmk+Menu_rfldr] = {
 	type: "separator"
 };
 ContextMenu["bsp2show"+Menu_rbkmk] = {
-	title: "S&how bookmark"
+	title: "S&how Bookmark"
 };
 ContextMenu["bsp2opentree"+Menu_bresbkmk+Menu_bresfldr] = {
-	title: "Open parent fo&lder(s)"
+	title: "Open Parent Fo&lder(s)"
 };
 ContextMenu["bsp2goparent"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_bprot+Menu_rbkmk] = {
 	is_goparent: true,
-	title: "&Go parent folder"
+	title: "&Go Parent Folder"
 };
 ContextMenu["bsp2sep2"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_rbkmk] = {
 	type: "separator"
 };
 ContextMenu["bsp2newb"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_bprotf] = {
-	title: "New &bookmark.."
+	title: "New &Bookmark..."
 };
 ContextMenu["bsp2newf"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_bprotf] = {
-	title: "New &folder.."
+	title: "New &Folder..."
 };
 ContextMenu["bsp2news"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_bprotf] = {
-	title: "New &separator"
+	title: "New &Separator"
 };
 ContextMenu["bsp2sep3"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_bprotf] = {
 	type: "separator"
@@ -103,11 +103,11 @@ ContextMenu["bsp2copy"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bs
 };
 ContextMenu["bsp2paste"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep] = {
 	is_paste: true,
-	title: "&Paste before"
+	title: "&Paste Before"
 };
 ContextMenu["bsp2pasteinto"+Menu_bfldr+Menu_bresfldr+Menu_bprotf] = {
 	is_paste: true,
-	title: "P&aste into"
+	title: "P&aste Into"
 };
 ContextMenu["bsp2sep4"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_rbkmk+Menu_rshowbkmk+Menu_rfldr] = {
 	type: "separator"
@@ -131,18 +131,18 @@ ContextMenu[BSP2AdvancedMenu] = {
 ContextMenu["bsp2refreshfav"+Menu_bbkmk+Menu_bresbkmk] = {
 	parentId: BSP2AdvancedMenu,
 	is_refreshfav: true,
-	title: "&Refresh favicon"
+	title: "&Refresh Davicon"
 };
 ContextMenu["bsp2collapseall"+Menu_bfldr+Menu_bresfldr+Menu_bprotf] = {
     parentId: BSP2AdvancedMenu,
-	title: "&Collapse all in branch"
+	title: "&Collapse All in Branch"
 };
 ContextMenu["bsp2expandall"+Menu_bfldr+Menu_bresfldr+Menu_bprotf] = {
     parentId: BSP2AdvancedMenu,
-	title: "&Expand all in branch"
+	title: "&Expand All in Branch"
 };
 ContextMenu["bsp2prop"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_rbkmk+Menu_rshowbkmk+Menu_rfldr] = {
-	title: "Propert&ies.."
+	title: "Propert&ies..."
 };
 
 
