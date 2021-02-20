@@ -131,7 +131,7 @@ ContextMenu[BSP2AdvancedMenu] = {
 ContextMenu["bsp2refreshfav"+Menu_bbkmk+Menu_bresbkmk] = {
 	parentId: BSP2AdvancedMenu,
 	is_refreshfav: true,
-	title: "&Refresh Davicon"
+	title: "&Refresh Favicon"
 };
 ContextMenu["bsp2collapseall"+Menu_bfldr+Menu_bresfldr+Menu_bprotf] = {
     parentId: BSP2AdvancedMenu,
