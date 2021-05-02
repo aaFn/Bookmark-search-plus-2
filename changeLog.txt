@@ -1,6 +1,45 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.90 Bugs & Improvements
+    - Accepted pull request from Gitoffthelawn aligning caps in menus with those of FF.
+        https://github.com/aaFn/Bookmark-search-plus-2/pull/176
+    - Aligned some more caps in other menus for consistency.
+    - Added option in Magnifier glass menu for search scope options, named "Current folder - no sub", for 1 level search only.
+      Renamed option "Inside current folder" to 'Current folder tree", to highlight this is recursive in sub folders.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/179
+    - Corrected a bug where an empty list of Child ids or an empty text would result in a reduced height field displayed
+      in the Bookmark Hitory window.
+    - Adjusted behavior to close the search pane only when there is a show, for the "After "Show bookmark", close search pane."
+      option.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/181
+    - Prevented default handling of keys when typing non interpreted keystrokes in search pane or in bookmark pane.
+      E.g. pressing <space> was scrolling down by one "page".
+    - Cleaned up a spurious trace in the browser console.
+    - Changed the BSP2 Linux shortcut to Ctrl+Alt+B, since this shortcut which was free at beginning of BSP2 is now taken
+      by FF for the Bookmark toolbar :-(
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/182
+    - Introduced internal code support in History window for handling display of Undo/Redo in two modes: linked to the bookmark
+      they are related to, or at their time position in raw list.
+    - Added more internal code support in History window for handling display of multiple selection operations
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/29
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/163
+    - Improved History display speed.
+    - Added real time update of favicons in History window when it is open
+    - Corrected a long standing regression happening in rare cases, where a favicon refresh is not properly displaying refreshed
+      image. 
+    - Slightly improved bookmark pane and search pane display speeds.
+    - Countered change introduced in FF86, which is setting passive option by default to true for wheel events, preventing to
+      disable Ctrl+mouse wheel zooming out and in .. Change introduced by FF with no warning :-(.
+      Now always forcing passive to false on such events
+        https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener
+    - Corrected an exception generated when switching to, or when showing BSP2 toolbar icon context menu for, a tab with "blob:"
+      type of URL.
+    - Adjusted error logging, because the message error interface changed attribute fileName to filename in some places
+      (without saying ... :-( ).
+    - Added a timeout on getting response.text on fetch favicon, for a few cases like http://radio10.pro-fhi.net/flux-qlvuthph/192stream
+      where it never returns a value.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/184
 - 2.0.89 Improvements
     - When showing a row from a search result, unhide also all chidren of already open sub-folders on the path to that row : their
       content is meant to be seen, for consistency with their twistie open state. So far, content of sibbling folders which were open
