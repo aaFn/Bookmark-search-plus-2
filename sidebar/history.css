@@ -38,6 +38,14 @@ body {
   flex-direction: column;
 }
 
+#displayopt {
+  margin: 0 0 0 0;
+  border: 1px solid #F0F0F0;
+  border-right-color: #E0E0E0;
+  background: #F0F0F0;
+  flex: none;
+}
+
 #bookmarks {
   margin: 0 0 0 0;
   border-top: 1px solid white;
@@ -234,7 +242,7 @@ tbody {
   margin-bottom: -2px;
 }
 
-.bkmkitem_b {
+.bkmkitem_b, .bkmkitem_f, .bkmkitem_mlst, .bkmkitem_mb, .bkmkitem_mf, .bkmkitem_urlst, .bkmkitem_u, .bkmkitem_r {
   flex: none;
   display: flex;
   flex-direction: row;
@@ -246,7 +254,7 @@ tbody {
   margin-bottom: -2px;
 }
 
-.bkmkitem_f {
+.bkmkitem_mb, .bkmkitem_mf, .bkmkitem_urlst, .bkmkitem_u, .bkmkitem_r {
   flex: none;
   display: flex;
   flex-direction: row;
@@ -256,6 +264,7 @@ tbody {
   border-bottom: solid 2px transparent;
   margin-top: -2px;
   margin-bottom: -2px;
+  margin-left: 16px;
 }
 
 .bkmkitem_s {
@@ -269,12 +278,24 @@ tbody {
   margin-bottom: -2px;
 }
 
+.bkmkitem_ms {
+  flex: auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-top: solid 2px transparent;
+  border-bottom: solid 2px transparent;
+  margin-top: -2px;
+  margin-bottom: -2px;
+  margin-left: 16px;
+}
+
 .favseparator {
   flex: auto;
   border-bottom: 1px solid #222426;
 }
 
-.brow:hover .bkmkitem_s .favseparator, .brow:focus .bkmkitem_s .favseparator, .selbrow .bkmkitem_s .favseparator {
+.brow:hover .favseparator, .brow:focus .favseparator, .selbrow .favseparator {
   border-bottom-color: #222426;
 }
 
@@ -292,12 +313,47 @@ tbody {
   background-image: url("/icons/folder.png");
 }
 
+.mfavicon {
+  flex: none;
+  height: 16px;
+  width: 16px;
+  vertical-align: text-bottom;
+  background-image: url("/icons/multiple.png");
+}
+
 .nofavicon {
   flex: none;
   height: 16px;
   width: 16px;
   vertical-align: text-bottom;
   background-image: url("/icons/nofavicon.png");
+}
+
+.vbar {
+  flex: none;
+  height: 16px;
+  width: 16px;
+  margin-left: 20px;
+  margin-right: 16px;
+  vertical-align: text-bottom;
+  background-image: url("/icons/vbar.png");
+}
+
+.vbarend {
+  flex: none;
+  height: 16px;
+  width: 16px;
+  margin-left: 20px;
+  vertical-align: text-bottom;
+  background-image: url("/icons/vbarend.png");
+}
+
+.urfavicon {
+  flex: none;
+  height: 16px;
+  width: 16px;
+  vertical-align: text-bottom;
+  background-image: url("/icons/urfavicon.png");
 }
 
 .favicon {
@@ -307,9 +363,62 @@ tbody {
   vertical-align: text-bottom;
 }
 
+.uritemicon {
+  flex: none;
+  height: 16px;
+  width: 16px;
+  margin-left: 52px;
+  vertical-align: text-bottom;
+}
+
+.undo {
+  background-image: url("/icons/undo.png");
+}
+
+.redo {
+  background-image: url("/icons/redo.png");
+}
+
 .favtext {
   margin-left: 3px;
   white-space: pre;
+}
+
+.favtextm {
+  margin-left: 3px;
+  white-space: pre;
+  color: #808080;
+  font-style: italic;
+}
+
+.incompleteop {
+  color: red;
+}
+
+.twistieac {
+  flex: none;
+  height: 16px;
+  width: 16px;
+  vertical-align: text-bottom;
+  background-image: url("/icons/twistieac.png");
+  cursor: pointer;
+}
+
+.brow:hover .twistieac, .selbrow:hover .twistieac {
+  background-image: url("/icons/twistieacf.png");
+}
+
+.twistieao {
+  flex: none;
+  height: 16px;
+  width: 16px;
+  vertical-align: text-bottom;
+  background-image: url("/icons/twistieao.png");
+  cursor: pointer;
+}
+
+.brow:hover .twistieao, .selbrow:hover .twistieao {
+  background-image: url("/icons/twistieaof.png");
 }
 
 #node {

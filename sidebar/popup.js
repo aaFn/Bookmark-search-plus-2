@@ -520,7 +520,7 @@ browser.runtime.getPlatformInfo().then(function(info){
 
 	  // General event handler for keyboard or mouse actions
 	  addEventListener("keydown", keyHandler, true);
-	  addEventListener('wheel', onWheel, {capture: true}); // To disable zooming
+	  addEventListener('wheel', onWheel, {capture: true, passive: false}); // To disable zooming
 
 	  // Catch commited changes to each input box contents
 	  TitleInput.addEventListener("change", titleInputHandler);

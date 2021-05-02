@@ -1013,7 +1013,7 @@ function resetSidebarCommand () {
   }
   else if (platformOs == "linux") {
 	cmd1 = "Ctrl";
-	cmd2 = "Shift";
+	cmd2 = "Alt";
 	cmd3 = "B";
   }
   else if (platformOs == "mac") {

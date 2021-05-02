@@ -19,6 +19,8 @@ const Body = document.querySelector("#body"); // Assuming it is an HTMLBodyEleme
 const HPane = document.querySelector("#pane"); // Assuming it is an HTMLDivElement
 const HNode = document.querySelector("#node"); // Assuming it is an HTMLDivElement
 const HActions = document.querySelector("#actions"); // Assuming it is an HTMLDivElement
+const URListInput = document.querySelector("#urlist"); // Assuming it is an HTMLInputElement
+const RawListInput = document.querySelector("#rawlist"); // Assuming it is an HTMLInputElement
 const Bookmarks = document.querySelector("#bookmarks"); // Assuming it is an HTMLDivElement
 const NDNum = document.querySelector("#ndnum"); // Assuming it is an HTMLSpanElement
 const NDTimestamp = document.querySelector("#ndtimestamp"); // Assuming it is an HTMLSpanElement
@@ -76,18 +78,18 @@ MetaTempl.classList.add("meta");
 MetaTempl.draggable = false; // False by default for <div>
 let tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("seqnum");
-tmpElem1.draggable = false; // True by default for <img>
+tmpElem1.draggable = false;
 MetaTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 										  // Not using <img> since with FF65 and later, they
 										  // show default box-shadow: inset when the src=
 										  // attribute is not specified.
 tmpElem1.classList.add("nocursor");
-tmpElem1.draggable = false; // True by default for <img>
+tmpElem1.draggable = false;
 MetaTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("histicon");
-tmpElem1.draggable = false; // True by default for <img>
+tmpElem1.draggable = false;
 MetaTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
 tmpElem1.classList.add("favtext");
@@ -127,19 +129,19 @@ SFolderTempl.classList.add("bkmkitem_f");
 SFolderTempl.draggable = false; // False by default for <div>
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("seqnum");
-tmpElem1.draggable = false; // True by default for <img>
+tmpElem1.draggable = false;
 SFolderTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("nocursor");
-tmpElem1.draggable = false; // True by default for <img>
+tmpElem1.draggable = false;
 SFolderTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("histicon");
-tmpElem1.draggable = false; // True by default for <img>
+tmpElem1.draggable = false;
 SFolderTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("img"); // Assuming it is an HTMLImageElement
 tmpElem1.classList.add("favicon");
-tmpElem1.draggable = false; // True by default for <img>
+tmpElem1.draggable = false;
 SFolderTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
 tmpElem1.classList.add("favtext");
@@ -153,19 +155,19 @@ SeparatorTempl.classList.add("bkmkitem_s");
 SeparatorTempl.draggable = false; // False by default for <div>
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("seqnum");
-tmpElem1.draggable = false; // True by default for <img>
+tmpElem1.draggable = false;
 SeparatorTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("nocursor");
-tmpElem1.draggable = false; // True by default for <img>
+tmpElem1.draggable = false;
 SeparatorTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("histicon");
-tmpElem1.draggable = false; // True by default for <img>
+tmpElem1.draggable = false;
 SeparatorTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("favseparator");
-tmpElem1.draggable = false; // False by default for <div>
+tmpElem1.draggable = false;
 SeparatorTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("favseparatorend");
@@ -179,15 +181,15 @@ BookmarkTempl.classList.add("bkmkitem_b");
 BookmarkTempl.draggable = false; // False by default for <div> 
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("seqnum");
-tmpElem1.draggable = false; // True by default for <img>
+tmpElem1.draggable = false;
 BookmarkTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("nocursor");
-tmpElem1.draggable = false; // True by default for <img>
+tmpElem1.draggable = false;
 BookmarkTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("histicon");
-tmpElem1.draggable = false; // True by default for <img>
+tmpElem1.draggable = false;
 BookmarkTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("img"); // Assuming it is an HTMLImageElement
 tmpElem1.classList.add("favicon");
@@ -207,15 +209,15 @@ NFBookmarkTempl.classList.add("bkmkitem_b");
 NFBookmarkTempl.draggable = false; // False by default for <div> 
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("seqnum");
-tmpElem1.draggable = false; // True by default for <img>
+tmpElem1.draggable = false;
 NFBookmarkTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("nocursor");
-tmpElem1.draggable = false; // True by default for <img>
+tmpElem1.draggable = false;
 NFBookmarkTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("histicon");
-tmpElem1.draggable = false; // True by default for <img>
+tmpElem1.draggable = false;
 NFBookmarkTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLImageElement
 										  // Not using <img> since with FF65 and later, they
@@ -228,6 +230,189 @@ tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
 tmpElem1.classList.add("favtext");
 tmpElem1.draggable = false; // False by default for <span>
 NFBookmarkTempl.appendChild(tmpElem1);
+/*
+ *******  Prepare Multiple selection structure for node cloning
+ */
+const MultiSelTempl = document.createElement("div"); // Assuming it is an HTMLDivElement
+MultiSelTempl.classList.add("bkmkitem_mlst");
+MultiSelTempl.draggable = false; // False by default for <div>
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("seqnum");
+tmpElem1.draggable = false;
+MultiSelTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("nocursor");
+tmpElem1.draggable = false;
+MultiSelTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("histicon");
+tmpElem1.draggable = false;
+MultiSelTempl.appendChild(tmpElem1);
+let tmpElem2 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem2.classList.add("mfavicon");
+tmpElem2.draggable = false;
+MultiSelTempl.appendChild(tmpElem2);
+let tmpElem3 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem3.classList.add("twistieac");
+tmpElem3.draggable = false; // False by default for <div>
+MultiSelTempl.appendChild(tmpElem3);
+tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
+tmpElem2.title = tmpElem3.title = tmpElem1.title = tmpElem1.textContent = "Multiple selection";
+tmpElem1.classList.add("favtextm");
+tmpElem1.draggable = false; // False by default for <span>
+MultiSelTempl.appendChild(tmpElem1);
+/*
+ *******  Prepare standard Folder Item in Multiple selection structure for node cloning
+ */
+const ItemFMultiSelTempl = document.createElement("div"); // Assuming it is an HTMLDivElement
+ItemFMultiSelTempl.classList.add("bkmkitem_mf");
+ItemFMultiSelTempl.draggable = false; // False by default for <div>
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("seqnum");
+tmpElem1.draggable = false;
+ItemFMultiSelTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("vbar");
+tmpElem1.draggable = false;
+ItemFMultiSelTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("ffavicon");
+tmpElem1.draggable = false;
+ItemFMultiSelTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
+tmpElem1.classList.add("favtextm");
+tmpElem1.draggable = false; // False by default for <span>
+ItemFMultiSelTempl.appendChild(tmpElem1);
+/*
+ *******  Prepare separator Item in Multiple selection structure for node cloning
+ */
+const ItemSMultiSelTempl = document.createElement("div"); // Assuming it is an HTMLDivElement
+ItemSMultiSelTempl.classList.add("bkmkitem_ms");
+ItemSMultiSelTempl.draggable = false; // False by default for <div>
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("seqnum");
+tmpElem1.draggable = false;
+ItemSMultiSelTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("vbar");
+tmpElem1.draggable = false;
+ItemSMultiSelTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("favseparator");
+tmpElem1.draggable = false;
+ItemSMultiSelTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("favseparatorend");
+tmpElem1.draggable = false; // False by default for <div>
+ItemSMultiSelTempl.appendChild(tmpElem1);
+/*
+ *******  Prepare bookmark Item in Multiple selection structure for node cloning
+ */
+const ItemBMultiSelTempl = document.createElement("div"); // Assuming it is an HTMLDivElement
+ItemBMultiSelTempl.classList.add("bkmkitem_mb");
+ItemBMultiSelTempl.draggable = false; // False by default for <div>
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("seqnum");
+tmpElem1.draggable = false;
+ItemBMultiSelTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("vbar");
+tmpElem1.draggable = false;
+ItemBMultiSelTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("img"); // Assuming it is an HTMLImageElement
+tmpElem1.classList.add("favicon");
+tmpElem1.draggable = false; // True by defaul for <img>
+ItemBMultiSelTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
+tmpElem1.classList.add("favtext");
+tmpElem1.draggable = false; // False by default for <span>
+ItemBMultiSelTempl.appendChild(tmpElem1);
+/*
+ *******  Prepare nofavicon bookmark Item in Multiple selection structure for node cloning
+ */
+const ItemNFBMultiSelTempl = document.createElement("div"); // Assuming it is an HTMLDivElement
+ItemNFBMultiSelTempl.classList.add("bkmkitem_mb");
+ItemNFBMultiSelTempl.draggable = false; // False by default for <div>
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("seqnum");
+tmpElem1.draggable = false;
+ItemNFBMultiSelTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("vbar");
+tmpElem1.draggable = false;
+ItemNFBMultiSelTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("div");
+tmpElem1.classList.add("nofavicon");
+tmpElem1.draggable = false; // True by defaul for <img>
+ItemNFBMultiSelTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
+tmpElem1.classList.add("favtext");
+tmpElem1.draggable = false; // False by default for <span>
+ItemNFBMultiSelTempl.appendChild(tmpElem1);
+/*
+ *******  Prepare Undo/Redo list structure for node cloning
+ */
+const URListTempl = document.createElement("div"); // Assuming it is an HTMLDivElement
+URListTempl.classList.add("bkmkitem_urlst");
+URListTempl.draggable = false; // False by default for <div>
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("seqnum");
+tmpElem1.draggable = false;
+URListTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("vbarend");
+tmpElem1.draggable = false;
+URListTempl.appendChild(tmpElem1);
+tmpElem2 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem2.classList.add("urfavicon");
+tmpElem2.draggable = false;
+URListTempl.appendChild(tmpElem2);
+tmpElem3 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem3.classList.add("twistieac");
+tmpElem3.draggable = false; // False by default for <div>
+URListTempl.appendChild(tmpElem3);
+tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
+tmpElem2.title = tmpElem3.title = tmpElem1.title = tmpElem1.textContent = "Undo/redo list";
+tmpElem1.classList.add("favtextm");
+tmpElem1.draggable = false; // False by default for <span>
+URListTempl.appendChild(tmpElem1);
+/*
+ *******  Prepare Undo item structure for node cloning
+ */
+const UItemTempl = document.createElement("div"); // Assuming it is an HTMLDivElement
+UItemTempl.classList.add("bkmkitem_u");
+UItemTempl.draggable = false; // False by default for <div>
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("seqnum");
+tmpElem1.draggable = false;
+UItemTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("ufavicon");
+tmpElem1.draggable = false;
+UItemTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
+tmpElem1.classList.add("favtextm");
+tmpElem1.draggable = false; // False by default for <span>
+UItemTempl.appendChild(tmpElem1);
+/*
+ *******  Prepare Redo item structure for node cloning
+ */
+const RItemTempl = document.createElement("div"); // Assuming it is an HTMLDivElement
+RItemTempl.classList.add("bkmkitem_u");
+RItemTempl.draggable = false; // False by default for <div>
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("seqnum");
+tmpElem1.draggable = false;
+RItemTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("rfavicon");
+tmpElem1.draggable = false;
+RItemTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
+tmpElem1.classList.add("favtextm");
+tmpElem1.draggable = false; // False by default for <span>
+RItemTempl.appendChild(tmpElem1);
+
 tmpElem1 = undefined;
 
 
@@ -294,13 +479,74 @@ function setSearchOptions () {
 }
 
 /*
+ * Handle click on URList radio button
+ *
+ */
+function handleURListClick () {
+  if (!historyDispURList_option) { // Option is changed
+	historyDispURList_option = true;
+	browser.storage.local.set({
+	  historydispurlist_option: true
+	})
+	.then(
+	  function () {
+		// Signal change to options to all
+		sendAddonMessage("savedOptions");
+	  }
+	);
+
+	// Empty table and re-display the history pane content
+	let newTable = document.createElement("table");
+	Bookmarks.replaceChild(newTable, bookmarksTable);
+	bookmarksTable = newTable;
+	displayHNList(curHNList.hnList);
+
+	// Go to and show the current active position (cursor)
+	goHNItem(curHNList.activeIndex);
+	lastActiveIndex = undefined; // Force redisplay of cursor
+	setUndoRedoCursor();
+  }
+}
+
+/*
+ * Handle click on RawList radio button
+ *
+ */
+function handleRawListClick () {
+  if (historyDispURList_option) { // Option is changed
+	historyDispURList_option = false;
+	browser.storage.local.set({
+	  historydispurlist_option: false
+	})
+	.then(
+	  function () {
+		// Signal change to options to all
+		sendAddonMessage("savedOptions");
+	  }
+	);
+
+	// Empty table and re-display the history pane content
+	let newTable = document.createElement("table");
+	Bookmarks.replaceChild(newTable, bookmarksTable);
+	bookmarksTable = newTable;
+	displayHNList(curHNList.hnList);
+
+	// Go to and show the current active position (cursor)
+	goHNItem(curHNList.activeIndex);
+	lastActiveIndex = undefined; // Force redisplay of cursor
+	setUndoRedoCursor();
+  }
+}
+
+/*
  * Append a bookmark HistoryNode inside the "pane" table
  *
- * id = Integer, id of the record in the list
+ * id = Integer, index of the record in the HN list
  * HN = HistoryNode
  *
  * Returns: the inserted row (an HTMLTableRowElement).
  */
+let isDisplayComplete = false;
 function appendBookmarkHN (id, HN) {
   // Append new row inside the bookmarks table
   let row = curRowList[id] = bookmarksTable.insertRow(-1);
@@ -318,7 +564,7 @@ function appendBookmarkHN (id, HN) {
   let type = map.type;
   let t = new Date (HN.timestamp);
   let tStr = t.toLocaleString();
-  if (type != undefined) {				// Meta node
+  if (type != undefined) {				// Meta node, only value is "meta" for now
 	row.dataset.type = type;
 	let div = MetaTempl.cloneNode(true);
 	let seqnum = div.firstElementChild;
@@ -333,124 +579,171 @@ function appendBookmarkHN (id, HN) {
   }
   else {
 	type = row.dataset.type = HN.type;
-	if (type == "folder") {				// Folder
-	  let div, seqnum, cursor, histicon, img;
-	  let uri = HN.faviconUri;
-	  if ((uri != undefined) && (uri != "/icons/folder.png")) { // Special folder
-		div = SFolderTempl.cloneNode(true);
+	let div, seqnum;
+	let revOp = HN.revOp; // If undefined, normal operation, else undo or redo
+	if ((revOp != undefined) && historyDispURList_option) { // Special display as URList item
+	  let textOp;
+	  if (revOp == HNREVOP_ISUNDO) {
+		div = UItemTempl.cloneNode(true);
+		textOp = "undo ";
+	  }
+	  else { // Must be HNREVOP_ISREDO
+		div = RItemTempl.cloneNode(true);
+		textOp = "redo ";
+	  }
+	  seqnum = div.firstElementChild;
+	  let img = seqnum.nextElementSibling;
+	  let span = img.nextElementSibling;
+	  let op = map.title;
+	  seqnum.title = img.title = span.title = textOp + op + "\n" + tStr;
+	  span.textContent = textOp + op + tStr;
+	}
+	else {
+	  let cursor, histicon;
+	  if (HN.is_multi == true) {					// Multiple bookmarks action
+		div = MultiSelTempl.cloneNode(true);
 		seqnum = div.firstElementChild;
 		cursor = seqnum.nextElementSibling;
 		histicon = cursor.nextElementSibling;
 		img = histicon.nextElementSibling;
-		img.src = uri;
+		if (!HN.is_complete) { // Color text in red, as incomplete
+		  let span = img.nextElementSibling;
+		  span.classList.add("incompleteop");
+		}
 	  }
-	  else {
+	  else if (type == "folder") {				// Folder
+		let img;
+		let uri = HN.faviconUri;
+		if (HN.multi_HNref) { // Item is part of a multi-selection operation
+		  row.draggable = true; // Note: it is false by default for <tr>
+		  div = ItemFMultiSelTempl.cloneNode(true);
+		  seqnum = div.firstElementChild;
+		  img = seqnum.nextElementSibling.nextElementSibling;
+		}
+		else if ((uri != undefined) && (uri != "/icons/folder.png")) { // Special folder
+		  div = SFolderTempl.cloneNode(true);
+		  seqnum = div.firstElementChild;
+		  cursor = seqnum.nextElementSibling;
+		  histicon = cursor.nextElementSibling;
+		  img = histicon.nextElementSibling;
+		  img.src = uri;
+		}
+		else {
+		  row.draggable = true; // Note: it is false by default for <tr>
+		  div = FolderTempl.cloneNode(true);
+		  seqnum = div.firstElementChild;
+		  cursor = seqnum.nextElementSibling;
+		  histicon = cursor.nextElementSibling;
+		  img = histicon.nextElementSibling;
+		}
+		let span = img.nextElementSibling;
+		let toTitle = HN.toTitle;
+		if (toTitle == undefined) {
+		  toTitle = HN.title;
+		}
+		img.title = span.title = span.textContent = toTitle;
+	  }
+	  else if (type == "separator") {				// Separator
 		row.draggable = true; // Note: it is false by default for <tr>
-		div = FolderTempl.cloneNode(true);
-		seqnum = div.firstElementChild;
-		cursor = seqnum.nextElementSibling;
-		histicon = cursor.nextElementSibling;
-		img = histicon.nextElementSibling;
+		if (HN.multi_HNref) { // Item is part of a multi-selection operation
+		  row.draggable = true; // Note: it is false by default for <tr>
+		  div = ItemSMultiSelTempl.cloneNode(true);
+		  seqnum = div.firstElementChild;
+		  img = seqnum.nextElementSibling.nextElementSibling;
+		}
+		else {
+		  div = SeparatorTempl.cloneNode(true);
+		  seqnum = div.firstElementChild;
+		  seqnum.textContent = id;
+		  cursor = seqnum.nextElementSibling;
+		  histicon = cursor.nextElementSibling;
+		}
 	  }
-	  let span = img.nextElementSibling;
+	  else {										// Presumably a Bookmark
+		row.draggable = true; // Note: it is false by default for <tr>
+		let img;
+		let uri;
+		if (disableFavicons_option || ((uri = HN.faviconUri) == undefined)) { // Clone with nofavicon image background
+		  if (HN.multi_HNref) { // Item is part of a multi-selection operation
+			div = ItemNFBMultiSelTempl.cloneNode(true);
+			seqnum = div.firstElementChild;
+			img = seqnum.nextElementSibling.nextElementSibling;
+		  }
+		  else {
+			div = NFBookmarkTempl.cloneNode(true);
+			seqnum = div.firstElementChild;
+			cursor = seqnum.nextElementSibling;
+			histicon = cursor.nextElementSibling;
+			img = histicon.nextElementSibling;
+		  }
+		}
+		else { // Clone normal one
+		  if (HN.multi_HNref) { // Item is part of a multi-selection operation
+			div = ItemBMultiSelTempl.cloneNode(true);
+			seqnum = div.firstElementChild;
+			img = seqnum.nextElementSibling.nextElementSibling;
+		  }
+		  else {
+			div = BookmarkTempl.cloneNode(true);
+			seqnum = div.firstElementChild;
+			cursor = seqnum.nextElementSibling;
+			histicon = cursor.nextElementSibling;
+			img = histicon.nextElementSibling;
+		  }
+		  if (isDisplayComplete) { // When we are on initial display, we will fill the image later
+			img.src = uri;
+		  }
+		}
+		let span = img.nextElementSibling;
+		let toUrl = HN.toUrl;
+		if (toUrl == undefined) {
+		  toUrl = HN.url;
+		}
+		let toTitle = HN.toTitle;
+		if (toTitle == undefined) {
+		  toTitle = HN.title;
+		}
+		if (toTitle == "") {
+		  img.title = span.title = toUrl;
+		  span.textContent = suggestDisplayTitle(toUrl);
+		}
+		else {
+		  img.title = span.title = toTitle+"\n"+toUrl;
+		  span.textContent = toTitle;
+		}
+	  }
 	  seqnum.textContent = id;
-	  seqnum.title = cursor.title = histicon.title = map.title + "\n" + tStr;
-	  let revOp = HN.revOp;
+	  let textOp;
 	  if (revOp == undefined) {
-		histicon.classList.add(map.nclass);
+		if (histicon != undefined) {
+		  histicon.classList.add(map.nclass);
+		}
+	    textOp = "";
 	  }
 	  else if (revOp == HNREVOP_ISUNDO) {
-		histicon.classList.add(map.uclass);
+		if (histicon != undefined) {
+		  histicon.classList.add(map.uclass);
+		}
+	    textOp = "undo";
 	  }
 	  else if (revOp == HNREVOP_ISREDO) {
-		histicon.classList.add(map.rclass);
+		if (histicon != undefined) {
+		  histicon.classList.add(map.rclass);
+		}
+	    textOp = "redo";
 	  }
-	  let toTitle = HN.toTitle;
-	  if (toTitle == undefined) {
-		toTitle = HN.title;
+	  let t = seqnum.title = textOp + map.title + "\n" + tStr;
+	  if (cursor != undefined) {
+		cursor.title = t;
 	  }
-	  img.title = span.title = span.textContent = toTitle;
-	  if (HN.state == HNSTATE_INACTIVEBRANCH) {
-		div.classList.add("inactive");
+	  if (histicon != undefined) {
+		histicon.title = t;
 	  }
-	  cell.appendChild(div);
 	}
-	else if (type == "separator") {		// Separator
-	  row.draggable = true; // Note: it is false by default for <tr>
-	  let div = SeparatorTempl.cloneNode(true);
-	  let seqnum = div.firstElementChild;
-	  seqnum.textContent = id;
-	  let cursor = seqnum.nextElementSibling;
-	  let histicon = cursor.nextElementSibling;
-	  seqnum.title = cursor.title = histicon.title = map.title + "\n" + tStr;
-	  let revOp = HN.revOp;
-	  if (revOp == undefined) {
-		histicon.classList.add(map.nclass);
-	  }
-	  else if (revOp == HNREVOP_ISUNDO) {
-		histicon.classList.add(map.uclass);
-	  }
-	  else if (revOp == HNREVOP_ISREDO) {
-		histicon.classList.add(map.rclass);
-	  }
-	  if (HN.state == HNSTATE_INACTIVEBRANCH) {
-		div.classList.add("inactive");
-	  }
-	  cell.appendChild(div);
+	if (HN.state == HNSTATE_INACTIVEBRANCH) {
+	  div.classList.add("inactive");
 	}
-	else {								// Presumably a Bookmark
-	  row.draggable = true; // Note: it is false by default for <tr>
-	  let div, seqnum, cursor, histicon, img;
-	  let uri;
-	  if (disableFavicons_option || ((uri = HN.faviconUri) == undefined)) { // Clone with nofavicon image background
-		div = NFBookmarkTempl.cloneNode(true);
-		seqnum = div.firstElementChild;
-		cursor = seqnum.nextElementSibling;
-		histicon = cursor.nextElementSibling;
-		img = histicon.nextElementSibling;
-	  }
-	  else { // Clone normal one, we will fill the image later
-		div = BookmarkTempl.cloneNode(true);
-		seqnum = div.firstElementChild;
-		cursor = seqnum.nextElementSibling;
-		histicon = cursor.nextElementSibling;
-		img = histicon.nextElementSibling;
-		img.src = uri;
-	  }
-	  let span = img.nextElementSibling;
-	  seqnum.textContent = id;
-	  seqnum.title = cursor.title = histicon.title = map.title + "\n" + tStr;
-	  let revOp = HN.revOp;
-	  if (revOp == undefined) {
-		histicon.classList.add(map.nclass);
-	  }
-	  else if (revOp == HNREVOP_ISUNDO) {
-		histicon.classList.add(map.uclass);
-	  }
-	  else if (revOp == HNREVOP_ISREDO) {
-		histicon.classList.add(map.rclass);
-	  }
-	  let toUrl = HN.toUrl;
-	  if (toUrl == undefined) {
-		toUrl = HN.url;
-	  }
-	  let toTitle = HN.toTitle;
-	  if (toTitle == undefined) {
-		toTitle = HN.title;
-	  }
-	  if (toTitle == "") {
-		img.title = span.title = toUrl;
-		span.textContent = suggestDisplayTitle(toUrl);
-	  }
-	  else {
-		img.title = span.title = toTitle+"\n"+toUrl;
-		span.textContent = toTitle;
-	  }
-	  if (HN.state == HNSTATE_INACTIVEBRANCH) {
-		div.classList.add("inactive");
-	  }
-	  cell.appendChild(div);
-	}
+	cell.appendChild(div);
   }
 
   return(row);
@@ -458,7 +751,7 @@ function appendBookmarkHN (id, HN) {
 
 /*
  * Refresh an existing bookmark HistoryNode inside the "pane" table.
- * Only its state (-> become inactive), or reversion/relHNref can change
+ * Only its state (-> become inactive), is_complete (-> become complete), reversion and revOp_HNref can change
  *
  * id = Integer, id of the record in the list
  * HN = HistoryNode
@@ -475,6 +768,43 @@ function refreshBookmarkHN (id, HN) {
   if ((HN.state == HNSTATE_INACTIVEBRANCH) && !div.classList.contains("inactive")) {
 	div.classList.add("inactive");
   }
+  if (HN.is_complete == true) {
+	let span = cell.lastElementChild;
+	if (div.classList.contains("incompleteop")) {
+	  span.classList.remove("incompleteop")
+	}
+  }	
+
+  // If row is in Node display, update it
+  if (cellHighlight == cell) {
+	if (row.dataset.type != "urlist") {
+	  displayHN(id);
+	}
+  }
+
+  return(row);
+}
+
+/*
+ * Append an undo / redo list inside the "pane" table
+ *
+ * Returns: the inserted row (an HTMLTableRowElement).
+ */
+function appendURList () {
+  // Append new row inside the bookmarks table
+  let row = bookmarksTable.insertRow(-1);
+  row.draggable = false; // True by default for <tr>
+
+  // Add UR List template in row
+  let cell = row.insertCell();
+  cell.classList.add("brow");
+  cell.tabIndex = 0;
+//  cell.draggable = false; // False by default for <td>
+
+  // Append UR List contents to the cell:
+  row.dataset.type = "urlist";
+  let div = URListTempl.cloneNode(true);
+  cell.appendChild(div);
 
   return(row);
 }
@@ -537,7 +867,7 @@ function setCellHighlight (cell) {
  * text: whatever ... but will finish as a String
  */
 function displayField (node, text) {
-  if (text == undefined) {
+  if ((text == undefined) || (text.length == 0)) {
 	node.textContent = NBSP;
   }
   else {
@@ -584,6 +914,22 @@ function displayHN (hnId) {
   let HN = curHNList.hnList[hnId];
   let t = new Date (HN.timestamp);
   NDTimestamp.textContent = t.toLocaleString();
+  let actionText;
+  let is_multi = HN.is_multi;
+  if (is_multi == true) {
+	actionText = "multi bookmarks (";
+	if (HN.is_complete) {
+	  actionText += "complete) "; 
+	  NDAction.style = "";
+	}
+	else {
+	  actionText += "incomplete) ";
+	  NDAction.classList.add("incompleteop");
+	}
+  }
+  else {
+	actionText = "";
+  }
   let action = HN.action;
   let map = MapAction[action];
   let revOp = HN.revOp;
@@ -593,17 +939,17 @@ function displayHN (hnId) {
 	  NDAction.textContent = map.title;
 	}
 	else if (reversion == HNREVERSION_UNDONE) {
-	  NDAction.textContent = map.title+" (undone by record #)"+hnId+HN.relHNref;
+	  NDAction.textContent = actionText+map.title+" (undone by record #)"+hnId+HN.revOp_HNref;
 	}
 	else if (reversion == HNREVERSION_RENDONE) {
-	  NDAction.textContent = map.title+" (redone by record #)"+hnId+HN.relHNref;
+	  NDAction.textContent = actionText+map.title+" (redone by record #)"+hnId+HN.revOp_HNref;
 	}
   }
   else if (revOp == HNREVOP_ISUNDO) {
-	NDAction.textContent = "undo "+map.title+" of record #"+hnId+HN.relHNref;
+	NDAction.textContent = "undo "+actionText+map.title+" of record #"+hnId+HN.revOp_HNref;
   }
   else if (revOp == HNREVOP_ISREDO) {
-	NDAction.textContent = "redo "+map.title+" of record #"+hnId+HN.relHNref;
+	NDAction.textContent = "redo "+actionText+map.title+" of record #"+hnId+HN.revOp_HNref;
   }
   if (HN.state == HNSTATE_INACTIVEBRANCH) {
 	NDState.textContent = "Inactive branch";
@@ -674,6 +1020,33 @@ function displayHN (hnId) {
 	displayField(NDToUrl, HN.toUrl);
 	displayField(NDToChildIds, HN.toChildIds);
   }
+}
+
+/*
+ * Display for an Undo /redo list Node in the "node" panel
+ */
+function displayURList () {
+  NDNum.textContent = NBSP;
+  NDTimestamp.textContent = NBSP;
+  NDAction.style = "";
+  NDAction.textContent = "Undo / redo list";
+  NDState.textContent = NBSP;
+  NDBNId.textContent = NBSP;
+  NDType.textContent = type;
+  NDParentId.textContent = NBSP;
+  NDIndex.textContent = NBSP;
+  NDPath.textContent = NBSP;
+  NDTitle.textContent = NBSP;
+  NDFavicon.style = "";
+  NDFavicon.className = "urfavicon";
+  NDUrl.textContent = NBSP;
+  NDChildIds.textContent = NBSP;
+  NDToParentId.textContent = NBSP;
+  NDToIndex.textContent = NBSP;
+  NDToPath.textContent = NBSP;
+  NDToTitle.textContent = NBSP;
+  NDToUrl.textContent = NBSP;
+  NDToChildIds.textContent = NBSP;
 }
 
 /*
@@ -1056,24 +1429,62 @@ function setPanelFolderImg (useAltFldr_option, altFldrImg_option) {
  *
  * hnList = Array of HN
  */
-let lastHNListLen;
+let lastHNListLen; // Length of last displayed list
 function displayHNList (hnList) {
+  isDisplayComplete = false;
   let HN;
   lastHNListLen = hnList.length;
   for (let i=0 ; i<lastHNListLen ; i++) {
 	HN = hnList[i];
-	appendBookmarkHN(i, HN);
+	let revop;
+	if ((HN.multi_HNref == undefined)		// Do not display items part of a multiple selection as they are done with their "parent"
+		&& (!historyDispURList_option || ((revop = HN.revOp) == undefined))	// If historyDispURList_option, do not display undo/redo, they are done after each bookamrk item
+	   ) {
+	  appendBookmarkHN(i, HN);
+	  if (HN.is_multi) { // Display all multiple selection "children" now
+		let hnref_list = HN.hnref_list;
+		let len = hnref_list.length;
+		let k;
+		for (let j=0 ; j<len ; j++) {
+		  k = i + hnref_list[j]; // Calculate absolute position of "child"
+		  appendBookmarkHN(k, hnList[k]); // Display "child"
+		}
+	  }
+	  let reversion = HN.reversion;
+	  if (historyDispURList_option && (reversion != undefined) && (reversion > 0)) { // Special display of URList items
+		appendURList(); // Create a new URList header
+		// Now display all redo / undo actions as URList items
+		let hnref_list = HN.revOp_HNref_list;
+		let k;
+		if (hnref_list != undefined) {
+		  let len = hnref_list.length;
+		  for (let j=0 ; j<len ; j++) {
+			k = i + hnref_list[j]; // Calculate absolute position of "child"
+			appendBookmarkHN(k, hnList[k]); // Display "child"
+		  }
+		}
+		// Display last one, not yet in list of inactive ones
+		k = i + revop;
+		appendBookmarkHN(k, hnList[k]); // Display "child"
+	  }
+	}
+  }
+
+  // Finish displaying favicons asynchronously
+  isDisplayComplete = true;
+  if (!disableFavicons_option) {
+	setTimeout(completeFavicons, 0);
   }
 }
 
 /*
- * Iteratively refresh the HN list on an update
+ * Iteratively refresh the HN list on an update, and refresh Node display for selected cell
  *
  * hnList = Array of HN
  */
 function refreshHNList (hnList) {
   let HN;
-  // First refresh existing records (only their state or reversion/relHNref can change)
+  // First refresh existing records (only their state, is_complete, reversion and revOp_HNref can change)
   for (let i=0 ; i<lastHNListLen ; i++) {
 	HN = hnList[i];
 	refreshBookmarkHN(i, HN);
@@ -1085,6 +1496,63 @@ function refreshHNList (hnList) {
 	appendBookmarkHN(i, HN);
   }
   lastHNListLen = len;
+}
+
+/*
+ * Refresh favicon of an existing bookmark inside the "pane" table.
+ *
+ * hnList = Array of HN
+ * bnId = String, id of the bookmark item
+ * uri = String, new faviconuri to show
+ */
+function refreshFavicon (hnList, bnId, uri) {
+  // Update all corresponding rows inside the bookmarks table
+  let len = hnList.length;
+  let HN;
+  for (let i=0 ; i<len ; i++) {
+	HN = hnList[i];
+	if (HN.id == bnId) { // Corresponding HistoryNode, update its row
+	  let row = curRowList[i];
+	  let cell = row.firstElementChild;
+	  let bkmkitem = cell.firstElementChild;
+	  let oldImg;
+	  if (bkmkitem.classList.contains("bkmkitem_b")) {
+		oldImg = bkmkitem.firstElementChild.nextElementSibling.nextElementSibling.nextElementSibling;
+	  }
+	  else { // bkmkitem_mb
+		oldImg = bkmkitem.firstElementChild.nextElementSibling.nextElementSibling;
+	  }
+	  // Set image
+	  let cn = oldImg.className;
+	  if (uri == "/icons/nofavicon.png") {
+		if ((cn == undefined) || !cn.includes("nofavicon")) { // Change to nofavicon only if not already a nofavicon
+		  let tmpElem = document.createElement("div");
+		  tmpElem.classList.add("nofavicon");
+		  tmpElem.draggable = false; // True by default for <img>
+		  bkmkitem.replaceChild(tmpElem, oldImg);
+		}
+	  }
+	  else {
+		if ((cn != undefined) && cn.includes("nofavicon")) { // Change type from <div> to <img> if it was a nofavicon
+		  let tmpElem = document.createElement("img"); // Assuming it is an HTMLImageElement
+		  tmpElem.classList.add("favicon");
+		  tmpElem.draggable = false; // True by default for <img>
+		  tmpElem.src = uri;
+		  bkmkitem.replaceChild(tmpElem, oldImg);
+		}
+		else {
+		  oldImg.src = uri;
+		}
+	  }
+
+	  // If row is in Node display, update it
+	  if (cellHighlight == cell) {
+		if (row.dataset.type != "urlist") {
+		  displayHN(i);
+		}
+	  }
+	}
+  }
 }
 
 /*
@@ -1188,23 +1656,24 @@ function handleAddonMessage (request, sender, sendResponse) {
 //		SearchResult.style.height = "";
 	  }
 	  else if (msg.startsWith("hnListAdd")) { // We are getting a new record appended to curHNList
-		refreshHNList(curHNList.hnList);
+		refreshHNList(curHNList.hnList); // This takes cre also of the Node display
 		// Update undo/redo cursor
 		setUndoRedoCursor();
-		// Update displayed HN
-		if (cellHighlight != null) {
-		  displayHN(cellHighlight.parentElement.dataset.id);
-		}
 	  }
 	  else if (msg.startsWith("hnListClear")) { // History was cleared
  		// Reload ourselves
 		window.location.reload();
 	  }
+	  else if (msg.startsWith("asyncFavicon")) { // Got a favicon uri to refresh
+		let bnId = request.bnId;
+		let uri = request.uri;
+		refreshFavicon (curHNList.hnList, bnId, uri);
+	  }
 	}
 
 	// Answer
 	sendResponse(
-	  {content: "Sidebar:"+myWindowId+" response to "+request.source		
+	  {content: "History:"+myWindowId+" response to "+request.source		
 	  }
 	);
   }
@@ -1212,7 +1681,9 @@ function handleAddonMessage (request, sender, sendResponse) {
 	console.log("Error processing message: "+request.content);
 	if (error != undefined) {
 	  console.log("message:    "+error.message);
-	  console.log("fileName:   "+error.fileName);
+	  let fn = error.fileName;
+	  if (fn == undefined)   fn = error.filename; // Not constant :-( Some errors have filename, and others have fileName 
+	  console.log("fileName:   "+fn);
 	  console.log("lineNumber: "+error.lineNumber);
 	}
   }
@@ -1257,7 +1728,7 @@ async function completeFavicons () {
 
 	  // Display the favicon
 	  let row = curRowList[i];
-	  let img = row.firstElementChild.firstElementChild.firstElementChild.nextElementSibling.nextElementSibling;
+	  let img = row.firstElementChild.firstElementChild.firstElementChild.nextElementSibling.nextElementSibling.nextElementSibling;
 	  img.src = HN.faviconUri;
 	}
   }
@@ -1267,11 +1738,9 @@ async function completeFavicons () {
  * Complete the initial display of bookmarks history table
  */
 function completeDisplay () {
-  // Finish displaying favicons asynchronously
-  if (!disableFavicons_option && !immediateFavDisplay_option) {
-	setTimeout(completeFavicons, 0);
-  }
-
+  // Handle display option changes
+  URListInput.addEventListener("click", handleURListClick);
+  RawListInput.addEventListener("click", handleRawListClick);
 
   // Setup mouse and keyboard handlers for bookmarks and results
 //  SearchResult.addEventListener("click", resultsMouseHandler);
@@ -1304,7 +1773,7 @@ function completeDisplay () {
   addEventListener("contextmenu", noDefaultAction);
   addEventListener("auxclick", noDefaultAction);
 //  addEventListener("blur", onBlur);
-  addEventListener('wheel', onWheel, {capture: true}); // To disable zooming
+  addEventListener('wheel', onWheel, {capture: true, passive: false}); // To disable zooming
 
   /*
   if (!beforeFF64) { // Handle integrated FF menu items
@@ -1357,6 +1826,14 @@ function initialize2 () {
   // Set folder image as per options
   if (useAltFldr_option) {
 	setPanelFolderImg(true, altFldrImg_option);
+  }
+
+  // Show historyDispURList_option on screen radio buttons
+  if (historyDispURList_option) {
+	URListInput.checked = true;
+  }
+  else {
+	RawListInput.checked = true;
   }
 
   // Display the HN list inside a table in "pane"

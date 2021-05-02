@@ -184,7 +184,7 @@ function openPropPopup (popupType, BN_id, path, type, title, url) {
 	let winType;
 	if (popupType == "new") {
 	  winType = "newfldr";
-	  titlePreface = "New folder";
+	  titlePreface = "New Folder";
 	}
 	else {
 	  winType = "propfldr";
@@ -196,7 +196,7 @@ function openPropPopup (popupType, BN_id, path, type, title, url) {
 	let winType;
 	if (popupType == "new") {
 	  winType = "newbkmk";
-	  titlePreface = "New bookmark";
+	  titlePreface = "New Bookmark";
 	}
 	else {
 	  winType = "propbkmk";
@@ -326,7 +326,7 @@ function openBsp2History () {
   .then(
 	function (a_Windowinfo) {
 	  let wi, openedWi;
-	  let wTitle = "("+selfName+") - Bookmark history -";
+	  let wTitle = "("+selfName+") - Bookmark History -";
 	  for (wi of a_Windowinfo) {
 		if (wi.title.includes(wTitle)) {
 		  openedWi = wi; 
@@ -337,7 +337,7 @@ function openBsp2History () {
 	  }
 	  else {
 		browser.windows.create(
-		  {titlePreface: "Bookmark history",
+		  {titlePreface: "Bookmark History",
 		   type: "popup",
 		   url: href,
 		   //----- Workaround for top and left position parameters being ignored for panels -----
@@ -529,18 +529,18 @@ function createBAContextMenu () {
   browser.menus.create({ // Main menu, open Bookmark history window
 	contexts: ["browser_action"],
 	id: 	  BAShowInSidebar,
-	title: 	  "Show bookmark in sidebar",
+	title: 	  "Show Bookmark in Sidebar",
 	enabled:  false
   });
   browser.menus.create({ // Main menu, open BSP2 in a tab
 	contexts: ["browser_action"],
 	id: 	  BAOpenTabId,
-	title: 	  "Open BSP2 in a tab"
+	title: 	  "Open BSP2 in a Tab"
   });
   browser.menus.create({ // Main menu, open Bookmark history window
 	contexts: ["browser_action"],
 	id: 	  BAHistory,
-	title: 	  "Bookmark history.."
+	title: 	  "Bookmark History.."
   });
   browser.menus.create({ // Main menu, open options page
 	contexts: ["browser_action"],

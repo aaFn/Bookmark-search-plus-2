@@ -55,8 +55,24 @@ const HNREVERSION_REDONE = 2;
 // action
 //    A String indicating the recorded action: "bsp2start", "reloadffapi", "create", "change", "move", "reorder", "remove".
 //    Note: nothing is recorded for favicon load / changes.
+// is_multi
+//    Boolean, if true, designate a multiple selection action to group them under history and for undo / redo
+//    (undefined if "bsp2start" or "reloadffapi".
+// id_list
+//    Array of String identifying the bookmarks subject to the multiple action (undefined if is_multi is false)
+// id_list_len
+//    Integer, length of the id_list array, initialized when is_multi is true, else undefined
+// hnref_list
+//    Array of offset integer to collect relative position of bookmarks later in list corresponding to the multiple action
+//    (undefined if is_multi is false, else initialized to an array of size id_list_len)
+// found_id_list
+//    Array of String to collect bookmarks ids later in list corresponding to the multiple action
+//    (undefined if is_multi is false, else initialized to [])
+// is_complete
+//    Boolean, undefined if is_multi is false and revOp is undefined,
+//    else initialized to false, and set to true when all ids in list are received, or when reversion operation is received. 
 // id
-//    String identifying the bookmark subject to the action (undefined if "bsp2start" or "reloadffapi").
+//    String identifying the bookmark subject to the action (undefined if "bsp2start" or "reloadffapi", or if is_multi is true).
 // type
 //    Bookmark type.
 // path
@@ -84,70 +100,86 @@ const HNREVERSION_REDONE = 2;
 // toUrl
 //    Changed to URL when "change" (undefined if no change), else undefined.
 // childIds
-//    Array, initial order when "reorder", else undefined.
+//    Array of String, initial order when "reorder", else undefined.
 // toChildIds
-//    Array, target order when "reorder", else undefined.
+//    Array of String, target order when "reorder", else undefined.
 // state
 //    Integer. 0 (or undefined) means "active branch", 1 means "inactive branch"
 // revOp
 //    If undefined, this is a normal operation. Else, 1 is for an "undo" record, and 2 is for a "redo" record
-// relHNref
+// revOp_HNref
 //    Integer, if revOp is defined and > 0, this is a relative (negative) integer to get to undone / redone HN from this node
 //    Else, if reversion (below) is defined and > 0, this is a relative (positive) integer to get to undoer / redoer HN
 //
-// Additional fields, added later on non is_undoredo records:
+// Additional fields, added later on:
 //-----------------------------------------------------------
 // reversion - Added or modififed when a reversion operation (undo / redo) is made by BSP2 to a bookmark item  
 //    Integer, if defined and different from 0, tells if the record was undone (= 1) or redone (= 2) by a further record
-//    Note that state can be "inactive branch" only when reversion is "undone". If reversion is "redone", state can only be "active branch". 
+//    Note that state can be "inactive branch" only when reversion is "undone". If reversion is "redone", state can only be "active branch".
+// revOp_HNref_list
+//    Array of offset integer to collect relative position of revOp operations later in list corresponding to that bookmark action
+//    (filled with successive revOp_HNref as they get replaced, so does not contain last one, which is the active one)
+// multi_HNref - Added when the record is recognized to be part of a multi bookmarks action  
+//    Integer, undefined if not part of any multi bookmarks action, else relative (negative) integer to get to multi bookmarks node
+//    Note: can have a value only when is_multi is false, which means when id is defined.
 function HistoryNode (action,
-					  id = undefined, type = undefined, path = undefined, parentId = undefined, index = undefined,
+					  is_multi = undefined, id_list = undefined, id = undefined, type = undefined, path = undefined, parentId = undefined, index = undefined,
 					  title = undefined, faviconUri = undefined, url = undefined, bnTreeJson = undefined,
 					  toPath = undefined, toParentId = undefined, toIndex = undefined, toTitle = undefined, toUrl = undefined,
 					  childIds = undefined, toChildIds = undefined,
-					  state = HNSTATE_ACTIVEBRANCH, revOp = undefined, relHNref = undefined) {
-  this.timestamp  = (new Date()).getTime();
-  this.action     = action;
-  if (id != undefined) {
-	this.id         = id;
-	this.type       = type;
-	this.path       = path;
-	this.parentId   = parentId;
-	this.index      = index;
+					  state = HNSTATE_ACTIVEBRANCH, revOp = undefined, revOp_HNref = undefined) {
+  this.timestamp   = (new Date()).getTime();
+  this.action      = action;
+  this.is_multi    = is_multi;
+  if (is_multi == true) {
+	this.id_list     = id_list;
+	let len = this.id_list_len = id_list.length;
+	this.hnref_list  = new Array (len);
+	this.found_id_list = [];
+	this.is_complete = false;
+  }
+  else if (id != undefined) {
+	this.id          = id;
+	this.type        = type;
+	this.path        = path;
+	this.parentId    = parentId;
+	this.index       = index;
 	if (title != undefined) {
-	  this.title      = title;
+	  this.title       = title;
 	}
 	if (faviconUri != undefined) {
-	  this.faviconUri = faviconUri;
+	  this.faviconUri  = faviconUri;
 	}
 	if (url != undefined) {
-	  this.url        = url;
+	  this.url         = url;
 	}
 	if (bnTreeJson != undefined) {
-	  this.bnTreeJson = bnTreeJson;
+	  this.bnTreeJson  = bnTreeJson;
 	}
 	if (toParentId != undefined) {
-	  this.toPath     = toPath;
-	  this.toParentId = toParentId;
-	  this.toIndex    = toIndex;
+	  this.toPath      = toPath;
+	  this.toParentId  = toParentId;
+	  this.toIndex     = toIndex;
 	}
 	if (toTitle != undefined) {
-	  this.toTitle    = toTitle;
+	  this.toTitle     = toTitle;
 	}
 	if (toUrl != undefined) {
-	  this.toUrl      = toUrl;
+	  this.toUrl       = toUrl;
 	}
 	if (childIds != undefined) {
-	  this.childIds   = childIds;
-	  this.toChildIds = toChildIds;
+	  this.childIds    = childIds;
+	  this.toChildIds  = toChildIds;
 	}
+  }
+  if ((is_multi == true) || (id != undefined)) {
 	this.state = state;
 	if (revOp != undefined) {
-	  this.revOp = revOp; 
+	  this.revOp       = revOp; 
+	  this.is_complete = false;
 	}
-	if (relHNref != undefined) {
-	  this.relHNref   = relHNref;
-	}
+	if (revOp_HNref != undefined) {
+	  this.revOp_HNref = relrevOp_HNref	}
   }
 }
 
@@ -160,60 +192,79 @@ function HN_trace (HN) {
   let ts = HN.timestamp;
   let tsDate = new Date ();
   tsDate.setTime(ts);
-  console.log("  timestamp:  "+ts+" ("+tsDate.toISOString()+" / "+tsDate.toLocaleString()+")");
-  console.log("  action:     "+HN.action);
-  let id = HN.id;
-  if (id != undefined) {
-	console.log("  id:         "+id);
-	console.log("  type:       "+HN.type);
-	console.log("  parentId:   "+HN.parentId);
-	console.log("  index:      "+HN.index);
+  console.log("  timestamp:   "+ts+" ("+tsDate.toISOString()+" / "+tsDate.toLocaleString()+")");
+  console.log("  action:      "+HN.action);
+  let is_multi = HN.is_multi;
+  console.log("  is_multi:    "+is_multi);
+  let id;
+  if (is_multi) {
+	console.log("  id_list_len   "+HN.id_list_len);
+	console.log("  id_list       "+HN.id_list);
+	console.log("  hnref_list    "+HN.hnref_list);
+	console.log("  found_id_list "+HN.found_id_list);
+	console.log("  is_complete   "+HN.is_complete);
+  }
+  else if ((id = HN.id) != undefined) {
+	console.log("  id:           "+id);
+	console.log("  type:         "+HN.type);
+	console.log("  parentId:     "+HN.parentId);
+	console.log("  index:        "+HN.index);
 	let title = HN.title;
 	if (title != undefined) {
-	  console.log("  title:      "+title);
+	  console.log("  title:       "+title);
 	}
 	let faviconUri = HN.faviconUri;
 	if (faviconUri != undefined) {
-	  console.log("  faviconUri: "+faviconUri);
+	  console.log("  faviconUri:  "+faviconUri);
 	}
 	let url = HN.url;
 	if (title != undefined) {
-	  console.log("  url:        "+url);
+	  console.log("  url:         "+url);
 	}
 	let bnTreeJson = HN.bnTreeJson;
 	if (bnTreeJson != undefined) {
-	  console.log("  bnTreeJson: "+bnTreeJson);
+	  console.log("  bnTreeJson:  "+bnTreeJson);
 	}
 	let toParentId = HN.toParentId;
 	if (toParentId != undefined) {
-	  console.log("  toParentId: "+toParentId);
-	  console.log("  toIndex:    "+HN.toIndex);
+	  console.log("  toParentId:  "+toParentId);
+	  console.log("  toIndex:     "+HN.toIndex);
 	}
 	let toTitle = HN.toTitle;
 	if (toTitle != undefined) {
-	  console.log("  toTitle:    "+toTitle);
+	  console.log("  toTitle:     "+toTitle);
 	}
 	let toUrl = HN.toUrl;
 	if (toUrl != undefined) {
-	  console.log("  toUrl:      "+HN.toUrl);
+	  console.log("  toUrl:       "+HN.toUrl);
 	}
 	let childIds = HN.childIds;
 	if (childIds != undefined) {
-	  console.log("  childIds:   "+childIds);
-	  console.log("  toChildIds: "+HN.toChildIds);
+	  console.log("  childIds:    "+childIds);
+	  console.log("  toChildIds:  "+HN.toChildIds);
 	}
-	console.log("  state:      "+HN.state);
+  }
+  if ((is_multi == true) || (id != undefined)) {
+	console.log("  state:       "+HN.state);
 	let revOp = HN.revOp;
 	if (revOp != undefined) {
-	  console.log("  revOp:      "+revOp);
+	  console.log("  revOp:       "+revOp);
+	  console.log("  is_complete: "+HN.is_complete);
 	}
-	let relHNref = HN.relHNref;
-	if (relHNref != undefined) {
-	  console.log("  relHNref:   "+relHNref);
+	let revOp_HNref = HN.revOp_HNref;
+	if (revOp_HNref != undefined) {
+	  console.log("  revOp_HNref: "+revOp_HNref);
 	}
 	let reversion = HN.reversion;
 	if (reversion != undefined) {
-	  console.log("  reversion:  "+reversion);
+	  console.log("  reversion:   "+reversion);
+      console.log("  revOp_HNref_list "+HN.revOp_HNref_list)
+	}
+  }
+  if (id != undefined) {
+	let multi_HNref = HN.multi_HNref;
+	if (multi_HNref != undefined) {
+	  console.log("  multi_HNref: "+multi_HNref);
 	}
   }
 }
@@ -227,14 +278,26 @@ function HN_trace (HN) {
 //   List (array) of HistoryNode
 // activeIndex
 //   Index in list of last active and not undone record (undefined if the list is empty)
+// lastMulti
+//   Index in list of last is_multi action, when not yet complete (else, undefined)
+// lastRevOp
+//   Index in list of last reversion operation (undo or redo), when not yet complete (else, undefined)
 function HistoryList (hnList = []) {
   this.hnList = hnList;
-  // Recalculate activeIndex
+  // Recalculate activeIndex, and find lastMulti at same time, if any
   let activeIndex = hnList.length;
   let hn;
   let action;
+  let lastMulti;
+  let is_multiFound = false;
   while (--activeIndex >= 0) { // Find first bookmark action record
 	action = (hn = hnList[activeIndex]).action;
+	if (!is_multiFound && (hn.is_multi)) {
+	  is_multiFound = true;
+	  if (!hn.is_complete) {
+		lastMulti = activeIndex;
+	  }
+	}
 	if ((action != HNACTION_BSP2START)
 		&& (action != HNACTION_RELOADFFAPI)
 		&& (action != HNACTION_AUTORELOADFFAPI)
@@ -248,14 +311,26 @@ function HistoryList (hnList = []) {
   }
   else {
 	let revOp = hn.revOp;
-	if (revOp == HNREVOP_ISUNDO) { // Last not undone record is the one before relHNref
-	  activeIndex += hn.relHNref - 1;
+	if (revOp == HNREVOP_ISUNDO) { // Last not undone record is the one before revOp_HNref
+	  activeIndex += hn.revOp_HNref - 1;
 	}
-	else if (revOp == HNREVOP_ISREDO) { // Last not undone record is the one on relHNref
-	  activeIndex += hn.relHNref;
+	else if (revOp == HNREVOP_ISREDO) { // Last not undone record is the one on revOp_HNref
+	  activeIndex += hn.revOp_HNref;
 	}
 	this.activeIndex = (activeIndex >= 0 ? activeIndex : undefined);
+	// We found activeIndex, but if no multi found yet, search deeper
+	while (!is_multiFound && (--activeIndex >= 0)) {
+	  hn = hnList[activeIndex];
+	  if (hn.is_multi) {
+		is_multiFound = true;
+		if (!hn.is_complete) {
+		  lastMulti = activeIndex;
+		}
+	  }
+	}
   }
+  // Store the lastMulti value
+  this.lastMulti = lastMulti;
 }
 
 
@@ -300,18 +375,18 @@ function historyListDeserialize (jsonstr) {
  * Add an HistoryNode to the HistoryList
  */
 function historyListAdd (hl, action,
-						 id = undefined, type = undefined, path = undefined, parentId = undefined, index = undefined,
+						 is_multi = false, id_list = undefined, id = undefined, type = undefined, path = undefined, parentId = undefined, index = undefined,
 						 title = undefined, faviconUri = undefined, url = undefined, bnTreeJson = undefined,
 						 toPath = undefined, toParentId = undefined, toIndex = undefined, toTitle = undefined, toUrl = undefined,
 						 childIds = undefined, toChildIds = undefined,
-  						 state = HNSTATE_ACTIVEBRANCH, revOp = undefined, relHNref = undefined) {
+  						 state = HNSTATE_ACTIVEBRANCH, revOp = undefined, revOp_HNref = undefined) {
   // Do not record actions on special folders
   if ((id != mostVisitedBNId) && (id != recentTagBNId) && (id != recentBkmkBNId)) {
 	let hn = new HistoryNode (action,
-							  id, type, path, parentId, index, title, faviconUri, url, bnTreeJson,
+							  is_multi, id_list, id, type, path, parentId, index, title, faviconUri, url, bnTreeJson,
 							  toPath, toParentId, toIndex, toTitle, toUrl,
 							  childIds, toChildIds,
-							  state, revOp, relHNref
+							  state, revOp, revOp_HNref
 							 );
 //HN_trace(hn);
 	let hnList = hl.hnList;
@@ -324,6 +399,7 @@ function historyListAdd (hl, action,
 		&& (action != HNACTION_CLEARHISTORY)
 	   ) { // Set at end of list
 	  // Any active record between current activeIndex and this new one becomes inactive
+	  // since they are now in a branch which cannot be reached anymore
 	  let curIndex = hl.activeIndex;
 	  if (curIndex == undefined) {
 		curIndex = -1;
@@ -333,56 +409,95 @@ function historyListAdd (hl, action,
 	  let tmpState, tmpAction;
 	  while (++curIndex < newIndex) {
 		tmpState = (tmpHn = hnList[curIndex]).state;
-		tmpAction = tmpHn.action;
 		if (((tmpState == undefined) || (tmpState == HNSTATE_ACTIVEBRANCH))
-			&& (tmpAction != HNACTION_BSP2START)
+			&& ((tmpAction = tmpHn.action) != HNACTION_BSP2START)
 			&& (tmpAction != HNACTION_RELOADFFAPI)
 			&& (tmpAction != HNACTION_AUTORELOADFFAPI)
-			&& (action != HNACTION_CLEARHISTORY)
+			&& (tmpAction != HNACTION_CLEARHISTORY)
 		   ) {
 		  tmpHn.state = HNSTATE_INACTIVEBRANCH;
 		}
 	  }
-	}
-	if (revOp == HNREVOP_ISUNDO) { // Coming back in past
-	  // If there was already a reversion on the undone record, inactivate the corresponding revOp record
-	  let tmpIndex = len - 1 + relHNref;
-	  let tmpHn = hnList[tmpIndex];
-	  let reversion = tmpHn.reversion;
-	  if (reversion != undefined) {
-		let revOpIndex = tmpIndex + tmpHn.relHNref;
-		hnList[revOpIndex].state = HNSTATE_INACTIVEBRANCH;
+
+	  if (revOp == HNREVOP_ISUNDO) { // Coming back in past
+		// If there was already a reversion on the undone record, inactivate the revOp record we are replacing
+		let tmpIndex = len - 1 + revOp_HNref;
+		let tmpHn = hnList[tmpIndex];
+		let reversion = tmpHn.reversion;
+		if (reversion != undefined) {
+		  let oldDelta = tmpHn.revOp_HNref;
+		  let revOpIndex = tmpIndex + oldDelta;
+		  hnList[revOpIndex].state = HNSTATE_INACTIVEBRANCH;
+		  // Store old revOp_HNref in revOp_HNref_list
+		  let lst = tmpHn.revOp_HNref_list;
+		  if (lst == undefined) {
+			lst = tmpHn.revOp_HNref_list = [];
+		  }
+		  lst.push(oldDelta);
+		}
+		// Update undone record with proper information
+		tmpHn.revOp_HNref = -revOp_HNref;
+		tmpHn.reversion = HNREVERSION_UNDONE;
+		// Find the last active record before the undone one, and set it in activeIndex
+		let tmpState;
+		let revOp;
+		while (--tmpIndex >= 0) {
+		  tmpState = (tmpHn = hnList[curIndex]).state;
+		  revOp = tmpHn.revOp;
+		  if (((tmpState == undefined) || (tmpState == HNSTATE_ACTIVEBRANCH))
+			  && (revOp == undefined)
+		 	 ) {
+			break;
+		  }
+		}
+		hl.activeIndex = (tmpIndex >= 0 ? tmpIndex : undefined);
 	  }
-	  // Update undone record with proper information
-	  tmpHn.relHNref = -relHNref;
-	  tmpHn.reversion = HNREVERSION_UNDONE;
-	  // Find the last active record before the undone one, and set it in activeIndex
-	  let tmpState;
-	  let revOp;
-	  while (--tmpIndex >= 0) {
-		tmpState = (tmpHn = hnList[curIndex]).state;
-		revOp = tmpHn.revOp;
-		if (((tmpState == undefined) || (tmpState == HNSTATE_ACTIVEBRANCH))
-			&& (revOp == undefined)
-		   ) {
-		  break;
+	  else if (revOp == HNREVOP_ISREDO) { // Redoing an undo
+		// If there was already a reversion on the redone record, inactivate the revOp record we are replacing
+		// Also set activeIndex to the redone record itself
+		let tmpIndex = hl.activeIndex = len - 1 + revOp_HNref;
+		let tmpHn = hnList[tmpIndex];
+		let reversion = tmpHn.reversion;
+		if (reversion != undefined) {
+		  let oldDelta = tmpHn.revOp_HNref;
+		  let revOpIndex = tmpIndex + oldDelta;
+		  hnList[revOpIndex].state = HNSTATE_INACTIVEBRANCH;
+		  // Store old revOp_HNref in revOp_HNref_list
+		  let lst = tmpHn.revOp_HNref_list;
+		  if (lst == undefined) {
+			lst = tmpHn.revOp_HNref_list = [];
+		  }
+		  lst.push(oldDelta);
+		}
+		// Update redone record with proper information
+		tmpHn.revOp_HNref = -revOp_HNref;
+		tmpHn.reversion = HNREVERSION_REDONE;
+	  }
+	  else if (is_multi) { // Multiple operation, remember its position (by construction it is not yet complete)
+		hl.lastMulti = newIndex;
+	  }
+	  else if (id != undefined) { // Normal record, can be part of (match) a multiple operation
+		// LIMITATION: we will only come back to the last incomplete recorded multiple operation
+		//   under assumption that a new multiple operation only happens when previous one has ended
+		let lastMulti = hl.lastMulti;
+		if (lastMulti != undefined) {
+		  // Check if the added record is part of it
+		  let parentHn = hnList[lastMulti];
+		  let i = parentHn.id_list.indexOf(id);
+		  if (i >= 0) { // Yes, verify if not already found
+			let j = parentHn.found_id_list.indexOf(id);
+			if (j < 0) { // Not yet found, so add it, and mark it to refer back to the parent is_multi HN record
+			  let foundLen = parentHn.found_id_list.push(id);
+			  parentHn.hnref_list[i] = len - 1 - lastMulti;
+			  if (foundLen == parentHn.id_list_len) { // We found the complete list
+				parentHn.is_complete = true;
+				hl.lastMulti = undefined; // No more lastMulti to remember for matching
+			  }
+			  hn.multi_HNref = lastMulti - newIndex; 
+			}
+		  }
 		}
 	  }
-	  hl.activeIndex = (tmpIndex >= 0 ? tmpIndex : undefined);
-	}
-	else if (revOp == HNREVOP_ISREDO) { // Redoing an undo
-	  // If there was already a reversion on the redone record, inactivate the corresponding revOp record
-	  // Also set activeIndex to the redone record
-	  let tmpIndex = hl.activeIndex = len - 1 + relHNref;
-	  let tmpHn = hnList[tmpIndex];
-	  let reversion = tmpHn.reversion;
-	  if (reversion != undefined) {
-		let revOpIndex = tmpIndex + tmpHn.relHNref;
-		hnList[revOpIndex].state = HNSTATE_INACTIVEBRANCH;
-	  }
-	  // Update redone record with proper information
-	  tmpHn.relHNref = -relHNref;
-	  tmpHn.reversion = HNREVERSION_REDONE;
 	}
 
 	// Notify the Bookmark history window that there is a change, if it is open
@@ -406,10 +521,15 @@ function historyListTrim (hl, retention) {
 	  break;
   }
 //console.log("Records to trim: "+count);
-  if (count > 0) { // Remove all outdated records at start, and update activeIndex
+  if (count > 0) { // Remove all outdated records at start, and update activeIndex and lastMulti
 	hnList.splice(0, count);
 	let activeIndex = hl.activeIndex - count;
 	hl.activeIndex = (activeIndex >= 0 ? activeIndex : undefined);
+	let lastMulti = hl.lastMulti;
+	if (lastMulti != undefined) {
+	  lastMulti -= count;
+	  hl.lastMulti = (lastMulti >= 0 ? lastMulti : undefined);
+	}
   }
 }
 
@@ -422,7 +542,7 @@ function historyListClear (hl) {
   hnList.length = 0;
   let hn = new HistoryNode (HNACTION_CLEARHISTORY);
   hnList.push(hn);
-  hl.activeIndex = undefined;
+  hl.activeIndex = hl.lastMulti = hl.lastRevOp = undefined;
 
   // Notify the Bookmark history window of the clear, if it is open
   sendAddonMessage("hnListClear");

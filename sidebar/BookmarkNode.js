@@ -788,13 +788,14 @@ function BN_match (BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSe
 
 // Search a BookmarkNode and its children for a match - normalized case insensitive
 // a_matchStr is an array of normalized lowercase word strings to match (no space)
+// If is_recur is specified and is false, then do 1 level search only (no sub-folders)
 //
 // Returns list of matches in a_result (supplied at start as an empty array []
-function BN_search (BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch, a_result) {
+function BN_search (BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch, a_result, is_recur = true) {
   if (BN_match(BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch)) {
 	a_result.push(BN);
   }
-  if (BN.type == "folder") {
+  if (is_recur && (BN.type == "folder")) {
 	let children = BN.children;
 	if (children != undefined) {
 	  let url;
@@ -805,7 +806,7 @@ function BN_search (BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlS
 		if ((i.type != "separator")
 			&& (((url = i.url) == undefined) || !url.startsWith("place:"))  // Ignore special bookmarks
 		   ) {
-		  BN_search(i, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch, a_result)
+		  BN_search(i, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch, a_result, is_recur)
 		}
 	  }
 	}
@@ -947,12 +948,14 @@ function searchCurBNList (a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUr
 /*
  * Search from current BN for matches - normalized case insensitive
  * If current BN is a folder (or Root), ignore it in the search
- * If it is a bookmark/separator, go to parent folder (and ignore the parent in the search) 
+ * If it is a bookmark/separator, go to parent folder (and ignore the parent in the search)
+ * 
  * a_matchStr is an array of normalized lower case word strings to match (no space)
+ * If is_recur is specified and is false, then do 1 level search only (no sub-folders)
  * 
  * Returns: an array listing matching BookmarkNodes
  */
-function searchBNRecur (BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch) {
+function searchBNRecur (BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch, is_recur = true) {
   let a_result = [];
 
   if (BN.type != "folder") { // Parent must be a folder ..
@@ -969,7 +972,7 @@ function searchBNRecur (BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, is
 		if ((i.type != "separator")
 			&& (((url = i.url) == undefined) || !url.startsWith("place:"))  // Ignore special bookmarks
 		   ) {
-		  BN_search (i, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch, a_result);
+		  BN_search (i, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch, a_result, is_recur);
 		}
 	  }
 	}

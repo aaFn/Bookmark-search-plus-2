@@ -47,12 +47,13 @@ var altNoFavImg_option; // String (data: URI)
 var useAltNoFav_option; // Boolean
 var lastcurbnid_option; // String
 var sidebarCommand_option; // String
-var historyRetention_option; // Integer
-var traceEnabled_option; // Boolean
 var searchField_option; // String
 var searchScope_option; // String
 var searchMatch_option; // String
 var searchFilter_option; // String
+var historyDispURList_option; // Boolean
+var historyRetention_option; // Integer
+var traceEnabled_option; // Boolean
 var savedBkmkUriList; // Used to receive the favicon uri saved in storage - Will be deleted at end
 var savedBNList; // Used to receive the BookmarkNodes saved in storage - Will be deleted at end
 var savedBNListBak; // Used to receive the second BookmarkNodes saved in storage if any - Will be deleted at end
@@ -89,12 +90,13 @@ var altNoFavImg_option_file; // String (data: URI)
 var useAltNoFav_option_file; // Boolean
 var lastcurbnid_option_file; // String
 var sidebarCommand_option_file; // String
-var historyRetention_option_file; // Integer
-var traceEnabled_option_file; // Boolean
 var searchField_option_file; // String
 var searchScope_option_file; // String
 var searchMatch_option_file; // String
 var searchFilter_option_file; // String
+var historyDispURList_option_file; // Boolean
+var historyRetention_option_file; // Integer
+var traceEnabled_option_file; // Boolean
 var migration_img16 = false;
 var migration_bnlist = false;
 var migration_spfldr = false;
@@ -188,10 +190,6 @@ function refreshOptionsBgnd(backgroundPage) {
 	lastcurbnid_option = backgroundPage.lastcurbnid_option;
 	sidebarCommand_option_file = backgroundPage.sidebarCommand_option_file;
 	sidebarCommand_option = backgroundPage.sidebarCommand_option;
-	historyRetention_option_file = backgroundPage.historyRetention_option_file;
-	historyRetention_option = backgroundPage.historyRetention_option;
-	traceEnabled_option_file = backgroundPage.traceEnabled_option_file;
-	traceEnabled_option = backgroundPage.traceEnabled_option;
 	searchField_option_file = backgroundPage.searchField_option_file;
 	searchField_option = backgroundPage.searchField_option;
 	searchScope_option_file = backgroundPage.searchScope_option_file;
@@ -200,6 +198,12 @@ function refreshOptionsBgnd(backgroundPage) {
 	searchMatch_option = backgroundPage.searchMatch_option;
 	searchFilter_option_file = backgroundPage.searchFilter_option_file;
 	searchFilter_option = backgroundPage.searchFilter_option;
+	historyDispURList_option_file = backgroundPage.historyDispURList_option_file;
+	historyDispURList_option = backgroundPage.historyDispURList_option;
+	historyRetention_option_file = backgroundPage.historyRetention_option_file;
+	historyRetention_option = backgroundPage.historyRetention_option;
+	traceEnabled_option_file = backgroundPage.traceEnabled_option_file;
+	traceEnabled_option = backgroundPage.traceEnabled_option;
 	structureVersion = backgroundPage.structureVersion;
 }
 
@@ -248,6 +252,7 @@ function refreshOptionsLStore() {
 					, "searchscope_option"
 					, "searchmatch_option"
 					, "searchfilter_option"
+					, "historydispurlist_option"
 					, "historyretention_option"
 					, "traceEnabled_option"
 				]
@@ -518,6 +523,30 @@ function refreshOptionsLStore() {
 					searchScope_option = "all";
 				}
 
+				// -- Read SM option..
+				if ((searchMatch_option_file = res.searchmatch_option) != undefined) {
+					searchMatch_option = searchMatch_option_file;
+				}
+				else {
+					searchMatch_option = "words";
+				}
+
+				// -- Read SFLT option..
+				if ((searchFilter_option_file = res.searchfilter_option) != undefined) {
+					searchFilter_option = searchFilter_option_file;
+				}
+				else {
+					searchFilter_option = "all";
+				}
+
+				// -- Read HDUL option..
+				if ((historyDispURList_option_file = res.historydispurlist_option) != undefined) {
+					historyDispURList_option = historyDispURList_option_file;
+				}
+				else {
+					historyDispURList_option = true;
+				}
+
 				// -- Read HR option..
 				if ((historyRetention_option_file = res.historyretention_option) != undefined) {
 					historyRetention_option = historyRetention_option_file;
@@ -533,23 +562,6 @@ function refreshOptionsLStore() {
 				else {
 					traceEnabled_option = false;
 				}
-
-				// -- Read SM option..
-				if ((searchMatch_option_file = res.searchmatch_option) != undefined) {
-					searchMatch_option = searchMatch_option_file;
-				}
-				else {
-					searchMatch_option = "words";
-				}
-
-				// -- Read SF option..
-				if ((searchFilter_option_file = res.searchfilter_option) != undefined) {
-					searchFilter_option = searchFilter_option_file;
-				}
-				else {
-					searchFilter_option = "all";
-				}
-
 				resolve(); // Send promise for anybody waiting ..
 			})
 				.catch( // Asynchronous, like .then
@@ -557,8 +569,10 @@ function refreshOptionsLStore() {
 						let msg = "libstore error on loading from local storage 1 : " + err;
 						console.log(msg);
 						if (err != undefined) {
+							let fn = err.fileName;
+							if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+							console.log("fileName:   "+fn);
 							console.log("lineNumber: " + err.lineNumber);
-							console.log("fileName:   " + err.fileName);
 						}
 
 						reject(); // Send promise for anybody waiting ..
@@ -603,8 +617,10 @@ function readFoldersLStore(waitMsg) {
 						let msg = "libstore error on loading from local storage 2 : " + err;
 						console.log(msg);
 						if (err != undefined) {
+							let fn = err.fileName;
+							if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+							console.log("fileName:   "+fn);
 							console.log("lineNumber: " + err.lineNumber);
-							console.log("fileName:   " + err.fileName);
 						}
 
 						reject(); // Send promise for anybody waiting ..
@@ -665,6 +681,7 @@ function launchReadFullLStore(isSidebar) {
 				, "searchscope_option"
 				, "searchmatch_option"
 				, "searchfilter_option"
+				, "historydispurlist_option",
 				, "historyretention_option"
 				, "traceEnabled_option"
 				, "savedFldrOpenList"
@@ -710,6 +727,7 @@ function launchReadFullLStore(isSidebar) {
 				, "searchscope_option"
 				, "searchmatch_option"
 				, "searchfilter_option"
+				, "historydispurlist_option"
 				, "historyretention_option"
 				, "traceEnabled_option"
 				, "fIndex"
@@ -1051,12 +1069,20 @@ function readFullOptions(res, isSidebar, waitMsg) {
 		searchMatch_option = "words";
 	}
 
-	waitMsg("Read SF option..");
+	waitMsg("Read SFLT option..");
 	if ((searchFilter_option_file = res.searchfilter_option) != undefined) {
 		searchFilter_option = searchFilter_option_file;
 	}
 	else {
 		searchFilter_option = "all";
+	}
+
+	waitMsg("Read HDUL option..");
+	if ((historyDispURList_option_file = res.historydispurlist_option) != undefined) {
+		historyDispURList_option = historyDispURList_option_file;
+	}
+	else {
+		historyDispURList_option = true;
 	}
 
 	waitMsg("Read HR option..");
@@ -1223,8 +1249,10 @@ function retryReadFullLStore(resolve, reject, retries, isSidebar, waitMsg) {
 				let msg = "libstore error on loading from local storage 3 : " + err + " (retries left: " + retries + ")";
 				console.log(msg);
 				if (err != undefined) {
+					let fn = err.fileName;
+					if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+					console.log("fileName:   "+fn);
 					console.log("lineNumber: " + err.lineNumber);
-					console.log("fileName:   " + err.fileName);
 				}
 
 				if (retries > 0) {

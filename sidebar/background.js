@@ -842,8 +842,10 @@ function reloadFFAPI (is_autoDetected) {
 	  let msg = "Error on processing reloadFFAPI : "+err;
 	  console.log(msg);
 	  if (err != undefined) {
+		let fn = err.fileName;
+		if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+		console.log("fileName:   "+fn);
 		console.log("lineNumber: "+err.lineNumber);
-		console.log("fileName:   "+err.fileName);
 	  }
 	}
   );
@@ -867,7 +869,7 @@ function reloadFFAPI (is_autoDetected) {
  * Handle responses or errors when talking with sidebars
  */
 function handleMsgResponse (message) {
-  // Is always called, even is destination didn't specifically reply (then message is undefined)
+  // Is always called, even if destination didn't specifically reply (then message is undefined)
 //  console.log("Sidebar sent a response: <<"+message.content+">> received in background");
 }
 
@@ -1078,8 +1080,10 @@ function handleAddonMessage (request, sender, sendResponse) {
 		  let msg = "Error on processing addon message : "+err;
 		  console.log(msg);
 		  if (err != undefined) {
+			let fn = err.fileName;
+			if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+			console.log("fileName:   "+fn);
 			console.log("lineNumber: "+err.lineNumber);
-			console.log("fileName:   "+err.fileName);
 		  }
 		}
 	  );
@@ -1097,8 +1101,10 @@ function handleAddonMessage (request, sender, sendResponse) {
 		  let msg = "Error on processing savedSearchOptions : "+err;
 		  console.log(msg);
 		  if (err != undefined) {
+			let fn = err.fileName;
+			if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+			console.log("fileName:   "+fn);
 			console.log("lineNumber: "+err.lineNumber);
-			console.log("fileName:   "+err.fileName);
 		  }
 		}
 	  );
@@ -1212,8 +1218,10 @@ function handleAddonMessage (request, sender, sendResponse) {
 	console.log("Error processing message: "+request.content);
 	if (error != undefined) {
 	  console.log("message:    "+error.message);
+	  let fn = error.fileName;
+	  if (fn == undefined)   fn = error.filename; // Not constant :-( Some errors have filename, and others have fileName 
+	  console.log("fileName:   "+fn);
 	  console.log("lineNumber: "+error.lineNumber);
-	  console.log("fileName:   "+error.fileName);
 //console.log("   keys: "+Object.keys(error));
 //console.log("   values: "+Object.values(error));
 	}
@@ -1470,7 +1478,7 @@ function setNoFavicon (bnId) {
 	  countFetchFav--;
 	BN.faviconUri = uri;
 	BN.fetchedUri = false;
-	historyListUpdateFaviconUri(curHNList, destCvtBnId, uri);
+	historyListUpdateFaviconUri(curHNList, bnId, uri);
 	saveBNList();
 
 	// Signal to sidebars
@@ -1841,7 +1849,7 @@ function bkmkCreatedHandler (id, BTN) {
 
   // Record action
   historyListAdd(curHNList, HNACTION_BKMKCREATE,
-	  			 id, BTN.type, BN_aPath(parentId), parentId, index,
+	  			 false, undefined, id, BTN.type, BN_aPath(parentId), parentId, index,
 	  			 BTN.title, BN.faviconUri, BTN.url);
   // Save new current info
   saveBNList();
@@ -1921,7 +1929,7 @@ function bkmkRemovedHandler (id, removeInfo) {
 	// Record action sent to us at source of detecting the problem
 	let btn = removeInfo.node;
 	historyListAdd(curHNList, HNACTION_BKMKREMOVE_DESYNC,
-				   id, btn.type, BN_aPath(parentId), parentId, removeInfo.index,
+				   false, undefined, id, btn.type, BN_aPath(parentId), parentId, removeInfo.index,
 				   btn.title,
 				   historyListSearchFaviconUri(curHNList, id, btn),
 				   btn.url);
@@ -1931,7 +1939,7 @@ function bkmkRemovedHandler (id, removeInfo) {
 	// Record action
 	let type = BN.type;
 	historyListAdd(curHNList, HNACTION_BKMKREMOVE,
-				   id, type, BN_aPath(parentId), parentId, removeInfo.index,
+				   false, undefined, id, type, BN_aPath(parentId), parentId, removeInfo.index,
 				   BN.title, BN.faviconUri, BN.url, BN_serialize(BN),
 				   undefined, undefined, undefined, undefined, undefined,
 				   (type == "folder") ? BN_childIds(BN) : undefined // To increase chances to find childIds in case of desynchro
@@ -1980,7 +1988,7 @@ function bkmkChangedHandler (id, changeInfo) {
 		let BTN = a_BTN[0];
 		let parentId = BTN.parentId;
 		historyListAdd(curHNList, HNACTION_BKMKCHANGE_DESYNC,
-					   id, BTN.type, BN_aPath(parentId), parentId, BTN.index,
+					   false, undefined, id, BTN.type, BN_aPath(parentId), parentId, BTN.index,
 					   // Can't know the old title and url values !!! Hopefully, they will be sooner in the past history
 					   historyListSearchTitle(curHNList, id),
 					   historyListSearchFaviconUri(curHNList, id, BTN),
@@ -2027,7 +2035,7 @@ function bkmkChangedHandler (id, changeInfo) {
 	let uri = BN.faviconUri;
 	let parentId = BN.parentId;
 	historyListAdd(curHNList, HNACTION_BKMKCHANGE,
-				   id, type, BN_aPath(parentId), parentId, BN_getIndex(BN),
+				   false, undefined, id, type, BN_aPath(parentId), parentId, BN_getIndex(BN),
 				   oTitle, uri, oUrl, undefined,
 				   undefined, undefined, undefined, cTitle, cUrl,
 				   (type == "folder") ? BN_childIds(BN) : undefined // To increase chances to find childIds in case of desynchro
@@ -2076,7 +2084,7 @@ function bkmkMovedHandler (id, moveInfo) {
 		// Record action sent to us at source of detecting the problem
 		let BTN = a_BTN[0];
 		historyListAdd(curHNList, HNACTION_BKMKMOVE_DESYNC,
-					   id, BTN.type, BN_aPath(curParentId), curParentId, moveInfo.oldIndex,
+					   false, undefined, id, BTN.type, BN_aPath(curParentId), curParentId, moveInfo.oldIndex,
 					   BTN.title,
 					   historyListSearchFaviconUri(curHNList, id, BTN),
 					   BTN.url, undefined,
@@ -2098,7 +2106,7 @@ function bkmkMovedHandler (id, moveInfo) {
 	// Record action
 	let type = BN.type;
 	historyListAdd(curHNList, HNACTION_BKMKMOVE,
-				   id, type, BN_aPath(curParentId), curParentId, moveInfo.oldIndex,
+				   false, undefined, id, type, BN_aPath(curParentId), curParentId, moveInfo.oldIndex,
 				   BN.title, BN.faviconUri, BN.url, undefined, // To increase chances to find last title or url in case of desynchro
 				   BN_aPath(targetParentId), targetParentId, targetIndex, undefined, undefined,
 				   (type == "folder") ? BN_childIds(BN) : undefined // To increase chances to find childIds in case of desynchro
@@ -2146,7 +2154,7 @@ function bkmkReorderedHandler (id, reorderInfo, recHistory = true) {
 		  let BTN = a_BTN[0];
 		  let parentId = BTN.parentId;
 		  historyListAdd(curHNList, HNACTION_BKMKMOVE_DESYNC,
-			  			 id, "folder", BN_aPath(parentId), parentId, BTN.index,
+			  			 false, undefined, id, "folder", BN_aPath(parentId), parentId, BTN.index,
 			  			 BTN.title,
 			  			 historyListSearchFaviconUri(curHNList, id, BTN),
 			  			 undefined, undefined,
@@ -2177,7 +2185,7 @@ function bkmkReorderedHandler (id, reorderInfo, recHistory = true) {
 		// Record action
 		let parentId = folderBN.parentId;
 		historyListAdd(curHNList, HNACTION_BKMKREORDER,
-					   id, "folder", BN_aPath(parentId), parentId, BN_getIndex(folderBN),
+					   false, undefined, id, "folder", BN_aPath(parentId), parentId, BN_getIndex(folderBN),
 					   folderBN.title, folderBN.faviconUri, undefined, undefined, // To increase chances to find last title and favicon in history when searching for it
 					   undefined, undefined, undefined, undefined, undefined,
 					   BN_childIds(folderBN), childIds
@@ -2231,6 +2239,7 @@ function tabModified (tabId, changeInfo, tabInfo) {
 		&& (!tabUrl.startsWith("data:"))
 		&& (!tabUrl.startsWith("file:"))
 		&& (!tabUrl.startsWith("view-source:"))
+		&& (!tabUrl.startsWith("blob:"))
 	   ) {
 	  // Look for a bookmark matching the url
 	  if (tabUrl.startsWith("wyciwyg://")) { // Cached URL wyciwyg://x/....    Cf. https://en.wikipedia.org/wiki/WYCIWYG
@@ -2376,7 +2385,9 @@ function onShownContextMenuHandler (info, tab) {
 		&& (!tabUrl.startsWith("moz-extension://"))
 		&& (!tabUrl.startsWith("about:"))
 		&& (!tabUrl.startsWith("data:"))
+		&& (!tabUrl.startsWith("file:"))
 		&& (!tabUrl.startsWith("view-source:"))
+		&& (!tabUrl.startsWith("blob:"))
 	   ) {
 	  // Look for a bookmark matching the url
 	  if (tabUrl.startsWith("wyciwyg://")) { // Cached URL wyciwyg://x/....    Cf. https://en.wikipedia.org/wiki/WYCIWYG
@@ -2678,8 +2689,10 @@ function initialize2 () {
 		  let msg = "initialize2() error : "+err;
 		  console.log(msg);
 		  if (err != undefined) {
+			let fn = err.fileName;
+			if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+			console.log("fileName:   "+fn);
 			console.log("lineNumber: "+err.lineNumber);
-			console.log("fileName:   "+err.fileName);
 		  }
 		}
 	  );
@@ -2702,8 +2715,10 @@ function initialize2 () {
 	let msg = "Error in initialize2() : "+err;
 	console.log(msg);
 	if (err != undefined) {
+	  let fn = err.fileName;
+	  if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+	  console.log("fileName:   "+fn);
 	  console.log("lineNumber: "+err.lineNumber);
-	  console.log("fileName:   "+err.fileName);
 	}
   }
 }
@@ -2865,8 +2880,10 @@ readFullLStore(false, trace)
 		  let msg = "Error on gotInstallStatus : "+err;
 		  console.log(msg);
 		  if (err != undefined) {
+			let fn = err.fileName;
+			if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+			console.log("fileName:   "+fn);
 			console.log("lineNumber: "+err.lineNumber);
-			console.log("fileName:   "+err.fileName);
 		  }
 		}
 	  );
@@ -2880,8 +2897,10 @@ readFullLStore(false, trace)
 	let msg = "Error on loading from local storage : "+err;
 	console.log(msg);
 	if (err != undefined) {
+	  let fn = err.fileName;
+	  if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+	  console.log("fileName:   "+fn);
 	  console.log("lineNumber: "+err.lineNumber);
-	  console.log("fileName:   "+err.fileName);
 	}
   }
 );

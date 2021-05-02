@@ -164,6 +164,7 @@ const SFieldUrlOnlyInput = document.querySelector("#urlonly");
 const SFieldUrlOnlyLabel = document.querySelector("#lblurlonly");
 const SScopeAllInput = document.querySelector("#all");
 const SScopeSubfolderInput = document.querySelector("#subfolder");
+const SScopeFolderonlyInput = document.querySelector("#folderonly");
 const SMatchWordsInput = document.querySelector("#words");
 const SMatchRegexpInput = document.querySelector("#regexp");
 const SFilterAllInput = document.querySelector("#fall");
@@ -212,6 +213,10 @@ let tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElemen
 											  // Not using <img> since with FF65 and later, they
 											  // show default box-shadow: inset when the src=
 											  // attribute is not specified.
+//tmpElem1.classList.add("twistieac");
+tmpElem1.draggable = false; // False by default for <div>
+FolderTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("ffavicon");
 tmpElem1.draggable = false; // True by default for <img>
 FolderTempl.appendChild(tmpElem1);
@@ -226,6 +231,10 @@ const RFolderTempl = document.createElement("div"); // Assuming it is an HTMLDiv
 RFolderTempl.classList.add("rbkmkitem_f");
 RFolderTempl.draggable = false; // False by default for <div>
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("rtwistieac");
+tmpElem1.draggable = false; // False by default for <div>
+RFolderTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("ffavicon");
 tmpElem1.draggable = false; // True by default for <img>
 RFolderTempl.appendChild(tmpElem1);
@@ -239,6 +248,10 @@ RFolderTempl.appendChild(tmpElem1);
 const SFolderTempl = document.createElement("div"); // Assuming it is an HTMLDivElement
 SFolderTempl.classList.add("bkmkitem_f");
 SFolderTempl.draggable = false; // False by default for <div>
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+//tmpElem1.classList.add("twistieac");
+tmpElem1.draggable = false; // False by default for <div>
+SFolderTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("img"); // Assuming it is an HTMLImageElement
 tmpElem1.classList.add("favicon");
 tmpElem1.draggable = false; // True by default for <img>
@@ -253,6 +266,10 @@ SFolderTempl.appendChild(tmpElem1);
 const RSFolderTempl = document.createElement("div"); // Assuming it is an HTMLDivElement
 RSFolderTempl.classList.add("rbkmkitem_f");
 RSFolderTempl.draggable = false; // False by default for <div>
+tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
+tmpElem1.classList.add("rtwistieac");
+tmpElem1.draggable = false; // False by default for <div>
+RSFolderTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("img"); // Assuming it is an HTMLImageElement
 tmpElem1.classList.add("favicon");
 tmpElem1.draggable = false; // True by default for <img>
@@ -514,43 +531,39 @@ function appendResult (BTN) {
 	cell.tabIndex = 0;
 
 	// Append proper contents to the cell:
-	// - a <div> of class "rbkmkitem_f", or a <a> of class "rbkmkitem_b",
+	// - a <div> of class "rbkmkitem_f" or "rbkmkitem_b",
 	//   for respectively folder or bookmark, containing:
-	//   - an <img> (class "favicon") and a <span> with text
-	//     (set class to "favtext" in javascript to get 3px margin-left, but not in HTML where
-	//      it's already done, don't know why).
+	//   - a <div> (class "rtwistiexx") if a folder
+	//   - an <div>, or <img> if special folder, (class "favicon")
+	//   - and a <span> with text (class "favtext")
 	if (type == "folder") {				// Folder
 	  // Mark that row as folder
 	  row.dataset.type = "folder";
 
 	  // Create elements
-	  let div2 = document.createElement("div"); // Assuming it is an HTMLDivElement
-	  div2.classList.add("rtwistieac");
-	  div2.draggable = false; // False by default for <div>
-	  cell.appendChild(div2);
-	  let div3;
+	  let div2;
 	  let span;
 	  if (BN.fetchedUri) { // Special bookmark folder with special favicon
-		div3 = RSFolderTempl.cloneNode(true);
-		let img = div3.firstElementChild;
+		div2 = RSFolderTempl.cloneNode(true);
+		let img = div2.firstElementChild.nextElementSibling;
 		img.src = BN.faviconUri;
 		span = img.nextElementSibling;
 	  }
 	  else {
-		div3 = RFolderTempl.cloneNode(true);
-		span = div3.firstElementChild.nextElementSibling;
+		div2 = RFolderTempl.cloneNode(true);
+		span = div2.firstElementChild.nextElementSibling.nextElementSibling;
 	  }
 
 	  let title = BTN.title;
 	  if (showPath_option) {
-		div3.title = BN_path(BTN.parentId);
+		div2.title = BN_path(BTN.parentId);
 	  }
 	  else {
-		div3.title = title;
+		div2.title = title;
 	  }
 	  span.textContent = title;
 //	  span.draggable = false;
-	  cell.appendChild(div3);
+	  cell.appendChild(div2);
 	}
 	else {								// "bookmark"
 	  // Mark that row as bookmark
@@ -728,8 +741,30 @@ function refreshFaviconSearch (btnId, uri) {
 	let row = curResultRowList[btnId];
 	if (row != undefined) { // There is a result in search pane corresponding to that BTN
 	  // Update only the row, do not change anything else
-	  let img = row.firstElementChild.firstElementChild.firstElementChild;
-	  img.src = uri;
+	  let bkmkitem = row.firstElementChild.firstElementChild;
+	  let oldImg = bkmkitem.firstElementChild;
+	  let cn = oldImg.className;
+	  if (uri == "/icons/nofavicon.png") {
+		if ((cn == undefined) || !cn.includes("nofavicon")) { // Change to nofavicon only if not already a nofavicon
+		  let tmpElem = document.createElement("div");
+		  tmpElem.classList.add("nofavicon");
+		  tmpElem.draggable = false; // True by default for <img>
+		  bkmkitem.replaceChild(tmpElem, oldImg);
+		}
+	  }
+	  else {
+		if ((cn != undefined) && cn.includes("nofavicon")) { // Change type from <div> to <img> if it was a nofavicon
+		  let tmpElem = document.createElement("img"); // Assuming it is an HTMLImageElement
+		  tmpElem.classList.add("favicon");
+		  tmpElem.draggable = false; // True by default for <img>
+		  bkmkitem.replaceChild(tmpElem, oldImg);
+		  tmpElem.src = uri;
+		  bkmkitem.replaceChild(tmpElem, oldImg);
+		}
+		else {
+		  oldImg.src = uri;
+		}
+	  }
 	}
   }
 }
@@ -900,7 +935,9 @@ function updateSearch () {
 				  BN = rootBN;
 				}
 			  }
-			  a_BN = searchBNRecur(BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch);
+			  a_BN = searchBNRecur(BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch,
+								   (searchScope_option == "subfolder") // Go down to subfolders, or only current folder ?
+								  );
 			}
 		  }
 
@@ -948,7 +985,7 @@ function resetTreeVisiblity () {
 	row.hidden = false;
 	// Check if this is a folder and if meant to be open
 	if ((row.dataset.type == "folder") // This is a folder, check its intended state
-		&& (row.firstElementChild.firstElementChild.classList
+		&& (row.firstElementChild.firstElementChild.firstElementChild.classList
 			   .contains("twistieac"))
 	   ) {
 	  // It is closed, then all its children are hidden ..
@@ -1081,12 +1118,12 @@ function setSearchOptions () {
   else if (searchFilter_option == "fldr") {
 	SFilterFldrOnlyInput.checked = true;
 	SFieldUrlOnlyInput.disabled = true; // Disable search on URL
-	buttonTitleFilter = "Show folders only";
+	buttonTitleFilter = SFieldUrlOnlyInput.nextSibling.nextSibling.textContent;
   }
   else {
 	SFilterBkmkOnlyInput.checked = true;
 	SFieldUrlOnlyInput.disabled = SFieldUrlOnlyLabel.disabled = false;
-	buttonTitleFilter = "Show bookmarks only";
+	buttonTitleFilter = SFieldUrlOnlyInput.nextSibling.nextSibling.textContent;
   }
   cn +=  " sfilter"+searchFilter_option;
   SearchButtonInput.className = cn;
@@ -1094,10 +1131,15 @@ function setSearchOptions () {
 	MGlassImgStyle.backgroundImage = 'url("/icons/search.png"';
 	SScopeAllInput.checked = true;
   }
-  else {
+  else if (searchScope_option == "subfolder") {
 	MGlassImgStyle.backgroundImage = 'url("/icons/searchsub.png"';
 	SScopeSubfolderInput.checked = true;
-	buttonTitleScope = "Inside current folder";
+	buttonTitleScope = SScopeSubfolderInput.nextSibling.nextSibling.textContent;
+  }
+  else {
+	MGlassImgStyle.backgroundImage = 'url("/icons/searchfldnosub.png"';
+	SScopeFolderonlyInput.checked = true;
+	buttonTitleScope = SScopeFolderonlyInput.nextSibling.nextSibling.textContent;
   }
 
   if (searchField_option == "both") {
@@ -1105,11 +1147,11 @@ function setSearchOptions () {
   }
   else if (searchField_option == "title") {
 	SFieldTitleOnlyInput.checked = true;
-	buttonTitleFields = "Search title only";
+	buttonTitleFields = SFieldTitleOnlyInput.nextSibling.nextSibling.textContent;
   }
   else {
 	SFieldUrlOnlyInput.checked = true;
-	buttonTitleFields = "Search URL only";
+	buttonTitleFields = SFieldUrlOnlyInput.nextSibling.nextSibling.textContent;
   }
 
   // Set hover text on button
@@ -1206,6 +1248,11 @@ function setSScopeAllHandler () {
 
 function setSScopeSubfolderHandler () {
   searchScope_option = "subfolder";
+  saveSearchOptions();
+}
+
+function setSScopeFolderonlyHandler () {
+  searchScope_option = "folderonly";
   saveSearchOptions();
 }
 
@@ -1323,65 +1370,61 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
 //  cell.draggable = false; // False by default for <td>
 
   // Append proper contents to the cell:
-  // - if folder, a <div> of class "twistiena", "twistieac" or twistieao", depending
-  //   if there are no children, if closed or open, with a margin-left corresponding
-  //   to the level
-  // - a <div> of class "bkmkitem_s" or "bkmkitem_f", or a <a> of class "bkmkitem_b",
-  //   for respectively separator, folder or bookmark, with a margin-left corresponding
-  //   to the level + 16 if not "bkmkitem_f", containing:
+  // - if folder, a <div> of class "bkmkitem_f" with a margin-left corresponding to the level
+  //   or of class "bkmkitem_s" or "bkmkitem_b", for respectively separator or bookmark,
+  //   with a margin-left corresponding to the level + 16
+  //   containing:
+  //   - if folder, a <div> of class "twistiena", "twistieac" or twistieao", depending if there
+  //     are no children, if closed or open, 
   //   - if separator, a <div> of class "favseparator"
-  //   - if folder or bookmark, an <img> (class "favicon") and a <span> with text
-  //     (set class to "favtext" in javascript to get 3px margin-left, but not in HTML where
-  //      it's already done, don't know why).
+  //   - if folder or bookmark, an <img> (class "favicon"), or <div> if normal folder,  and a
+  //     <span> with text (class "favtext")
   let type = row.dataset.type = BN.type;
   if (type == "folder") {				// Folder
 	// Retrieve saved state or set open by default
-	let is_open = undefined;
-	if (savedFldrOpenList != undefined) {
-	  is_open = savedFldrOpenList[BN_id];
+	let is_open;
+	if (savedFldrOpenList != undefined) { // Initial display
+	  is_open = curFldrOpenList[BN_id] = savedFldrOpenList[BN_id];
 	}
 	else {
-	  // Verify if we already know about it
 	  is_open = curFldrOpenList[BN_id];
 	}
 	if (is_open == undefined) { // Folder closed by default when no info
 	  is_open = curFldrOpenList[BN_id] = false;
 	}
-	else   curFldrOpenList[BN_id] = is_open;
 
 	// Update indicator of highest open level .. only if open and in an open part
 	if (is_open && (highest_open_level == level))
 	  highest_open_level = level + 1;
 
 	// Create elements
-	let div2 = document.createElement("div"); // Assuming it is an HTMLDivElement
+	let div2;
+	let twistie;
+	let span;
+	if (BN.fetchedUri) { // Special folder, load image now, there are not a big number of them
+	  div2 = SFolderTempl.cloneNode(true);
+	  let img = (twistie = div2.firstElementChild).nextElementSibling;
+	  img.src = BN.faviconUri;
+	  span = img.nextElementSibling;
+	}
+	else {
+	  div2 = FolderTempl.cloneNode(true);
+	  span = (twistie = div2.firstElementChild).nextElementSibling.nextElementSibling;
+	}
 	// Look at children to set the twistie
 //	if (!delayLoad_option)
 	  children = BN.children;
 	if ((children == undefined) || (children.length == 0))
-	  div2.classList.add("twistiena");
+	  twistie.classList.add("twistiena");
 	else
-	  div2.classList.add(is_open ? "twistieao" : "twistieac");
-	div2.draggable = false; // False by default for <div>
+	  twistie.classList.add(is_open ? "twistieao" : "twistieac");
 	if (level > 0) {
 	  div2.style.marginLeft = (LevelIncrementPx * level)+"px";
 	}
 	cell.appendChild(div2);
 
-	let div3;
-	let span;
-	if (BN.fetchedUri) { // Special folder, load image now, there are not a big number of them
-	  div3 = SFolderTempl.cloneNode(true);
-	  let img = div3.firstElementChild;
-	  img.src = BN.faviconUri;
-	  span = img.nextElementSibling;
-	}
-	else {
-	  div3 = FolderTempl.cloneNode(true);
-	  span = div3.firstElementChild.nextElementSibling;
-	}
-	span.textContent = div3.title = BN.title;
-	cell.appendChild(div3);
+	span.textContent = div2.title = BN.title;
+	cell.appendChild(div2);
   }
   else if (type == "separator") {		// Separator
 	// Create elements
@@ -1475,7 +1518,7 @@ function insertBkmks (BN, parentRow, parentLevel = undefined, parentOpen = undef
 
 	// Update parent twistiexx class if we insert under an empty folder
 	// Note: this only happens when we don't know the parent ...
-	let twistie = parentRow.firstElementChild.firstElementChild;
+	let twistie = parentRow.firstElementChild.firstElementChild.firstElementChild;
 	if (twistie.classList.contains("twistiena")) { // It was empty
 	  if (parentOpen) {
 		twistie.classList.replace("twistiena", "twistieao");
@@ -1669,7 +1712,7 @@ function removeBkmks (row, cleanup) {
 	  && (parseInt(previousRow.dataset.level, 10) == level-1)
 	  && ((nextRow == null) || (parseInt(nextRow.dataset.level, 10) < level))
      ) {
-	let twistie = previousRow.firstElementChild.firstElementChild;
+	let twistie = previousRow.firstElementChild.firstElementChild.firstElementChild;
 	if (twistie.classList.contains("twistieao")) { // It was open
 	  twistie.classList.replace("twistieao", "twistiena");
 	  curFldrOpenList[previousRow.dataset.id] = false;
@@ -1757,32 +1800,32 @@ function bkmkChanged (bnId, isBookmark, title, url, uri) {
   if (isBookmark) { // item is a .bkmkitem_b <div>
     // item.title mixes both, so is always updated
     // Update all
-    let span = item.firstElementChild.nextElementSibling;
-    if (title == "") {
-      item.title = url;
-      span.textContent = suggestDisplayTitle(url);
-    }
-    else {
-      item.title = title+"\n"+url;
-      span.textContent = title;
-    }
-    let isSpecial = url.startsWith("place:");
-    if (isSpecial) {
-      if (item.hasAttribute("href")) { // It was not special before .. remove the href
-    	item.removeAttribute("href");
-      }
-    }
-    else { // Set the new href value
-      item.href = url;
-    }
+	let span = item.firstElementChild.nextElementSibling;
+	if (title == "") {
+	  item.title = url;
+	  span.textContent = suggestDisplayTitle(url);
+	}
+	else {
+	  item.title = title+"\n"+url;
+	  span.textContent = title;
+	}
+	let isSpecial = url.startsWith("place:");
+	if (isSpecial) {
+	  if (item.hasAttribute("href")) { // It was not special before .. remove the href
+		item.removeAttribute("href");
+	  }
+	}
+	else { // Set the new href value
+	  item.href = url;
+	}
 
-    let img = item.firstElementChild; // Assuming it is an HTMLImageElement
-    img.src = uri;
+	let img = item.firstElementChild; // Assuming it is an HTMLImageElement
+	img.src = uri;
   }
   else { // Can only be a folder, per spec of the event, not a separator
-         // => item is a ".twistie.." <div>
-	// Get to the <span> in .bkmkmitem_f <div>
-	let span = item.nextElementSibling.firstElementChild.nextElementSibling;
+		 // => item is a ".bkmkmitem_f" <div>
+	// Get to the <span> in it
+	let span = item.firstElementChild.nextElementSibling.nextElementSibling;
 	span.textContent = title;
   }
 
@@ -2005,7 +2048,7 @@ function showRow (srcBnId, srcRow) {
 	let BN_id;
 	let twistie;
 	if (openTree_option) { // Set it to open state
-	  twistie = firstUnhiddenParentRow.firstElementChild.firstElementChild;
+	  twistie = firstUnhiddenParentRow.firstElementChild.firstElementChild.firstElementChild;
 	  // First unhidden means all under it is hidden so it is necessarily closed => Open twistie
 	  twistie.classList.replace("twistieac", "twistieao");
 	  BN_id = firstUnhiddenParentRow.dataset.id;
@@ -2035,7 +2078,7 @@ function showRow (srcBnId, srcRow) {
 		}
 		else { // It is on path to srcBnId, we need to unhide its children
 		  if (openTree_option) { // If option is true, set it to open state
-			twistie = row.firstElementChild.firstElementChild;
+			twistie = row.firstElementChild.firstElementChild.firstElementChild;
 			twistie.classList.replace("twistieac", "twistieao");
 			BN_id = row.dataset.id;
 			curFldrOpenList[BN_id] = true;
@@ -2124,7 +2167,7 @@ function collapseAll (bnId, row) {
 
   // Close and hide all children
   // Close twistie
-  let twistie = row.firstElementChild.firstElementChild;
+  let twistie = row.firstElementChild.firstElementChild.firstElementChild;
   twistie.classList.replace("twistieao", "twistieac");
   curFldrOpenList[bnId] = false;
 
@@ -2136,7 +2179,7 @@ function collapseAll (bnId, row) {
 	  break; // Stop when lower or same level
 	if (cur_level > prev_level) { // We just crossed a folder in previous row ..
 	  // Check if it was open or not
-	  twistie = prev_row.firstElementChild.firstElementChild;
+	  twistie = prev_row.firstElementChild.firstElementChild.firstElementChild;
 	  if (twistie.classList.replace("twistieao", "twistieac")) { // We just closed the sub-folder
 		bnId = prev_row.dataset.id;
 		curFldrOpenList[bnId] = false;
@@ -2167,7 +2210,7 @@ function expandAll (bnId, row) {
   } 
 
   // Open twistie
-  let twistie = row.firstElementChild.firstElementChild;
+  let twistie = row.firstElementChild.firstElementChild.firstElementChild;
   twistie.classList.replace("twistieac", "twistieao");
   curFldrOpenList[bnId] = true;
 
@@ -2179,7 +2222,7 @@ function expandAll (bnId, row) {
 	  break; // Stop when lower or same level
 	if (cur_level > prev_level) { // We just crossed a folder in previous row ..
 	  // Check if it was open or not
-	  twistie = prev_row.firstElementChild.firstElementChild;
+	  twistie = prev_row.firstElementChild.firstElementChild.firstElementChild;
 	  if (twistie.classList.replace("twistieac", "twistieao")) { // We just opened the sub-folder
 		bnId = prev_row.dataset.id;
 		curFldrOpenList[bnId] = true;
@@ -2223,7 +2266,7 @@ function openResParents (row) {
 
 	// That can only be a folder, but that doesn't hurt to check
  	if (row.dataset.type == "folder") { // Set it to open state
-	  twistie = row.firstElementChild.firstElementChild;
+	  twistie = row.firstElementChild.firstElementChild.firstElementChild;
 	  if (twistie.classList.contains("twistieac")) { // Open twistie
 		twistie.classList.replace("twistieac", "twistieao");
 		curFldrOpenList[BN_id] = true;
@@ -2277,7 +2320,7 @@ function handleResultClick (resultBN_id) {
  */
 function handleFolderClick (twistie) {
   // Retrieve bookmark information in the row (BN.id and level)
-  let row = twistie.parentElement.parentElement;
+  let row = twistie.parentElement.parentElement.parentElement;
   let BN_id = row.dataset.id;
   let level = parseInt(row.dataset.level, 10);
 //  trace("Row: "+row+" level: "+level);
@@ -2317,7 +2360,7 @@ function handleFolderClick (twistie) {
 		}
 		else if (prev_level == level) { // If folder at same level with an open twistie, close it 
 		  // Check if this is an open folder row
-		  prev_twistie = prev_row.firstElementChild.firstElementChild;
+		  prev_twistie = prev_row.firstElementChild.firstElementChild.firstElementChild;
 		  is_open = prev_twistie.classList.contains("twistieao");
 		  if (is_open) { // Yes, close it
 			prev_twistie.classList.replace("twistieao", "twistieac");
@@ -2345,7 +2388,7 @@ function handleFolderClick (twistie) {
 		break; // Stop when lower or same level
 	  if (cur_level > prev_level) { // We just crossed a folder in previous row ..
 		// Check if it was open or not
-		twistie = prev_row.firstElementChild.firstElementChild;
+		twistie = prev_row.firstElementChild.firstElementChild.firstElementChild;
 		is_open = twistie.classList.contains("twistieao");
 
 		// Make the new level visible only if the previous one was visible
@@ -2365,7 +2408,7 @@ function handleFolderClick (twistie) {
 	// If option set, go until end or lower level to close all other open folders at same level
 	if (closeSibblingFolders_option && (row != null) && (cur_level == level)) { // There are sibbling rows
 	  // Check if current row is an open folder
-	  twistie = row.firstElementChild.firstElementChild;
+	  twistie = row.firstElementChild.firstElementChild.firstElementChild;
 	  is_open = twistie.classList.contains("twistieao");
 	  if (is_open) { // Yes, close it
 		twistie.classList.replace("twistieao", "twistieac");
@@ -2380,7 +2423,7 @@ function handleFolderClick (twistie) {
 		}
 		else if (cur_level == level) { // If folder at same level with an open twistie, close it 
 		  // Check if this is an open folder row
-		  twistie = row.firstElementChild.firstElementChild;
+		  twistie = row.firstElementChild.firstElementChild.firstElementChild;
 		  is_open = twistie.classList.contains("twistieao");
 		  if (is_open) { // Yes, close it
 			twistie.classList.replace("twistieao", "twistieac");
@@ -2406,17 +2449,15 @@ function resultsMouseDownHandler (e) {
   let target = e.target; // Type depends ..
   let className = target.className;
 //console.log("Result mouse down event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" target: "+target+" class: "+className);
-  if ((className != undefined)
-	  && (className.length > 0)) {
+  if ((className != undefined) && (className.length > 0)) {
 	// The click target is one of .brow cell,
-	// .rbkmkitem_x div or anchor, .favicon img or .favttext span
+	// .rbkmkitem_x div, .rtwistieac div, favicon img or .favttext span
 	// Find cell, for selection
 	let cell;
-	if (className.includes("fav")) { // <div>, <img> or <span> -> got to .bkmkitem_x
-	  								 // when advanced or Alt key, else go to .brow
+	if (className.includes("fav") || className.startsWith("rtwistie")) {
 	  cell = target.parentElement.parentElement;
 	}
-	else if (className.startsWith("rbkmkitem_") || (className == "rtwistieac")) {
+	else if (className.startsWith("rbkmkitem_")) {
 	  cell = target.parentElement;
 	}
 	else if (className.includes("brow")) {
@@ -2439,14 +2480,13 @@ function resultsMouseHandler (e) {
   let target = e.target; // Type depends ..
   let className = target.className;
 //console.log("Result click event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" target: "+target+" class: "+className);
-  if ((className != undefined)
-	  && (className.length > 0)) {
+  if ((className != undefined) && (className.length > 0)) {
 	// The click target is one of .brow cell,
-	// .rbkmkitem_x div or anchor, .favicon img or .favttext span
+	// .rbkmkitem_x div, .twistieac div, favicon img or .favttext span
 	// Handle click, and go to the parent row
 	let row;
-	if (className.includes("fav")) { // <div>, <img> or <span> -> got to .bkmkitem_x
-	  								 // when advanced or Alt key, else go to .brow
+	if (className.includes("fav") || className.startsWith("rtwistie")) {
+      // Go to .bkmkitem_x when advanced or Alt key, else go to .brow
 	  if (advancedClick_option || e.altKey) {
 		row = (target = target.parentElement).parentElement.parentElement;
 	  }
@@ -2455,10 +2495,10 @@ function resultsMouseHandler (e) {
 	  }
 	  className = target.className;
 	}
-	else if (className.startsWith("rbkmkitem_") || (className == "rtwistieac")) {
+	else if (className.startsWith("rbkmkitem_")) {
 	  let cell;
 	  row = (cell = target.parentElement).parentElement;
-	  // If Alt key or advanced, open in current tab, else just show => go to .brow
+	  // If Alt key or advanced, open in current tab (remainon current target), else show => go to .brow
 	  if (!advancedClick_option && !e.altKey) {
 		target = cell;
 		className = target.className;
@@ -2516,11 +2556,11 @@ function resultsMouseHandler (e) {
 	  // Retrieve bookmark information in the result row (BN.id)
 	  // Then show it
 	  handleResultClick(resultBN_id);
-	}
 
-	// If close search option is set, close search pane now
-	if (closeSearch_option) {
-	  clearSearchTextHandler();
+	  // If close search option is set, close search pane now
+	  if (closeSearch_option) {
+		clearSearchTextHandler();
+	  }
 	}
   }
   e.stopPropagation(); // Prevent handlers up the DOM chain on same event
@@ -2535,14 +2575,13 @@ function bkmkMouseDownHandler (e) {
   let target = e.target; // Type depends ..
   let className = target.className;
 //console.log("Bookmark mouse down event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" target: "+target+" class: "+className);
-  if ((className != undefined)
-	  && (className.length > 0)) {
+  if ((className != undefined) && (className.length > 0)) {
 	// Find cell, for selection
 	let cell;
-	if (className.includes("fav")) {
+	if (className.includes("fav") || className.startsWith("twistie")) {
 	  cell = target.parentElement.parentElement;
 	}
-	else if (className.startsWith("bkmkitem_") || className.startsWith("twistie")) {
+	else if (className.startsWith("bkmkitem_")) {
 	  cell = target.parentElement;
 	}
 	else if (className.includes("brow")) {
@@ -2566,13 +2605,12 @@ function bkmkMouseHandler (e) {
   let className = target.className;
 //console.log("Bookmark click event: "+e.type+" button: "+e.button+" shift: "+e.shiftKey+" target: "+target+" class: "+className);
 
-  // The click target is one of .brow/.selbrow cell, .twistiexx img (if folder),
-  // .bkmkitem_x div, .favseparator/.favseparatorend div, .favicon or .favttext
-  // Act only if the user clicked on .twistieax img, .bkmkitem_x, .favicon or .favtext
-  // If favicon or favtext, get parent instead to handle click
+  // The click target is one of .brow/.selbrow cell, .bkmkitem_x div,
+  // .twistiexx img (if folder), .favseparator/.favseparatorend div, .favicon or .favttext
+  // Act only if the user clicked on .bkmkitem_x, .twistieax, .favicon or .favtext
+  // If twistie, favicon or favtext, get parent instead to handle click
   // Cannot be scrollbars when left mouse click
-  let twistie;
-  if (className.includes("fav")) {
+  if (className.includes("fav") || className.startsWith("twistie")) {
 	target = target.parentElement;
 	className = target.className;
   }
@@ -2638,13 +2676,11 @@ function bkmkMouseHandler (e) {
 		);
 	  }
 	}
-	if ((twistie = target.previousElementSibling).className.startsWith("twistiea")) {
+	// If active twistie (folder with children), go for folder action
+	let twistie = target.firstElementChild;
+	if (twistie.className.startsWith("twistiea")) {
 	  handleFolderClick(twistie);
 	}
-  }
-  // If active twistie (folder with children), also go for folder action
-  else if (className.startsWith("twistiea")) { // "twistieao" or "twistieac"
-	handleFolderClick(target);
   }
 
   e.stopPropagation(); // Prevent handlers up the DOM chain on same event
@@ -2667,11 +2703,11 @@ function resultsAuxHandler (e) {
 	// .rbkmkitem_x div or anchor, .favicon img or .favttext span
 	// Handle click, and go to the parent row
 	let row;
-	if (className.includes("fav")) { // <div>, <img> or <span>
+	if (className.includes("fav") || className.startsWith("rtwistie")) {
 	  row = (target = target.parentElement).parentElement.parentElement;
 	  className = target.className;
 	}
-	else if (className.startsWith("rbkmkitem_") || (className == "rtwistieac")) {
+	else if (className.startsWith("rbkmkitem_")) {
 	  row = target.parentElement.parentElement;
 	}
 	else { // .brow
@@ -2697,11 +2733,6 @@ function resultsAuxHandler (e) {
 		);
 	  }
 	}
-
-	// If close search option is set, close search pane now
-	if (closeSearch_option) {
-	  clearSearchTextHandler();
-	}
   }
   e.stopPropagation(); // Prevent handlers up the DOM chain on same event
 }
@@ -2718,11 +2749,11 @@ function bkmkAuxHandler (e) {
 
   // Be careful, button 2 (contextmenu) also ends up here :-(
   if (e.button == 1) {
-	// The click target is one of .brow cell, .twistiexx img (if folder),
-	// .bkmkitem_x div or anchor, .favseparator div, .favicon or .favttext
-	// Act only if the user clicked on .twistieax img, .bkmkitem_x, .favicon or .favtext
+	// The click target is one of .brow cell, .bkmkitem_x div,
+	// .favseparator div, .twistiexx div (if folder), .favicon or .favttext
+	// Act only if the user clicked on .bkmkitem_x, .twistieax img, favicon or .favtext
 	// If favicon or favtext, get parent instead to handle click
-	if (className.includes("fav")) {
+	if (className.includes("fav") || className.startsWith("twistie")) {
 	  target = target.parentElement;
 	  className = target.className;
 	}
@@ -2894,10 +2925,10 @@ function resultsContextHandler (e) {
 	// Go up to the row level, and store the rowIndex and type in the menu as data- attribute
 	let row;
 	let cell;
-	if(className.includes("fav")) {
+	if (className.includes("fav") || className.startsWith("rtwistie")) {
 	  row = (cell = target.parentElement.parentElement).parentElement;
 	}
-	else if (className.startsWith("rbkmkitem_") || (className == "rtwistieac")) {
+	else if (className.startsWith("rbkmkitem_")) {
 	  row = (cell = target.parentElement).parentElement;
 	}
 	else { // .brow
@@ -3021,10 +3052,10 @@ function bkmkContextHandler (e) {
   let className = target.className;
   let row;
   let cell;
-  if(className.includes("fav")) {
+  if (className.includes("fav") || className.startsWith("twistie")) {
 	row = (cell = target.parentElement.parentElement).parentElement;
   }
-  else if (className.startsWith("bkmkitem_") || className.startsWith("twistie")) {
+  else if (className.startsWith("bkmkitem_")) {
 	row = (cell = target.parentElement).parentElement;
   }
   else { // .brow
@@ -4060,24 +4091,24 @@ function getDragToRow (target) {
 	isTopItem = ((level = row.dataset.level) == "0");
 	isBkmkitem_f = (row.dataset.type == "folder");
 	if (isBkmkitem_f) {
-      if (bkmkitem_x.previousElementSibling.classList.contains("twistieac"))
+	  if (bkmkitem_x.firstElementChild.classList.contains("twistieac"))
 		isFolderClosed = true;
 	  else   isFolderClosed = false;
-      nextRow = row.nextElementSibling;
-      isFolderEmpty = (nextRow == undefined) || isStringA_le_B(nextRow.dataset.level, level);
+	  nextRow = row.nextElementSibling;
+	  isFolderEmpty = (nextRow == undefined) || isStringA_le_B(nextRow.dataset.level, level);
 	}
   }
-  else if (className.includes("fav")) {
+  else if (className.includes("fav") || className.startsWith("twistie")) {
 	row = (bkmkitem_x = target.parentElement).parentElement.parentElement;
 	isProtected = (row.dataset.protect == "true");
 	isTopItem = ((level = row.dataset.level) == "0");
 	isBkmkitem_f = (row.dataset.type == "folder");
 	if (isBkmkitem_f) {
-	  if (bkmkitem_x.previousElementSibling.classList.contains("twistieac"))
+	  if (bkmkitem_x.firstElementChild.classList.contains("twistieac"))
 		isFolderClosed = true;
 	  else   isFolderClosed = false;
-      nextRow = row.nextElementSibling;
-      isFolderEmpty = (nextRow == undefined) || isStringA_le_B(nextRow.dataset.level, level);
+	  nextRow = row.nextElementSibling;
+	  isFolderEmpty = (nextRow == undefined) || isStringA_le_B(nextRow.dataset.level, level);
 	}
   }
   else if (classList.contains("bkmkitem_f")) {
@@ -4085,11 +4116,11 @@ function getDragToRow (target) {
 	isProtected = (row.dataset.protect == "true");
 	isTopItem = ((level = row.dataset.level) == "0");
 	isBkmkitem_f = true;
-    if (bkmkitem_x.previousElementSibling.classList.contains("twistieac"))
+	if (bkmkitem_x.firstElementChild.classList.contains("twistieac"))
 	  isFolderClosed = true;
 	else   isFolderClosed = false;
-    nextRow = row.nextElementSibling;
-    isFolderEmpty = (nextRow == undefined) || isStringA_le_B(nextRow.dataset.level, level);
+	nextRow = row.nextElementSibling;
+	isFolderEmpty = (nextRow == undefined) || isStringA_le_B(nextRow.dataset.level, level);
   }
   else if (className.startsWith("bkmkitem_")) {
 	row = (bkmkitem_x = target).parentElement.parentElement;
@@ -4097,33 +4128,19 @@ function getDragToRow (target) {
 	isTopItem = (row.dataset.level == "0");
 	isBkmkitem_f = false;
   }
-  else if (className.startsWith("twistie")) {
-	row = target.parentElement.parentElement;
-	isProtected = (row.dataset.protect == "true");
-	isTopItem = ((level = row.dataset.level) == "0");
-	bkmkitem_x = target.nextElementSibling;
-	isBkmkitem_f = true;
-    if (classList.contains("twistieac"))
-	  isFolderClosed = true;
-	else   isFolderClosed = false;
-    nextRow = row.nextElementSibling;
-    isFolderEmpty = (nextRow == undefined) || isStringA_le_B(nextRow.dataset.level, level);
-  }
   else if (className.includes("brow")) {
 	row = target.parentElement;
+	bkmkitem_x = target.firstElementChild;
 	isProtected = (row.dataset.protect == "true");
 	isTopItem = ((level = row.dataset.level) == "0");
-	bkmkitem_x = target.firstElementChild;
-	if (bkmkitem_x.className.startsWith("twistie")) {
-      isBkmkitem_f = true;
-      if (bkmkitem_x.classList.contains("twistieac"))
-  	    isFolderClosed = true;
-  	  else   isFolderClosed = false;
-      bkmkitem_x = bkmkitem_x.nextElementSibling;
-      nextRow = row.nextElementSibling;
-      isFolderEmpty = (nextRow == undefined) || isStringA_le_B(nextRow.dataset.level, level);
+	isBkmkitem_f = (row.dataset.type == "folder");
+	if (isBkmkitem_f) {
+	  if (bkmkitem_x.firstElementChild.classList.contains("twistieac"))
+		isFolderClosed = true;
+	  else   isFolderClosed = false;
+	  nextRow = row.nextElementSibling;
+	  isFolderEmpty = (nextRow == undefined) || isStringA_le_B(nextRow.dataset.level, level);
 	}
-	else   isBkmkitem_f = false;
   }
 
 //console.log("className: "+className+" isBkmkitem_f: "+isBkmkitem_f);
@@ -4367,7 +4384,7 @@ function bkmkDragOverHandler (e) {
 	curBkmkTarget = target;
 	curBkmkDt = dt;
   }
-console.log("Drag over event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
+//console.log("Drag over event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
   // Handle drag scrolling inhibition
   handleBkmkDragScroll(OverEvent, e);
   if (((target.className == undefined)  // When on Text, className and classList are undefined.
@@ -5150,7 +5167,6 @@ function keyHandler (e) {
 		  cell.focus();
 		}
 	  }
-	  e.preventDefault();
 	}
 	else if (key == "ArrowUp") {
 	  if (!myMenu_open) {
@@ -5168,7 +5184,6 @@ function keyHandler (e) {
 		  cell.focus();
 		}
 	  }
-	  e.preventDefault();
 	}
 	else if (key == "PageDown") {
 	  if (!myMenu_open) {
@@ -5221,7 +5236,6 @@ function keyHandler (e) {
 		  cell.focus();
 		}
 	  }
-	  e.preventDefault();
 	}
 	else if (key == "PageUp") {
 	  if (!myMenu_open) {
@@ -5274,7 +5288,6 @@ function keyHandler (e) {
 		  cell.focus();
 		}
 	  }
-	  e.preventDefault();
 	}
 	else if (key == "End") {
 	  if (!myMenu_open) {
@@ -5301,7 +5314,6 @@ function keyHandler (e) {
 		}
 		cell.focus();
 	  }
-	  e.preventDefault();
 	}
 	else if (key == "Home") {
 	  if (!myMenu_open) {
@@ -5322,13 +5334,12 @@ function keyHandler (e) {
 		}
 		cell.focus();
 	  }
-	  e.preventDefault();
 	}
 	else if (!isResultRow && (key == "ArrowLeft")) {
 	  if (!myMenu_open) {
 		// If on an open folder, close it, else go to parent folder (if not root)
 		let type = row.dataset.type;
-		let twistie = target.firstElementChild;
+		let twistie = target.firstElementChild.firstElementChild;
 		if (e.shiftKey) { // Collapse it (even if already closed)
 		  collapseAll(row.dataset.id, row);
 		}
@@ -5348,14 +5359,13 @@ function keyHandler (e) {
 		  }
 		}
 	  }
-	  e.preventDefault();
 	}
 	else if (!isResultRow && (key == "ArrowRight")) {
 	  if (!myMenu_open) {
 		// If on a closed folder, open it, or if on an open folder, go to first child if any, else do nothing
 		let type = row.dataset.type;
 		if (type == "folder") {
-		  let twistie = target.firstElementChild;
+		  let twistie = target.firstElementChild.firstElementChild;
 		  if (e.shiftKey) { // Expand it (even if already open)
 			expandAll(row.dataset.id, row);
 		  }
@@ -5378,7 +5388,6 @@ function keyHandler (e) {
 		  }
 		}
 	  }
-	  e.preventDefault();
 	}
 	else if (!isResultRow && (key == "Delete")) {
 	  if (!myMenu_open) {
@@ -5388,7 +5397,6 @@ function keyHandler (e) {
 		  browser.bookmarks.removeTree(BN_id);
 		}
 	  }
-	  e.preventDefault();
 	}
 	else if (key == "Enter") {
 	  if (!myMenu_open) {
@@ -5430,13 +5438,12 @@ function keyHandler (e) {
 		  }
 		}
 		else if (!isResultRow && (type == "folder")) { // Folder default action
-		  let twistie = target.firstElementChild;
+		  let twistie = target.firstElementChild.firstElementChild;
 		  if (twistie.className.startsWith("twistiea")) {
 			handleFolderClick(twistie);
 		  }
 		}
 	  }
-	  e.preventDefault();
 	}
 	else if ((key.toLowerCase() == "c") && ctrlKey) { // Copy
 	  if (!myMenu_open) {
@@ -5475,7 +5482,7 @@ console.log("edit");
 console.log("type: "+type);
 	  let span;
 	  if (type == "folder") {
-		span = target.firstElementChild.nextElementSibling.firstElementChild.nextElementSibling;
+		span = target.firstElementChild.firstElementChild.nextElementSibling.nextElementSibling;
 	  }
 	  else if (type == "bookmark") {
 		span = target.firstElementChild.firstElementChild.nextElementSibling;
@@ -5484,9 +5491,9 @@ console.log("type: "+type);
 	  console.log("span: "+span);
 	  span.contentEditable = true;
 	  span.focus();
-	  e.preventDefault();
 	}
 */
+	e.preventDefault();
   }
 //  else {
 //	SearchTextInput.focus(); // Focus on search box when a key is typed ...
@@ -6047,6 +6054,10 @@ function clickHandler (e) {
 	  menuAction = true;
 	  setSScopeSubfolderHandler();
 	}
+	else if (classList.contains("menussfolderonly")) { // Search options
+	  menuAction = true;
+	  setSScopeFolderonlyHandler();
+	}
 	else if (classList.contains("menusmwords")) { // Search options
 	  menuAction = true;
 	  setSMatchWordsHandler();
@@ -6480,7 +6491,9 @@ function handleAddonMessage (request, sender, sendResponse) {
 			  let msg = "Error on processing changedOptions : "+err;
 			  console.log(msg);
 			  if (err != undefined) {
-				console.log("fileName:   "+err.fileName);
+				let fn = err.fileName;
+				if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+				console.log("fileName:   "+fn);
 				console.log("lineNumber: "+err.lineNumber);
 			  }
 			}
@@ -6501,7 +6514,9 @@ function handleAddonMessage (request, sender, sendResponse) {
 			  let msg = "Error on processing changedOptions : "+err;
 			  console.log(msg);
 			  if (err != undefined) {
-				console.log("fileName:   "+err.fileName);
+				let fn = err.fileName;
+				if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+				console.log("fileName:   "+fn);
 				console.log("lineNumber: "+err.lineNumber);
 			  }
 			}
@@ -6528,7 +6543,7 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  else if (msg.startsWith("asyncFavicon")) { // Got a favicon uri to display
 		let bnId = request.bnId;
 		let uri = request.uri;
-		if (backgroundPage == undefined) { // If we are a private window, we have our own copy of curBNList
+		if (backgroundPage == undefined) { // If we are in a private window, we have our own copy of curBNList
 		  // Maintain it up to date
 		  curBNList[bnId].faviconUri = uri;
 		}
@@ -6537,8 +6552,29 @@ function handleAddonMessage (request, sender, sendResponse) {
 		let row = curRowList[bnId]; // Retrieve row holding the icon
 //trace("BN.id: "+bnId+" index: "+row.rowIndex+" Row id: "+row.dataset.id+" uri: "+uri);
 		if (row != undefined) { // May happen on most visited and recent bookmarks when they are not yet ready
-		  let img = row.firstElementChild.firstElementChild.firstElementChild;
-		  img.src = uri;
+		  let bkmkitem = row.firstElementChild.firstElementChild;
+		  let oldImg = bkmkitem.firstElementChild;
+		  let cn = oldImg.className;
+		  if (uri == "/icons/nofavicon.png") {
+			if ((cn == undefined) || !cn.includes("nofavicon")) { // Change to nofavicon only if not already a nofavicon
+			  let tmpElem = document.createElement("div");
+			  tmpElem.classList.add("nofavicon");
+			  tmpElem.draggable = false; // True by default for <img>
+			  bkmkitem.replaceChild(tmpElem, oldImg);
+			}
+		  }
+		  else {
+			if ((cn != undefined) && cn.includes("nofavicon")) { // Change type from <div> to <img> if it was a nofavicon
+			  let tmpElem = document.createElement("img"); // Assuming it is an HTMLImageElement
+			  tmpElem.classList.add("favicon");
+			  tmpElem.draggable = false; // True by default for <img>
+			  tmpElem.src = uri;
+			  bkmkitem.replaceChild(tmpElem, oldImg);
+			}
+			else {
+			  oldImg.src = uri;
+			}
+		  }
 		}
 //		else {
 //consolde.log("null row for: "+bnId);
@@ -6611,7 +6647,9 @@ function handleAddonMessage (request, sender, sendResponse) {
 	console.log("Error processing message: "+request.content);
 	if (error != undefined) {
 	  console.log("message:    "+error.message);
-	  console.log("fileName:   "+error.fileName);
+	  let fn = error.fileName;
+	  if (fn == undefined)   fn = error.filename; // Not constant :-( Some errors have filename, and others have fileName 
+	  console.log("fileName:   "+fn);
 	  console.log("lineNumber: "+error.lineNumber);
 	}
   }
@@ -6791,7 +6829,7 @@ function completeDisplay () {
   addEventListener("contextmenu", noDefaultAction);
   addEventListener("auxclick", noDefaultAction);
   addEventListener("blur", onBlur);
-  addEventListener('wheel', onWheel, {capture: true}); // To disable zooming
+  addEventListener('wheel', onWheel, {capture: true, passive: false}); // To disable zooming
   addEventListener('resize', windowSizeHandler);
 
   if (!beforeFF64) { // Handle integrated FF menu items on sidebar
@@ -7272,12 +7310,7 @@ function setupUI () {
 	let cssStyleRule;
 	let style;
 
-	cssStyleRule = getStyleRule(cssRules, ".bkmkitem_b");
-	style = cssStyleRule.style; // A CSSStyleDeclaration object
-	style.setProperty("padding-top", padding+"px");
-	style.setProperty("padding-bottom", padding+"px");
-
-	cssStyleRule = getStyleRule(cssRules, ".bkmkitem_f");
+	cssStyleRule = getStyleRule(cssRules, ".bkmkitem_b, .bkmkitem_f");
 	style = cssStyleRule.style; // A CSSStyleDeclaration object
 	style.setProperty("padding-top", padding+"px");
 	style.setProperty("padding-bottom", padding+"px");

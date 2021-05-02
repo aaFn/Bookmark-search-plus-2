@@ -52,8 +52,10 @@ function answerBack (bnId, uri) {
 	let msg = "Error in favicon call to asyncFavicon() : "+err;
 	console.log(msg);
 	if (err != undefined) {
+	  let fn = err.fileName;
+	  if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+	  console.log("fileName:   "+fn);
 	  console.log("lineNumber: "+err.lineNumber);
-	  console.log("fileName:   "+err.fileName);
 	}
   }
 
@@ -179,8 +181,10 @@ async function getUri (url, enableCookies) {
 		let msg = "Response.blob Error :-S "+err;
 		console.log(msg, url);
 		if (err != undefined) {
+		  let fn = err.fileName;
+		  if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+		  console.log("fileName:   "+fn);
 		  console.log("lineNumber: "+err.lineNumber);
-		  console.log("fileName:   "+err.fileName);
 		}
 	  }
 	}
@@ -458,6 +462,8 @@ async function fetchFavicon (bnUrl, enableCookies) {
 	// Some errors return a page with a favicon, when the site implements a proper error page
 	//if (response.status == 200) { // If ok, get contents as a string
 	  try {
+		// Agauin, timeout on fetch
+		fetchTimerID = setTimeout(fetchTimeoutHandler, FetchTimeout);
 		let text = await response.text();
 		// text is a USVString returned by Response.text()
 //		text = htmldecode(text);
@@ -536,11 +542,18 @@ async function fetchFavicon (bnUrl, enableCookies) {
 		}
 	  }
 	  catch (err) {
-		let msg = "Error on getting favison URL : "+err;
+		// Remove fetch timeout
+		if (fetchTimerID != null) {
+		  clearTimeout(fetchTimerID);
+		  fetchTimerID = null;
+		}
+		let msg = "Error on getting favicon URL : "+err;
 		console.log(msg);
 		if (err != undefined) {
+		  let fn = err.fileName;
+		  if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+		  console.log("fileName:   "+fn);
 		  console.log("lineNumber: "+err.lineNumber);
-		  console.log("fileName:   "+err.fileName);
 		}
 	  }
 /*
@@ -563,8 +576,10 @@ async function fetchFavicon (bnUrl, enableCookies) {
 	let msg = "Page fetch Error :-S "+err;
 	console.log(msg, bnUrl);
 	if (err != undefined) {
+	  let fn = err.fileName;
+	  if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+	  console.log("fileName:   "+fn);
 	  console.log("lineNumber: "+err.lineNumber);
-	  console.log("fileName:   "+err.fileName);
 	}
   }
 

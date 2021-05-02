@@ -258,46 +258,7 @@ tbody {
   border-color: #7BC3FF;
 }
 
-.twistiena {
-  height: 16px;
-  width: 16px;
-  flex: none;
-  background-image: url("/icons/twistiena.png");
-}
-
-.twistieac {
-  height: 16px;
-  width: 16px;
-  flex: none;
-  background-image: url("/icons/twistieac.png");
-  cursor: pointer;
-}
-
-.rtwistieac {
-  height: 16px;
-  width: 16px;
-  flex: none;
-  background-image: url("/icons/twistieac.png");
-  cursor: default;
-}
-
-.brow:hover .twistieac, .selbrow:hover .twistieac {
-  background-image: url("/icons/twistieacf.png");
-}
-
-.twistieao {
-  height: 16px;
-  width: 16px;
-  flex: none;
-  background-image: url("/icons/twistieao.png");
-  cursor: pointer;
-}
-
-.brow:hover .twistieao, .selbrow:hover .twistieao {
-  background-image: url("/icons/twistieaof.png");
-}
-
-.bkmkitem_b {
+.bkmkitem_b, .bkmkitem_f {
   flex: none;
   cursor: pointer;
   border-top: solid 2px transparent;
@@ -306,6 +267,7 @@ tbody {
   margin-bottom: -2px;
 }
 
+/* Keep separate as this CSSRule is modified by Advanced option to change the cursor attribute */
 .rbkmkitem_b {
   flex: none;
   cursor: default;
@@ -313,15 +275,7 @@ tbody {
   border-bottom: solid 2px transparent;
   margin-top: -2px;
   margin-bottom: -2px;
-}
-
-.bkmkitem_f {
-  flex: none;
-  cursor: pointer;
-  border-top: solid 2px transparent;
-  border-bottom: solid 2px transparent;
-  margin-top: -2px;
-  margin-bottom: -2px;
+  cursor: default;
 }
 
 .rbkmkitem_f {
@@ -349,7 +303,7 @@ tbody {
   border-bottom: 1px solid #222426;
 }
 
-.brow:hover .bkmkitem_s .favseparator, .brow:focus .bkmkitem_s .favseparator, .selbrow .bkmkitem_s .favseparator {
+.brow:hover .favseparator, .brow:focus .favseparator, .selbrow .favseparator {
   border-bottom-color: #222426;
 }
 
@@ -357,6 +311,49 @@ tbody {
   flex: none;
   width: 1px;
   height: 16px;
+}
+
+.twistiena {
+  display: inline-block;
+  height: 16px;
+  width: 16px;
+  vertical-align: text-bottom;
+  background-image: url("/icons/twistiena.png");
+}
+
+.twistieac {
+  display: inline-block;
+  height: 16px;
+  width: 16px;
+  vertical-align: text-bottom;
+  background-image: url("/icons/twistieac.png");
+  cursor: pointer;
+}
+
+.rtwistieac {
+  display: inline-block;
+  height: 16px;
+  width: 16px;
+  vertical-align: text-bottom;
+  background-image: url("/icons/twistieac.png");
+  cursor: default;
+}
+
+.brow:hover .twistieac, .selbrow:hover .twistieac {
+  background-image: url("/icons/twistieacf.png");
+}
+
+.twistieao {
+  display: inline-block;
+  height: 16px;
+  width: 16px;
+  vertical-align: text-bottom;
+  background-image: url("/icons/twistieao.png");
+  cursor: pointer;
+}
+
+.brow:hover .twistieao, .selbrow:hover .twistieao {
+  background-image: url("/icons/twistieaof.png");
 }
 
 .ffavicon {
