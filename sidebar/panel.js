@@ -882,10 +882,13 @@ function updateSearch () {
 
 	// Look for bookmarks matching the search text in their contents (title, url .. etc ..)
 	let searching;
-	if ((searchField_option == "both") && (searchScope_option == "all") && (searchMatch_option == "words")) {
+	if (!noffapisearch_option
+		&& (searchField_option == "both") && (searchScope_option == "all") && (searchMatch_option == "words")) {
+//console.log("Using FF Search API");
 	  searching = browser.bookmarks.search(value);
 	}
 	else {
+//console.log("Using BSP2 internal search algorithm");
 	  searching = new Promise ( // Do it asynchronously as that can take time ...
 		(resolve) => {
 		  let a_matchStr;
@@ -923,7 +926,7 @@ function updateSearch () {
 			if (searchScope_option == "all") { // Use the List form
 			  a_BN = searchCurBNList(a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch);
 			}
-			  else { // Use the recursive form
+			else { // Use the recursive form
 			  let BN;
 			  if (cursor.cell == null) { // Start from Root
 				BN = rootBN;
@@ -1800,7 +1803,9 @@ function bkmkChanged (bnId, isBookmark, title, url, uri) {
   if (isBookmark) { // item is a .bkmkitem_b <div>
     // item.title mixes both, so is always updated
     // Update all
-	let span = item.firstElementChild.nextElementSibling;
+	let img = item.firstElementChild; // Assuming it is an HTMLImageElement
+	img.src = uri;
+	let span = img.nextElementSibling;
 	if (title == "") {
 	  item.title = url;
 	  span.textContent = suggestDisplayTitle(url);
@@ -1818,9 +1823,6 @@ function bkmkChanged (bnId, isBookmark, title, url, uri) {
 	else { // Set the new href value
 	  item.href = url;
 	}
-
-	let img = item.firstElementChild; // Assuming it is an HTMLImageElement
-	img.src = uri;
   }
   else { // Can only be a folder, per spec of the event, not a separator
 		 // => item is a ".bkmkmitem_f" <div>
@@ -1983,10 +1985,10 @@ function bkmkReordered (bnId, reorderInfo) {
  *
  * BN_id is a String.
  * 
- * Return true if BN is visible, else false
+ * Return true if BN is visible because all its ancestors are open, else false
  * Set the global variable firstVisibleParentRow to the lowest visible ancestor, from root.
- * Also set the global variable firstUnihiddenParentRow to the lowest unhidden ancestor (can
- * be different if upper parts were already unhidden by a previous showRow()),
+ * Also set the global variable firstUnhiddenParentRow to the lowest unhidden ancestor (can
+ * be different - and necessarily lower - if upper parts were already unhidden by a previous showRow()),
  * and the global variable hiddenParentRowsPath to the list (Array) of hidden parents above BN. 
  */
 let firstUnhiddenParentRow, hiddenParentRowsPath;
@@ -2067,7 +2069,7 @@ function showRow (srcBnId, srcRow) {
 	  row.hidden = false;
 	  // Check if this is a folder and if open, or meant to be open because on the path to srcBnId
 	  if ((row.dataset.type == "folder")
-		  && (row.firstElementChild.firstElementChild.classList.contains("twistieac"))
+		  && (row.firstElementChild.firstElementChild.firstElementChild.classList.contains("twistieac"))
 		 ) { // This is a closed folder, check its intended state
 		if (hiddenParentRowsPath.indexOf(row) == -1) {
 		  // Should stay closed, then all its children stay hidden ..
@@ -6407,6 +6409,7 @@ function handleAddonMessage (request, sender, sendResponse) {
 		let advancedClick_option_old = advancedClick_option;
 		let showPath_option_old = showPath_option;
 //		let closeSearch_option_old = closeSearch_option;
+//		let noffapisearch_option_old = noffapisearch_option;
 //		let openTree_option_old = openTree_option;
 		let matchTheme_option_old = matchTheme_option;
 		let setColors_option_old = setColors_option;

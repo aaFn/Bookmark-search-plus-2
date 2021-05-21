@@ -975,6 +975,7 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  let showPath_option_old = showPath_option;
 	  let closeSearch_option_old = closeSearch_option;
 	  let openTree_option_old = openTree_option;
+	  let noffapisearch_option_old = noffapisearch_option;
 	  let searchOnEnter_option_old = searchOnEnter_option;
 	  let reversePath_option_old = reversePath_option;
 	  let closeSibblingFolders_option_old = closeSibblingFolders_option;
@@ -1054,6 +1055,7 @@ function handleAddonMessage (request, sender, sendResponse) {
 			  	   || (showPath_option_old != showPath_option)
 			  	   || (closeSearch_option_old != closeSearch_option)
 			  	   || (openTree_option_old != openTree_option)
+				   || (noffapisearch_option_old != noffapisearch_option)
 			   	   || (searchOnEnter_option_old != searchOnEnter_option)
 			  	   || (reversePath_option_old != reversePath_option)
 			  	   || (closeSibblingFolders_option_old != closeSibblingFolders_option)

@@ -30,6 +30,7 @@ const CloseSearchInput = document.querySelector("#closesearch");
 const ImmediateFavDisplayInput = document.querySelector("#immediatefavdisplay");
 const LoadFFAPIInput = document.querySelector("#loadffapi");
 const ReloadFFAPIButton = document.querySelector("#reloadffapi");
+const NoFFAPISearchInput = document.querySelector("#noffapisearch");
 const DelayLoadInput = document.querySelector("#delayLoad");
 const SearchOnEnterInput = document.querySelector("#searchonenter");
 const ReversePathInput = document.querySelector("#reversepath");
@@ -266,6 +267,7 @@ function saveOptions (e) {
 	,opentree_option: OpenTreeInput.checked
 	,immediatefavdisplay_option: ImmediateFavDisplayInput.checked
 	,loadffapi_option: LoadFFAPIInput.checked
+	,noffapisearch_option: NoFFAPISearchInput.checked
 	,delayLoad_option: DelayLoadInput.checked
 	,searchonenter_option: SearchOnEnterInput.checked
 	,reversepath_option: ReversePathInput.checked
@@ -577,6 +579,10 @@ function restoreOptions () {
   if (loadffapi_option_file) {
 	LoadFFAPIInput.checked = true;
 	ReloadFFAPIButton.disabled = true;
+  }
+
+  if (noffapisearch_option_file) {
+	NoFFAPISearchInput.checked = true;
   }
 
   if (delayLoad_option_file) {
@@ -1147,6 +1153,7 @@ function initialize2 () {
   ImmediateFavDisplayInput.addEventListener("click", saveOptions);
   LoadFFAPIInput.addEventListener("click", saveOptions);
   ReloadFFAPIButton.addEventListener("click", reloadFFAPI);
+  NoFFAPISearchInput.addEventListener("click", saveOptions);
   DelayLoadInput.addEventListener("click", saveOptions);
   SearchOnEnterInput.addEventListener("click", saveOptions);
   ReversePathInput.addEventListener("click", saveOptions);

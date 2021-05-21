@@ -62,6 +62,9 @@
     <label for="loadffapi">Revert to old behavior of loading full bookmark tree from Firefox API at each restart. <i>Slows down bookmark tree availability</i></label>
     <button type="button" id="reloadffapi">Reload all bookmarks from FF now</button>
     <br/>
+    <input type="checkbox" id="noffapisearch">
+    <label for="noffapisearch">Never use FF Bookmark Search API, but use the BSP2 internal algorithm at all times. <i>Improves performance on default mode searches when lots of bookmarks</i></label>
+    <br/>
     <input type="checkbox" id="delayLoad" disabled>
     <label for="delayLoad"> (not yet effective) Load bookmarks only when required to (show result or open folder), do not load all at start. <i>For large volumes</i></label>
   </p>

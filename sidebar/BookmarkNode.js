@@ -932,7 +932,7 @@ function searchCurBNList (a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUr
   let len = names.length;
   for (let j=0 ; j<len ; j++) {
 	i = names[j];
-	if ((i != 0) && (i != Root) && !i.startsWith("place:")) { // Do not match with Root, nr with most visited or recent bookmarks
+	if ((i != 0) && (i != Root) && !i.startsWith("place:")) { // Do not match with Root, nor with most visited nor recent bookmarks
 	  BN = curBNList[i];
 	  if ((BN.type != "separator")
 		  && (((url = BN.url) == undefined) || !url.startsWith("place:"))  // Ignore special bookmarks

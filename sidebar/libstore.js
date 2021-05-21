@@ -27,6 +27,7 @@ var closeSearch_option; // Boolean
 var openTree_option; // Boolean
 var immediateFavDisplay_option; // Boolean
 var loadffapi_option; // Boolean
+var noffapisearch_option; // Boolean
 var delayLoad_option; // Boolean
 var searchOnEnter_option; // Boolean
 var reversePath_option; // Boolean
@@ -70,6 +71,7 @@ var closeSearch_option_file; // Boolean
 var openTree_option_file; // Boolean
 var immediateFavDisplay_option_file; // Boolean
 var loadffapi_option_file; // Boolean
+var noffapisearch_option_file; // Boolean
 var delayLoad_option_file; // Boolean
 var searchOnEnter_option_file; // Boolean
 var reversePath_option_file; // Boolean
@@ -150,6 +152,8 @@ function refreshOptionsBgnd(backgroundPage) {
 	immediateFavDisplay_option = backgroundPage.immediateFavDisplay_option;
 	loadffapi_option_file = backgroundPage.loadffapi_option_file;
 	loadffapi_option = backgroundPage.loadffapi_option;
+	noffapisearch_option_file = backgroundPage.noffapisearch_option_file;
+	noffapisearch_option = backgroundPage.noffapisearch_option;
 	delayLoad_option_file = backgroundPage.delayLoad_option_file;
 	delayLoad_option = backgroundPage.delayLoad_option;
 	delayLoad_option = false; // Disabled for now
@@ -226,6 +230,7 @@ function refreshOptionsLStore() {
 					, "opentree_option"
 					, "immediatefavdisplay_option"
 					, "loadffapi_option"
+					, "noffapisearch_option"
 					, "delayLoad_option"
 					, "searchonenter_option"
 					, "reversepath_option"
@@ -337,6 +342,13 @@ function refreshOptionsLStore() {
 				}
 				else {
 					loadffapi_option = false;
+				}
+				// -- Read NFFAS option..
+				if ((noffapisearch_option_file = res.noffapisearch_option) != undefined) {
+					noffapisearch_option = noffapisearch_option_file;
+				}
+				else {
+					noffapisearch_option = false;
 				}
 				// -- Read DL option..
 				if ((delayLoad_option_file = res.delayLoad_option) != undefined) {
@@ -655,6 +667,7 @@ function launchReadFullLStore(isSidebar) {
 				, "opentree_option"
 				, "immediatefavdisplay_option"
 				, "loadffapi_option"
+				, "noffapisearch_option"
 				, "delayLoad_option"
 				, "searchonenter_option"
 				, "reversepath_option"
@@ -681,7 +694,7 @@ function launchReadFullLStore(isSidebar) {
 				, "searchscope_option"
 				, "searchmatch_option"
 				, "searchfilter_option"
-				, "historydispurlist_option",
+				, "historydispurlist_option"
 				, "historyretention_option"
 				, "traceEnabled_option"
 				, "savedFldrOpenList"
@@ -701,6 +714,7 @@ function launchReadFullLStore(isSidebar) {
 				, "opentree_option"
 				, "immediatefavdisplay_option"
 				, "loadffapi_option"
+				, "noffapisearch_option"
 				, "delayLoad_option"
 				, "searchonenter_option"
 				, "reversepath_option"
@@ -866,6 +880,13 @@ function readFullOptions(res, isSidebar, waitMsg) {
 	}
 	else {
 		loadffapi_option = false;
+	}
+	waitMsg("Read NFFAS option..");
+	if ((noffapisearch_option_file = res.noffapisearch_option) != undefined) {
+		noffapisearch_option = noffapisearch_option_file;
+	}
+	else {
+		noffapisearch_option = false;
 	}
 	waitMsg("Read DL option..");
 	if ((delayLoad_option_file = res.delayLoad_option) != undefined) {
