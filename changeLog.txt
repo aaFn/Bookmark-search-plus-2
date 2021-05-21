@@ -1,6 +1,17 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.92 Bugs
+    - Corrected a regression introduced in 2.0.91 when slightly accelerating display of folders.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/187
+ - 2.0.91 Bugs & Improvements
+    - Corrected a regression appearing at start of BSP2 in private windows, causing BSP2 not to load properly.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/186
+    - Added option to not use the FF Search Bookmark API, but to use only the internal BSP2 search algorithm,
+      as performance improvement for the default mode search, in cases where the FF native search is too slow.
+      Note that this can change the order of results in the search result pane, but the list of results should
+      be the same.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/185  
 - 2.0.90 Bugs & Improvements
     - Accepted pull request from Gitoffthelawn aligning caps in menus with those of FF.
         https://github.com/aaFn/Bookmark-search-plus-2/pull/176
@@ -10,17 +21,18 @@ Please find here the release notes, TODO's, and some limitations I know of today
         https://github.com/aaFn/Bookmark-search-plus-2/issues/179
     - Corrected a bug where an empty list of Child ids or an empty text would result in a reduced height field displayed
       in the Bookmark Hitory window.
-    - Adjusted behavior to close the search pane only when there is a show, for the "After "Show bookmark", close search pane."
-      option.
-        https://github.com/aaFn/Bookmark-search-plus-2/issues/181
+    - Adjusted behavior to close the search pane only when there is a show action, for the "After "Show bookmark", close
+      search pane." option, and not when the action does not do any show (e.g. "Open in New Tab").
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/181#issuecomment-808581984
     - Prevented default handling of keys when typing non interpreted keystrokes in search pane or in bookmark pane.
-      E.g. pressing <space> was scrolling down by one "page".
+      E.g. pressing "space" was scrolling down by one "page".
     - Cleaned up a spurious trace in the browser console.
     - Changed the BSP2 Linux shortcut to Ctrl+Alt+B, since this shortcut which was free at beginning of BSP2 is now taken
       by FF for the Bookmark toolbar :-(
         https://github.com/aaFn/Bookmark-search-plus-2/issues/182
     - Introduced internal code support in History window for handling display of Undo/Redo in two modes: linked to the bookmark
       they are related to, or at their time position in raw list.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/75
     - Added more internal code support in History window for handling display of multiple selection operations
         https://github.com/aaFn/Bookmark-search-plus-2/issues/29
         https://github.com/aaFn/Bookmark-search-plus-2/issues/163
