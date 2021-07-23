@@ -1,6 +1,24 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.93 Bugs & Improvements
+    - Adjusted behavior to handle the MacOS Cmd key like Windows/Linux Ctrl key (and conversely handle MacOS
+      Control/Ctrl key like the Windows/Linux Meta key).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/191
+    - Replaced browser.extension.getURL() calls to browser.runtime.getURL(), as they are deprecated with FF 90+
+    - Made "Match active FF theme colors" option default to true on new installs of BSP2
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/190
+    - On delete of a bookmark by keyboard, select the next one (or the previous one if none), to no lose keyboard focus.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/181
+    - Added cursor move on typing alphanumeric characters, with a simple search algorithm (much less convoluted than
+      native FF Bookmark sidebar, which is quite hard to understand / reverse engineer, and not very natural):
+      when keystrokes are typed fast enough (faster than every 1/2 second), concatenate them as a string to search
+      for the next bookmark item starting with them. When a keystroke is more than 1/2 second after last,
+      re-initiate string used for search with that character only (and the ones typed after, sufficiently fast, if any).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/181
+    - In search result panel, highlight folders by a simple round bullet instead of a twistie, which is misleading
+      for some people who interpret it as being an "openable" item, and click on it in hope to see it open/close.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/84
 - 2.0.92 Bugs
     - Corrected a regression introduced in 2.0.91 when slightly accelerating display of folders.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/187
