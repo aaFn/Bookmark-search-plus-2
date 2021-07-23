@@ -384,7 +384,9 @@ let waitingInitBckgnd = false; // To flag we're waiting for background init
 let migrationTimeout = null; // Timer to trigger migration
 let platformOs;
 let isLinux = false; // To indicate we are under Linux, used for workaround on dragover not firing
-                     // continuously under Linux
+					 // continuously under Linux
+let isMacOS = false; // To indicate we are under MacOS, used for properly detecting the Cmd key
+					 // which is Ctrl in Windows/Linux (Apple always want to do it their way, don't they ?)
 let myWindowId;
 let isInSidebar = false; // To detect if we are open in sidebar or in a tab
 let openBookmarksInNewTabs_option = false; // Boolean
@@ -2517,6 +2519,7 @@ function resultsMouseHandler (e) {
 	}
 
 	let showSrcRow = true;
+	let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
 	if (className == "rbkmkitem_b") { // An HTMLDivElement
 	  e.preventDefault(); // We do not want the left click to open in a new tab ..
 	  					  // but in the active tab
@@ -2526,7 +2529,7 @@ function resultsMouseHandler (e) {
 		if (openSearchResultsInNewTabs_option) { // If option set, open in new tab at end
 		  browser.tabs.create({url: href});
 		}
-		else if (e.ctrlKey) { // Open in new tab, referred by this tab to come back to it when closing
+		else if (is_ctrlKey) { // Open in new tab, referred by this tab to come back to it when closing
 		  // Get current active tab as opener id to come back to it when closing the new tab
 		  if (beforeFF57)
 			browser.tabs.create({url: href});
@@ -2554,7 +2557,7 @@ function resultsMouseHandler (e) {
 	// Make the source object visible .. and scroll to it, except when Shift, Ctrl or Alt are pressed,
 	// and when not on favtext / favicon in advanced mode
 	let resultBN_id = row.dataset.id;
-	if (showSrcRow && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+	if (showSrcRow && !e.shiftKey && !is_ctrlKey && !e.altKey) {
 	  // Retrieve bookmark information in the result row (BN.id)
 	  // Then show it
 	  handleResultClick(resultBN_id);
@@ -2628,11 +2631,12 @@ function bkmkMouseHandler (e) {
 						// but in the active tab
 	let href = target.href;
 	if ((href != undefined) && (href.length > 0)) {
+	  let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
 	  // Respect the about:config browser.tabs.loadBookmarksInTabs setting
 	  if (openBookmarksInNewTabs_option) { // If option set, open in new tab at end
 		browser.tabs.create({url: href});
 	  }
-	  else if (e.ctrlKey) { // Open in new tab, referred by this tab to come back to it when closing
+	  else if (is_ctrlKey) { // Open in new tab, referred by this tab to come back to it when closing
 		// Get current active tab as opener id to come back to it when closing the new tab
 		if (beforeFF57)
 		  browser.tabs.create({url: href});
@@ -4352,7 +4356,7 @@ function bkmkDragEnterHandler (e) {
 	  dt.dropEffect = "none"; // Signal drop not allowed
 	}
 	else {
-	  let is_ctrlKey = e.ctrlKey;
+	  let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
 	  if ((!is_ctrlKey && (noDropZone != undefined) && noDropZone.isInZone(row.rowIndex))
 		  || (isProtected && !isTopItem) // Protection, can't drop on non top draggable elements = specials
 	     ) {
@@ -4404,7 +4408,7 @@ function bkmkDragOverHandler (e) {
 	  dt.dropEffect = "none"; // Signal drop not allowed
 	}
 	else {
-	  let is_ctrlKey = e.ctrlKey;
+	  let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
 	  if ((!is_ctrlKey && (noDropZone != undefined) && noDropZone.isInZone(row.rowIndex))
 		  || (isProtected && !isTopItem) // Protection, can't drop on non top draggable elements = specials
 	     ) {
@@ -4453,7 +4457,8 @@ function bkmkDragLeaveHandler (e) {
 	}
 	else {
 	  if (isBkmkItemDragged) { // For internal drags, take Ctrl key into account to change visual feedback
-		dt.dropEffect = (e.ctrlKey ? "copy" : "move");
+		let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
+		dt.dropEffect = (is_ctrlKey ? "copy" : "move");
 	  }
 	}
   }
@@ -4490,7 +4495,8 @@ function bkmkDragExitHandler (e) {
 	}
 	else {
 	  if (isBkmkItemDragged) { // For internal drags, take Ctrl key into account to change visual feedback
-		dt.dropEffect = (e.ctrlKey ? "copy" : "move");
+		let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
+		dt.dropEffect = (is_ctrlKey ? "copy" : "move");
 	  }
 	}
   }
@@ -4721,7 +4727,7 @@ console.log("dt.types        : "+dt.types);
 //traceDt(dt);
 
 	// Can't happen when in a dropEffect=none zone .. but in case, let's protect against it
-	let is_ctrlKey = e.ctrlKey; // When Ctrl is pressed, this is a copy, no protection
+	let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey); // When Ctrl is pressed, this is a copy, no protection
 	if (is_ctrlKey || (noDropZone == undefined) || !noDropZone.isInZone(row.rowIndex)) {
 	  // Drop allowed, forget dragged signature
 	  dtSignature = undefined;
@@ -5111,16 +5117,30 @@ function getMenuRow (item) {
 }
 
 /*
+ * Clear searchStr on SearchTimeout ms after receiving last alphanumeric character
+ * 
+ * e is of type KeyboardEvent
+ */
+let searchStr = ""; // Used to search next matching bookmark item
+let searchTimerID = null; // Timer for resetting searchStr
+const SearchTimeout = 500; // Timeout to reset searchStr, in ms
+function searchTimeoutHandler () {
+  searchTimerID = null;
+  searchStr = "";
+}
+
+/*
  * Receive event from keyboard anywhere in the sidebar panel, and also handle
  * menu actions
  * 
  * e is of type KeyboardEvent
  */
+const PatternAlphanumeric = /\w/; // [A-Za-z0-9_]
 function keyHandler (e) {
   let target = e.target; // Type depends ..
   let classList = target.classList;
   let key = e.key;
-  let ctrlKey = e.ctrlKey;
+  let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
 //console.log("Key event: "+e.type+" key: "+key+" char: "+e.char+" target: "+target+" classList: "+classList);
 
   let row = target.parentElement;
@@ -5393,6 +5413,34 @@ function keyHandler (e) {
 	}
 	else if (!isResultRow && (key == "Delete")) {
 	  if (!myMenu_open) {
+		// Find next visible row and highlight it
+		let nextRow = row;
+		while (((nextRow = nextRow.nextElementSibling) != null) && (nextRow.hidden));
+		if (nextRow != null) { // We got one
+		  let cell = nextRow.firstElementChild;
+		  if (isResultRow) { // Set result cursor and selection if in search panel
+			setCellHighlight(rcursor, cell, rbkmkSelectIds);
+		  }
+		  else { // Set cursor and selection in main panel
+			setCellHighlight(cursor, cell, bkmkSelectIds);
+		  }
+		  cell.focus();
+		}
+		else { // try row before instead
+		// Find previous visible row and highlight it
+		  let previousRow = row;
+		  while (((previousRow = previousRow.previousElementSibling) != null) && (previousRow.hidden));
+		  if (previousRow != null) { // We got one
+			let cell = previousRow.firstElementChild;
+			if (isResultRow) { // Set result cursor and selection if in search panel
+			  setCellHighlight(rcursor, cell, rbkmkSelectIds);
+			}
+			else { // Set cursor and selection in main panel
+			  setCellHighlight(cursor, cell, bkmkSelectIds);
+			}
+			cell.focus();
+		  }
+		}
 		if (row.dataset.protect != "true") { // Non protected row
 		  // Delete bookmark item in that row
 		  let BN_id = row.dataset.id;
@@ -5403,7 +5451,7 @@ function keyHandler (e) {
 	else if (key == "Enter") {
 	  if (!myMenu_open) {
 		let type = row.dataset.type;
-		if (isResultRow && !ctrlKey && !e.shiftKey && !e.altKey) { // Show original bookmark item
+		if (isResultRow && !is_ctrlKey && !e.shiftKey && !e.altKey) { // Show original bookmark item
 		  // Retrieve bookmark information in the result row (BN.id)
 		  let resultBN_id = row.dataset.id;
 		  // Then show it
@@ -5417,7 +5465,7 @@ function keyHandler (e) {
 			if (openBookmarksInNewTabs_option) { // If option set, open in new tab
 			  browser.tabs.create({url: href});
 			}
-			else if (ctrlKey) { // Open in new tab, referred by this tab to come back to it when closing
+			else if (is_ctrlKey) { // Open in new tab, referred by this tab to come back to it when closing
 			  // Get current active tab as opener id to come back to it when closing the new tab
 			  browser.tabs.query({windowId: myWindowId, active: true})
 			  .then (
@@ -5447,7 +5495,7 @@ function keyHandler (e) {
 		}
 	  }
 	}
-	else if ((key.toLowerCase() == "c") && ctrlKey) { // Copy
+	else if ((key.toLowerCase() == "c") && is_ctrlKey) { // Copy
 	  if (!myMenu_open) {
 		if (isResultRow) { // A results table menu
 		  menuCopyBkmkItem(rbkmkSelectIds);
@@ -5457,7 +5505,7 @@ function keyHandler (e) {
 		}
 	  }
 	}
-	else if ((key.toLowerCase() == "x") && ctrlKey) { // Cut
+	else if ((key.toLowerCase() == "x") && is_ctrlKey) { // Cut
 	  if (!myMenu_open) {
 		if (isResultRow) { // A results table menu
 		  menuCutBkmkItem(rbkmkSelectIds);
@@ -5467,7 +5515,7 @@ function keyHandler (e) {
 		}
 	  }
 	}
-	else if ((key.toLowerCase() == "v") && ctrlKey) { // Paste
+	else if ((key.toLowerCase() == "v") && is_ctrlKey) { // Paste
 	  let rowIndex = row.rowIndex;
 	  if (!myMenu_open && !isResultRow && (bkmkClipboard.length > 0)	// Paste only if there is something to paste
 		  && !noPasteZone.isInZone(rowIndex)							// Do not paste in the no paste zone
@@ -5476,6 +5524,50 @@ function keyHandler (e) {
 		let type = row.dataset.type;
 		menuPasteBkmkItem(BN_id, (type == "folder")); // If folder, paste into it
 	  }
+	}
+	else if (!is_ctrlKey && key.match(PatternAlphanumeric)) { // An alphanumeric key, accummulate and use to jump to next matching bookmark item
+	  // Stop the search timeout
+	  clearTimeout(searchTimerID);
+	  let nextRow;
+	  if (searchStr.length == 0) { // If first typed char, start on next record
+		searchStr = key.toLowerCase(); // Case insensitive compare
+		nextRow = row.nextElementSibling;
+	  }
+	  else { // Else, give a chance to current row
+	    searchStr += key.toLowerCase(); // Case insensitive compare
+	    nextRow = row;
+	  }
+	  // Search next bookmark item matching searchStr (or do not move if none)
+	  let cell;
+	  let type;
+	  let found = false;
+	  while (!found && (nextRow != null)) {
+		// Compare with searchStr
+		cell = nextRow.firstElementChild;
+		let span;
+		if (type == "folder") {
+		  span = cell.firstElementChild.firstElementChild.nextElementSibling.nextElementSibling;
+		}
+		else {
+		  span = cell.firstElementChild.firstElementChild.nextElementSibling;
+		}
+		found = (span.textContent.toLowerCase().startsWith(searchStr));
+		// If not found, go to next visible non separator row
+		while (((nextRow = nextRow.nextElementSibling) != null)
+			   && ((nextRow.hidden) || ((type = nextRow.dataset.type) == "separator"))
+			  );
+	  }
+	  if (found) {
+		if (isResultRow) { // Set result cursor and selection if in search panel
+		  setCellHighlight(rcursor, cell, rbkmkSelectIds);
+		}
+		else { // Set cursor and selection in main panel
+		  setCellHighlight(cursor, cell, bkmkSelectIds);
+		}
+		cell.focus();
+	  }
+	  // Rearm the search timeout
+	  searchTimerID = setTimeout(searchTimeoutHandler, SearchTimeout); //
 	}
 /*
 	else if ((key == "F2") && !isResultRow) { // Attempt at in-place edit
@@ -6688,7 +6780,17 @@ function onBlur (aEvent) {
  * Used to disable zooming with Ctrl+mouse wheel
  */
 function onWheel (aEvent) {
-  if (aEvent.ctrlKey && !aEvent.altKey && !aEvent.metaKey && !aEvent.shiftKey) {
+  let is_ctrlKey;
+  let is_metaKey;
+  if (isMacOS) {
+	is_ctrlKey = aEvent.metaKey;
+	is_metaKey = aEvent.ctrlKey;
+  }
+  else {
+	is_ctrlKey = aEvent.ctrlKey;
+	is_metaKey = aEvent.metaKey;
+  }
+  if (is_ctrlKey && !aEvent.altKey && !is_metaKey && !aEvent.shiftKey) {
 	aEvent.preventDefault();
   }
 }
@@ -7293,6 +7395,7 @@ function setupUI () {
   }
   else if (platformOs == "mac") {
 	trace("Setting Mac variations", true);
+	isMacOS = true;
 	setPageFontSize(fs);
 	if (fs != DfltFontSize) {
 	  let ms = Math.floor(DfltMenuSize * fs / DfltFontSize);

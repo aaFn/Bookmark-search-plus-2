@@ -453,7 +453,7 @@ function refreshOptionsLStore() {
 					matchTheme_option = matchTheme_option_file;
 				}
 				else {
-					matchTheme_option = false;
+					matchTheme_option = true;
 				}
 				// -- Read SC option
 				if ((setColors_option_file = res.setcolors_option) != undefined) {
@@ -1000,7 +1000,7 @@ function readFullOptions(res, isSidebar, waitMsg) {
 		matchTheme_option = matchTheme_option_file;
 	}
 	else {
-		matchTheme_option = false;
+		matchTheme_option = true;
 	}
 	waitMsg("Read SC option..");
 	if ((setColors_option_file = res.setcolors_option) != undefined) {

@@ -4,9 +4,9 @@
 /*
  * Constants
  */
-const PopupURL = browser.extension.getURL("sidebar/popup.html");
-const SelfURL = browser.extension.getURL("sidebar/panel.html");
-const HistoryURL = browser.extension.getURL("sidebar/history.html");
+const PopupURL = browser.runtime.getURL("sidebar/popup.html");
+const SelfURL = browser.runtime.getURL("sidebar/panel.html");
+const HistoryURL = browser.runtime.getURL("sidebar/history.html");
 const PopupWidth  = 380;
 const PopupHeight = 190;
 
@@ -171,7 +171,7 @@ function openPropPopup (popupType, BN_id, path, type, title, url) {
   // Open popup on bookmark item
   let titlePreface;
   let popupUrl;
-//  let popupURL = browser.extension.getURL("sidebar/popup.html");
+//  let popupURL = browser.runtime.getURL("sidebar/popup.html");
   // Did not find a good way to get a modal dialog so far :-(
   // 1) let sign = prompt("What's your sign?");
   //    creates a modal inside the sidebar, half hidden if the sidebar is not large enough. 
