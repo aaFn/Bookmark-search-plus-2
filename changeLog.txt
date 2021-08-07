@@ -1,6 +1,10 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.96 Bugs
+    - Corrected a bug introduced in 2.0.95 when deleting a node while BSP2 trash folder is invisible, which resulted in a
+      code exception while refreshing display, preventing from visually removing node from display.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/75
 - 2.0.95 Improvements
     - Better highlight options in BSP2 options page which do not start with a checkbox or with another HTML input object,
       by starting them with a bullet and aligning them better with other options.
