@@ -1,6 +1,17 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.95 Improvements
+    - Better highlight options in BSP2 options page which do not start with a checkbox or with another HTML input object,
+      by starting them with a bullet and aligning them better with other options.
+    - Introduced new function of BSP2 trash folder. This is to work around the fact that there is no "undo" on 
+      FF Bookmark API. This is a major preparation in support of undo/redo function, still to come in a future release.
+      This is enabled by default, but can be disabled in the BSP2 options page if user does not like it.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/75
+    - Made some code cleanup.
+- 2.0.94 Improvements
+    - Made round bullets darker in the search result pane, for better visibility of folders.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/84
 - 2.0.93 Bugs & Improvements
     - Adjusted behavior to handle the MacOS Cmd key like Windows/Linux Ctrl key (and conversely handle MacOS
       Control/Ctrl key like the Windows/Linux Meta key).
