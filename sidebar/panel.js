@@ -1622,9 +1622,22 @@ function bkmkCreated (BN, index) {
     	 //            rows to current item under process are always already at the right place.
 		 // Note that in such multi operations, things have been all processed in background first for the copy,
 		 //       so the BN tree is not anymore in sync with display.
-	let previousBN = BN_lastDescendant(children[index-1]);
-	let row = curRowList[previousBN.id];
-	insertRowIndex = row.rowIndex + 1; // Can be at end of bookmarks table
+	let previousSibblingBN = children[index-1];
+	if (previousSibblingBN.inBSP2Trash && !trashVisible_option) { // Protect against inserting just after BSP2 trash when not visible
+	  if (index < 2) {
+		insertRowIndex = parentRow.rowIndex + 1;
+	  }
+	  else {
+		let previousBN = BN_lastDescendant(children[index-2]);
+		let row = curRowList[previousBN.id];
+		insertRowIndex = row.rowIndex + 1; // Can be at end of bookmarks table
+	  }
+	}
+	else {
+	  let previousBN = BN_lastDescendant(previousSibblingBN);
+	  let row = curRowList[previousBN.id];
+	  insertRowIndex = row.rowIndex + 1; // Can be at end of bookmarks table
+	}
   }
 
   // We got the insertion point, proceed to insertion
@@ -1853,75 +1866,145 @@ function bkmkMoved (bnId, curParentId, targetParentId, targetIndex) {
 
   // Retrieve the real BookmarkNode and all its children, and its new parent
   let BN = curBNList[bnId];
+  // Remember current trash state (from curParentId BN, since BN was already modified - except in private page)
+  let curInBSP2Trash = curBNList[curParentId].inBSP2Trash;
   let targetParentBN = curBNList[targetParentId];
+  let tgtInBSP2Trash = targetParentBN.inBSP2Trash;
   if (backgroundPage == undefined) { // Redo change in our own copy of curBNList
 	// Remove item and its children from its current parent, but keep them in list
 	// as this is only a move.
 	BN_delete(BN, curParentId, false);
 	// Then insert it at new place, again not touching the list
+	if (trashEnabled_option) { // Maintain inBSP2Trash and trashDate fields
+	  BN_markTrash(BN, tgtInBSP2Trash);
+	}
 	BN_insert(BN, targetParentBN, targetIndex, false);
   }
 
   // Get move description in current (= old) reference
-  let movedRow = curRowList[bnId];
-  let curRowIndex = movedRow.rowIndex;
-  let targetParentRow = curRowList[targetParentId];
-  let targetCurIndex = targetIndex;
-
-  // Find insertion point, in current (= old) reference
-  let targetCurRowIndex;
-  let targetRow;
-  // Introduce robustness in case the BN tree is empty and index is not 0, as that seems to occur some times
-  let children = targetParentBN.children;
-  if ((targetCurIndex == 0) || (children == undefined)) { // Insert just after parent row
-	// Note that this also takes care of the case where parent had so far no child
-	targetCurRowIndex = targetParentRow.rowIndex + 1;
-	targetRow = targetParentRow.nextElementSibling; // Can be null if we move at end
-  }
-  else { // Insert just after previous row
-		 // ASSUMPTION (true so far): when multiple moves / creates to same parent, like in multi-select move
-		 //            or reorder or ..., items are sent to us in increasing row/index order, so previous
-		 //            rows to current item under process are always already at the right place.
-		 // Note that in such multi operations, things have been all processed in background first or the copy,
-		 //       so the BN tree is not any more in sync with display.
-	let previousBN = BN_lastDescendant(children[targetCurIndex-1]);
-	targetRow = curRowList[previousBN.id];
-	targetCurRowIndex = targetRow.rowIndex + 1; // Can be at end of bookmarks table
-	targetRow = targetRow.nextElementSibling; // Can be null if we move at end
-  }
-
-  // We got the move point in targetRow (null if at end), and its position in
-  // targetCurRowIndex, proceed to move
-//console.log("curRowIndex: "+curRowIndex+" targetCurRowIndex: "+targetCurRowIndex);
-
-  // Remove item and its children from display, but keep them in their cur lists
-  // as this is only a move.
-  // The returned value is the row which took its place in the table (or null if
-  // removed at end).
-  let deletePos = removeBkmks(movedRow, false);
-
-  // Insert the item at its new place (with its children) using global variable insertRowIndex
-  // and get the last inserted row in return.
-  if (curRowIndex == targetCurRowIndex) { // targetRow has disappeared, it was the moved row
-	// We are then visually inserting where it was deleted
-	if (deletePos == null) { // This is the end of the bookmark table
-	  insertRowIndex = bookmarksTable.rows.length;
-	}
-	else {
-	  insertRowIndex = deletePos.rowIndex;
+  if ((tgtInBSP2Trash == true) && !trashVisible_option) { // Simply remove source row, there is no visible target where to insert
+	if (curInBSP2Trash != true) { // If source is also in trash, nothing wisible to do ..
+	  let movedRow = curRowList[bnId];
+	  removeBkmks(movedRow, true); // remove from cur lists, as there is no visible targets
 	}
   }
-  else {
+  else if ((curInBSP2Trash == true) && !trashVisible_option) { // Simply insert tartget row, there is no wisible source to remove from
+	let targetParentRow = curRowList[targetParentId];
+
+	// Find insertion point, in current (= old) reference
+	let targetRow;
+	// Introduce robustness in case the BN tree is empty and index is not 0, as that seems to occur some times
+	let children = targetParentBN.children;
+	if ((targetIndex == 0) || (children == undefined)) { // Insert just after parent row
+	  // Note that this also takes care of the case where parent had so far no child
+	  targetRow = targetParentRow.nextElementSibling; // Can be null if we move at end
+	}
+	else { // Insert just after previous row
+		   // ASSUMPTION (true so far): when multiple moves / creates to same parent, like in multi-select move
+		   //            or reorder or ..., items are sent to us in increasing row/index order, so previous
+		   //            rows to current item under process are always already at the right place.
+		   // Note that in such multi operations, things have been all processed in background first or the copy,
+		   //       so the BN tree is not any more in sync with display.
+	  let previousSibblingBN = children[targetIndex-1];
+	  if (previousSibblingBN.inBSP2Trash && !trashVisible_option) { // Protect against inserting just after BSP2 trash when not visible
+		if (targetIndex < 2) {
+		  targetRow = targetParentRow.nextElementSibling; // Can be null if we move at end
+		}
+		else {
+		  let previousBN = BN_lastDescendant(children[targetIndex-2]);
+		  targetRow = curRowList[previousBN.id].nextElementSibling; // Can be null if we move at end
+		}
+	  }
+	  else {
+		let previousBN = BN_lastDescendant(previousSibblingBN);
+		targetRow = curRowList[previousBN.id].nextElementSibling; // Can be null if we move at end
+	  }
+	}
+
+	// We got the insert point in targetRow (null if at end), proceed to move
+	// Insert the item at its new place (with its children) using global variable insertRowIndex
+	// and get the last inserted row in return.
 	if (targetRow == null) // Moving at end of bookmarks table
 	  insertRowIndex = bookmarksTable.rows.length;
 	else   insertRowIndex = targetRow.rowIndex; // Get the updated row index of target
+	insertBkmks(BN, targetParentRow);
   }
-  insertBkmks(BN, targetParentRow);
+  else { // Npormal case
+	let movedRow = curRowList[bnId];
+	let curRowIndex = movedRow.rowIndex;
+	let targetParentRow = curRowList[targetParentId];
+	let targetCurIndex = targetIndex;
+
+	// Find insertion point, in current (= old) reference
+	let targetCurRowIndex;
+	let targetRow;
+	// Introduce robustness in case the BN tree is empty and index is not 0, as that seems to occur some times
+	let children = targetParentBN.children;
+	if ((targetCurIndex == 0) || (children == undefined)) { // Insert just after parent row
+	  // Note that this also takes care of the case where parent had so far no child
+	  targetCurRowIndex = targetParentRow.rowIndex + 1;
+	  targetRow = targetParentRow.nextElementSibling; // Can be null if we move at end
+	}
+	else { // Insert just after previous row
+		   // ASSUMPTION (true so far): when multiple moves / creates to same parent, like in multi-select move
+		   //            or reorder or ..., items are sent to us in increasing row/index order, so previous
+		   //            rows to current item under process are always already at the right place.
+		   // Note that in such multi operations, things have been all processed in background first or the copy,
+		   //       so the BN tree is not any more in sync with display.
+	  let previousSibblingBN = children[targetIndex-1];
+	  if (previousSibblingBN.inBSP2Trash && !trashVisible_option) { // Protect against inserting just after BSP2 trash when not visible
+		if (targetIndex < 2) {
+		  targetCurRowIndex = targetParentRow.rowIndex + 1;
+		  targetRow = targetParentRow.nextElementSibling; // Can be null if we move at end
+		}
+		else {
+		  let previousBN = BN_lastDescendant(children[targetIndex-2]);
+		  targetRow = curRowList[previousBN.id];
+		  targetCurRowIndex = targetRow.rowIndex + 1; // Can be at end of bookmarks table
+		  targetRow = targetRow.nextElementSibling; // Can be null if we move at end
+		}
+	  }
+	  else {
+		let previousBN = BN_lastDescendant(previousSibblingBN);
+		targetRow = curRowList[previousBN.id];
+		targetCurRowIndex = targetRow.rowIndex + 1; // Can be at end of bookmarks table
+		targetRow = targetRow.nextElementSibling; // Can be null if we move at end
+	  }
+	}
+
+	// We got the move point in targetRow (null if at end), and its position in
+	// targetCurRowIndex, proceed to move
+//console.log("curRowIndex: "+curRowIndex+" targetCurRowIndex: "+targetCurRowIndex);
+
+	// Remove item and its children from display, but keep them in their cur lists
+	// as this is only a move.
+	// The returned value is the row which took its place in the table (or null if
+	// removed at end).
+	let deletePos = removeBkmks(movedRow, false);
+
+	// Insert the item at its new place (with its children) using global variable insertRowIndex
+	// and get the last inserted row in return.
+	if (curRowIndex == targetCurRowIndex) { // targetRow has disappeared, it was the moved row
+	  // We are then visually inserting where it was deleted
+	  if (deletePos == null) { // This is the end of the bookmark table
+		insertRowIndex = bookmarksTable.rows.length;
+	  }
+	  else {
+		insertRowIndex = deletePos.rowIndex;
+	  }
+	}
+	else {
+	  if (targetRow == null) // Moving at end of bookmarks table
+		insertRowIndex = bookmarksTable.rows.length;
+	  else   insertRowIndex = targetRow.rowIndex; // Get the updated row index of target
+	}
+	insertBkmks(BN, targetParentRow);
+  }
 
   // State of parent folders may change, so save folder open state
   saveFldrOpen();
 
-  if (showPath_option || (trashEnabled_option && trashVisible_option)) {
+  if (showPath_option || trashEnabled_option) {
 	// Trigger an update as results can change, if there is a search active
 	triggerUpdate();
   }
