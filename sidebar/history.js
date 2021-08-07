@@ -34,6 +34,7 @@ const NDPath = document.querySelector("#ndpath"); // Assuming it is an HTMLDivEl
 const NDTitle = document.querySelector("#ndtitle"); // Assuming it is an HTMLDivElement
 const NDFavicon = document.querySelector("#ndfavicon"); // Assuming it is an HTMLDivElement
 const NDUrl = document.querySelector("#ndurl"); // Assuming it is an HTMLDivElement
+const NDInTrash = document.querySelector("#ndintrash"); // Assuming it is an HTMLDivElement
 const NDChildIds = document.querySelector("#ndchildids"); // Assuming it is an HTMLDivElement
 const NDToParentId = document.querySelector("#ndtoparentid"); // Assuming it is an HTMLDivElement
 const NDToIndex = document.querySelector("#ndtoindex"); // Assuming it is an HTMLDivElement
@@ -61,14 +62,18 @@ MapAction[HNACTION_CLEARHISTORY]       = {nclass: "cleared", type: "meta", title
 MapAction[HNACTION_RELOADFFAPI]        = {nclass: "reloaded", type: "meta", title: "BSP2 reload"};
 MapAction[HNACTION_AUTORELOADFFAPI]    = {nclass: "reloadeda", type: "meta", title: "BSP2 auto reload"};
 MapAction[HNACTION_BKMKCREATE]         = {nclass: "created", uclass: "created_u", rclass: "created_r", title: "create"};
+MapAction[HNACTION_BKMKCREATEFROMTRASH]        = {nclass: "created", uclass: "created_u", rclass: "created_r", title: "create from trash"};
+MapAction[HNACTION_BKMKCREATEFROMTRASH_DESYNC] = {nclass: "created", uclass: "created_u", rclass: "created_r", title: "create from trash (desync detected)"};
 MapAction[HNACTION_BKMKCHANGE]         = {nclass: "changed", uclass: "changed_u", rclass: "changed_r", title: "change"};
-MapAction[HNACTION_BKMKCHANGE_DESYNC]  = {nclass: "changedd", title: "change"};
+MapAction[HNACTION_BKMKCHANGE_DESYNC]  = {nclass: "changedd", title: "change (desync detected)"};
 MapAction[HNACTION_BKMKMOVE]           = {nclass: "moved", uclass: "moved_u", rclass: "moved_r", title: "move"};
-MapAction[HNACTION_BKMKMOVE_DESYNC]    = {nclass: "movedd", title: "move"};
+MapAction[HNACTION_BKMKMOVE_DESYNC]    = {nclass: "movedd", title: "move (desync detected)"};
 MapAction[HNACTION_BKMKREORDER]        = {nclass: "reordered", uclass: "reordered_u", rclass: "reorderted_r", title: "reorder"};
-MapAction[HNACTION_BKMKREORDER_DESYNC] = {nclass: "reorderedd", title: "reorder"};
+MapAction[HNACTION_BKMKREORDER_DESYNC] = {nclass: "reorderedd", title: "reorder (desync detected)"};
 MapAction[HNACTION_BKMKREMOVE]         = {nclass: "removed", uclass: "removed_u", rclass: "removed_r", title: "remove"};
-MapAction[HNACTION_BKMKREMOVE_DESYNC]  = {nclass: "removedd", title: "remove"};
+MapAction[HNACTION_BKMKREMOVE_DESYNC]  = {nclass: "removedd", title: "remove (desync detected)"};
+MapAction[HNACTION_BKMKREMOVETOTRASH]          = {nclass: "removed", uclass: "removed_u", rclass: "removed_r", title: "remove to trash"};
+MapAction[HNACTION_BKMKREMOVETOTRASH_DESYNC]   = {nclass: "removedd", title: "remove to trash (desync detected)"};
 
 /*
  *******  Prepare standard Meta structure for node cloning
@@ -421,6 +426,8 @@ tmpElem1 = undefined;
  */
 let backgroundPage;
 let platformOs;
+let isMacOS = false; // To indicate we are under MacOS, used for properly detecting the Cmd key
+					 // which is Ctrl in Windows/Linux (Apple always want to do it their way, don't they ?)
 let beforeFF57;
 let beforeFF58;
 let beforeFF60;
@@ -637,6 +644,9 @@ function appendBookmarkHN (id, HN) {
 		  img = histicon.nextElementSibling;
 		}
 		let span = img.nextElementSibling;
+		if (HN.inBSP2Trash) { // Set to italics
+		  span.style.fontStyle = "italic";
+		}
 		let toTitle = HN.toTitle;
 		if (toTitle == undefined) {
 		  toTitle = HN.title;
@@ -695,6 +705,9 @@ function appendBookmarkHN (id, HN) {
 		  }
 		}
 		let span = img.nextElementSibling;
+		if (HN.inBSP2Trash) { // Set to italics
+		  span.style.fontStyle = "italic";
+		}
 		let toUrl = HN.toUrl;
 		if (toUrl == undefined) {
 		  toUrl = HN.url;
@@ -968,6 +981,7 @@ function displayHN (hnId) {
 	NDFavicon.style = "";
 	NDFavicon.className = "favicon "+map.nclass;
 	NDUrl.textContent = NBSP;
+	NDInTrash.textContent = NBSP;
 	NDChildIds.textContent = NBSP;
 	NDToParentId.textContent = NBSP;
 	NDToIndex.textContent = NBSP;
@@ -1012,6 +1026,7 @@ function displayHN (hnId) {
 	  }
 	}
 	displayField(NDUrl, HN.url);
+	displayField(NDInTrash, HN.inBSP2Trash);
 	displayField(NDChildIds, HN.childIds);
 	displayPath(NDToPath, HN.toPath);
 	displayField(NDToParentId, HN.toParentId);
@@ -1040,6 +1055,7 @@ function displayURList () {
   NDFavicon.style = "";
   NDFavicon.className = "urfavicon";
   NDUrl.textContent = NBSP;
+  NDInTrash.textContent = NBSP;
   NDChildIds.textContent = NBSP;
   NDToParentId.textContent = NBSP;
   NDToIndex.textContent = NBSP;
@@ -1694,7 +1710,17 @@ function handleAddonMessage (request, sender, sendResponse) {
  * Used to disable zooming with Ctrl+mouse wheel
  */
 function onWheel (aEvent) {
-  if (aEvent.ctrlKey && !aEvent.altKey && !aEvent.metaKey && !aEvent.shiftKey) {
+  let is_ctrlKey;
+  let is_metaKey;
+  if (isMacOS) {
+	is_ctrlKey = aEvent.metaKey;
+	is_metaKey = aEvent.ctrlKey;
+  }
+  else {
+	is_ctrlKey = aEvent.ctrlKey;
+	is_metaKey = aEvent.metaKey;
+  }
+  if (is_ctrlKey && !aEvent.altKey && !is_metaKey && !aEvent.shiftKey) {
 	aEvent.preventDefault();
   }
 }
@@ -1820,6 +1846,7 @@ function initialize2 () {
 	Body.style.fontSize = "12px";
   }
   else if (platformOs == "mac") {
+	isMacOS = true;
 	Body.style.fontSize = "12px";
   }
 

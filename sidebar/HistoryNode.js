@@ -4,19 +4,23 @@
 /*
  * Constants
  */
-const HNACTION_BSP2START          = "bsp2start";
-const HNACTION_CLEARHISTORY       = "bsp2clearhist";
-const HNACTION_RELOADFFAPI        = "reloadffapi";
-const HNACTION_AUTORELOADFFAPI    = "autoreloadffapi";
-const HNACTION_BKMKCREATE         = "create";
-const HNACTION_BKMKCHANGE         = "change";
-const HNACTION_BKMKCHANGE_DESYNC  = "change_desync"; // De-sync problem detected when doing a Change on bookmark
-const HNACTION_BKMKMOVE           = "move";
-const HNACTION_BKMKMOVE_DESYNC    = "move_desync"; // De-sync problem detected when doing a bookmark move
-const HNACTION_BKMKREORDER        = "reorder";
-const HNACTION_BKMKREORDER_DESYNC = "reorder_desync"; // De-sync problem detected when reordering bookmarks
-const HNACTION_BKMKREMOVE         = "remove";
-const HNACTION_BKMKREMOVE_DESYNC  = "remove_desync"; // De-sync problem detected when removing a bookmark
+const HNACTION_BSP2START           = "bsp2start";
+const HNACTION_CLEARHISTORY        = "bsp2clearhist";
+const HNACTION_RELOADFFAPI         = "reloadffapi";
+const HNACTION_AUTORELOADFFAPI     = "autoreloadffapi";
+const HNACTION_BKMKCREATE          = "create";
+const HNACTION_BKMKCREATEFROMTRASH = "create_ft";
+const HNACTION_BKMKCREATEFROMTRASH_DESYNC = "create_ft_desync";
+const HNACTION_BKMKCHANGE          = "change";
+const HNACTION_BKMKCHANGE_DESYNC   = "change_desync"; // De-sync problem detected when doing a Change on bookmark
+const HNACTION_BKMKMOVE            = "move";
+const HNACTION_BKMKMOVE_DESYNC     = "move_desync"; // De-sync problem detected when doing a bookmark move
+const HNACTION_BKMKREORDER         = "reorder";
+const HNACTION_BKMKREORDER_DESYNC  = "reorder_desync"; // De-sync problem detected when reordering bookmarks
+const HNACTION_BKMKREMOVE          = "remove";
+const HNACTION_BKMKREMOVE_DESYNC   = "remove_desync"; // De-sync problem detected when removing a bookmark (move to trash)
+const HNACTION_BKMKREMOVETOTRASH   = "remove_tt";
+const HNACTION_BKMKREMOVETOTRASH_DESYNC  = "remove_tt_desync"; // De-sync problem detected when removing a bookmark (move to trash)
 const HNSTATE_ACTIVEBRANCH   = 0;
 const HNSTATE_INACTIVEBRANCH = 1;
 const HNREVOP_NONE   = 0;
@@ -87,8 +91,10 @@ const HNREVERSION_REDONE = 2;
 //    Favicon.
 // url
 //    Bookmark URL.
+// inBSP2Trash
+//    Record if in trash or not.
 // bnTreeJson
-//    Recursive representation of node and its children if any, when "remove" (to be able to undo the remove).
+//    Recursive representation of node and its children if any, when "remove" (to be able to undo the remove, when no BSP2 trash).
 // toPath
 //    Target path of move = Array of parent title String, from top to deepest (last one = parent of bookmark item)
 // toParentId
@@ -124,11 +130,11 @@ const HNREVERSION_REDONE = 2;
 //    Note: can have a value only when is_multi is false, which means when id is defined.
 function HistoryNode (action,
 					  is_multi = undefined, id_list = undefined, id = undefined, type = undefined, path = undefined, parentId = undefined, index = undefined,
-					  title = undefined, faviconUri = undefined, url = undefined, bnTreeJson = undefined,
+					  title = undefined, faviconUri = undefined, url = undefined, inBSP2Trash = undefined, bnTreeJson = undefined,
 					  toPath = undefined, toParentId = undefined, toIndex = undefined, toTitle = undefined, toUrl = undefined,
 					  childIds = undefined, toChildIds = undefined,
 					  state = HNSTATE_ACTIVEBRANCH, revOp = undefined, revOp_HNref = undefined) {
-  this.timestamp   = (new Date()).getTime();
+  this.timestamp   = (new Date ()).getTime();
   this.action      = action;
   this.is_multi    = is_multi;
   if (is_multi == true) {
@@ -152,6 +158,9 @@ function HistoryNode (action,
 	}
 	if (url != undefined) {
 	  this.url         = url;
+	}
+	if (inBSP2Trash != undefined) {
+	  this.inBSP2Trash = inBSP2Trash;
 	}
 	if (bnTreeJson != undefined) {
 	  this.bnTreeJson  = bnTreeJson;
@@ -216,6 +225,10 @@ function HN_trace (HN) {
 	let faviconUri = HN.faviconUri;
 	if (faviconUri != undefined) {
 	  console.log("  faviconUri:  "+faviconUri);
+	}
+	let inBSP2Trash = HN.inBSP2Trash;
+	if (inBSP2Trash != undefined) {
+	  console.log("  inBSP2Trash: "+inBSP2Trash);
 	}
 	let url = HN.url;
 	if (title != undefined) {
@@ -376,14 +389,14 @@ function historyListDeserialize (jsonstr) {
  */
 function historyListAdd (hl, action,
 						 is_multi = false, id_list = undefined, id = undefined, type = undefined, path = undefined, parentId = undefined, index = undefined,
-						 title = undefined, faviconUri = undefined, url = undefined, bnTreeJson = undefined,
+						 title = undefined, faviconUri = undefined, url = undefined, inBSP2Trash = undefined, bnTreeJson = undefined,
 						 toPath = undefined, toParentId = undefined, toIndex = undefined, toTitle = undefined, toUrl = undefined,
 						 childIds = undefined, toChildIds = undefined,
   						 state = HNSTATE_ACTIVEBRANCH, revOp = undefined, revOp_HNref = undefined) {
   // Do not record actions on special folders
   if ((id != mostVisitedBNId) && (id != recentTagBNId) && (id != recentBkmkBNId)) {
 	let hn = new HistoryNode (action,
-							  is_multi, id_list, id, type, path, parentId, index, title, faviconUri, url, bnTreeJson,
+							  is_multi, id_list, id, type, path, parentId, index, title, faviconUri, url, inBSP2Trash, bnTreeJson,
 							  toPath, toParentId, toIndex, toTitle, toUrl,
 							  childIds, toChildIds,
 							  state, revOp, revOp_HNref
@@ -515,7 +528,7 @@ function historyListTrim (hl, retention) {
   let hnList = hl.hnList;
   let len = hnList.length;
 //console.log("History length: "+len);
-  let trimTime = (new Date()).getTime() - retention;
+  let trimTime = (new Date ()).getTime() - retention;
   for (let i=0 ; i<len ; i++, count++) {
 	if (hnList[i].timestamp > trimTime)
 	  break;

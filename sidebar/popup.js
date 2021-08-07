@@ -65,6 +65,8 @@ const CancelInput = document.querySelector("#cancel"); // Assuming it is an HTML
  *  Global variables
  */
 let platformOs;
+let isMacOS = false; // To indicate we are under MacOS, used for properly detecting the Cmd key
+					 // which is Ctrl in Windows/Linux (Apple always want to do it their way, don't they ?)
 let myWindowId;
 let myTab;
 let myType; //String = type of window being open. This conditions button names and actions
@@ -129,7 +131,17 @@ function keyHandler (e) {
  * Used to disblae zooming with Ctrl+mouse wheel
  */
 function onWheel (aEvent) {
-  if (aEvent.ctrlKey && !aEvent.altKey && !aEvent.metaKey && !aEvent.shiftKey) {
+  let is_ctrlKey;
+  let is_metaKey;
+  if (isMacOS) {
+	is_ctrlKey = aEvent.metaKey;
+	is_metaKey = aEvent.ctrlKey;
+  }
+  else {
+	is_ctrlKey = aEvent.ctrlKey;
+	is_metaKey = aEvent.metaKey;
+  }
+  if (is_ctrlKey && !aEvent.altKey && !is_metaKey && !aEvent.shiftKey) {
 	aEvent.preventDefault();
   }
 }
@@ -294,6 +306,7 @@ function cancelInputHandler () {
 	);
   }
   else { // Delete the bookmark, then close
+ 	// Proceed like native bookmark FF = no undo / redo on such "cancel" => do not use BSP2 trash
 	browser.bookmarks.remove(btnId)
 	.then(
 	  function () {
@@ -309,7 +322,7 @@ function cancelInputHandler () {
 function closeHandler (e) {
 //console.log("Close clicked: "+e.type);
   // Note that this is unclean ... the promise to be returned by browser.bookmarks.update
-  // or by ()browser.bookmarks.remove()
+  // or by browser.bookmarks.remove()
   // will never be able to be dispatched to something stil existing, therefore generating
   // an error message on the browser console.
   // Could do something complex by listening in the main code for the windows.onRemoved
@@ -462,6 +475,7 @@ browser.runtime.getPlatformInfo().then(function(info){
 		CancelInput.style.fontSize = fontSize;
 	  }
 	  else if (platformOs == "mac") {
+		isMacOS = true;
 		let fontSize = "12px";
 		Body.style.fontSize = fontSize;
 		TitleInput.style.fontSize = fontSize;

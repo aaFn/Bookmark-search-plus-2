@@ -13,6 +13,7 @@ const TagsFolder = "tags________";
 const MostVisitedSort = "sort=8";
 const RecentTagSort = "sort=14"; 
 const RecentBkmkSort = "sort=12";
+const BSP2TrashName = "BSP2 trash folder for undo of bookmark deletes - DO NOT REMOVE !" // Placed under Other bookmarks
 //Next ones are encountered in Bookmarks library
 const HistoryFolderV = "history____v";
 const DownloadsFolderV = "downloads__v";
@@ -25,6 +26,7 @@ const AllBookmarksV = "allbms_____v";
  */
 var countBookmarks = 0, countFolders = 0, countSeparators = 0, countOddities = 0, countFetchFav = 0;
 var mostVisitedBNId, mostVisitedBN, recentTagBNId, recentTagBN, recentBkmkBNId, recentBkmkBN;
+var bsp2TrashFldrBNId, bsp2TrashFldrBN;
 
 
 /*
@@ -79,16 +81,19 @@ var mostVisitedBNId, mostVisitedBN, recentTagBNId, recentTagBN, recentBkmkBNId, 
 //    or when a chiild of a child .. has been moved / added / removed.
 //    Does not change when a child or any child of child .. changes of title / url.
 //    undefined if not a folder.
+// inBSP2Trash Optional
+//    undefined or Boolean. If true, marks the BN as being in BSP2 trash
+// trashDate Optional
+//    If inBSP2Trash is true, date at which the item was put in trash (for trimming at BSP2 start)
 // unmodifiable Optional
 //    undefined or a string as described by the type bookmarks.BookmarkTreeNodeUnmodifiable. Represents the reason that the node can't be changed.
 //    Always undefined today
 function BookmarkNode (id, type, level, parentId, dateAdded, protect = false, 
 					   title = undefined, faviconUri = undefined, fetchedUri = false, url = undefined,
 					   children = undefined, dateGroupModified = undefined,
-					   unmodifiable = undefined) {
+					   inBSP2Trash = undefined, trashDate = undefined, unmodifiable = undefined) {
   this.id                = id;
   this.type              = type;
-//  this.index             = index;
   this.level             = level;
   this.parentId          = parentId;
   this.dateAdded         = dateAdded;
@@ -99,6 +104,8 @@ function BookmarkNode (id, type, level, parentId, dateAdded, protect = false,
   this.url               = url;
   this.children          = children;
   this.dateGroupModified = dateGroupModified;
+  this.inBSP2Trash       = inBSP2Trash;
+  this.trashDate         = trashDate;
   this.unmodifiable      = unmodifiable;
 }
 
@@ -348,7 +355,7 @@ function BN_copy (BN) {
   let node = new BookmarkNode (BN.id, BN.type, BN.level, BN.parentId, BN.dateAdded, BN.protect, 
 	  						   BN.title, BN.faviconUri, BN.fetchedUri, BN.url,
 	  						   undefined, BN.dateGroupModified,
-	  						   BN.unmodifiable);
+	  						   BN.inBSP2Trash, BN.trashDate, BN.unmodifiable);
   let children = BN.children;
   if (children != undefined) {
 	let len = children.length;
@@ -436,6 +443,10 @@ function BN_delete (BN, parentId = undefined, real = true, bnList = curBNList, r
 	  recentTagBNId = undefined;
 	  recentTagBN = undefined;
 	}
+	else if (bnId == bsp2TrashFldrBNId) {
+	  bsp2TrashFldrBNId = undefined;
+	  bsp2TrashFldrBN = undefined;
+	}
   }
 }
 
@@ -455,7 +466,7 @@ function BN_updateLevel (BN, level) {
 // at 0-based position index (if -1, append at end)
 // Note: for a move, set real to false for both delete and insert.
 //
-// requires function insertFF56EndGapSep (parentBN) {}
+// Requires global function insertFF56EndGapSep (parentBN) {} when running on FF < 57
 function BN_insert (BN, parentBN, index = -1, real = true, bnList = curBNList) {
   if (parentBN == undefined) {
 	return; // Cannot insert root
@@ -514,7 +525,6 @@ function BN_insert (BN, parentBN, index = -1, real = true, bnList = curBNList) {
   }
 }
 
-
 /*
  * Get type from a BTN
  *
@@ -552,7 +562,8 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
   if (type == "folder") { // Root cannot be created, so do not verify
 	countFolders++;
 
-	let uri, fetchedUri;
+	let title = BTN.title;
+	let uri, fetchedUri, inBSP2Trash;
 	if (BTN_id == PersonalToobar) {
 	  uri = "/icons/toolbarbkmk.png";
 	  protect = true;
@@ -573,6 +584,12 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 	  protect = true;
 	  fetchedUri = false;
 	}
+	else if (title == BSP2TrashName) {
+	  uri = "/icons/bsp2trash.png";
+	  protect = inBSP2Trash = true;
+	  fetchedUri = true;
+	  bsp2TrashFldrBNId = BTN_id;
+	}
 	else {
 	  uri = "/icons/folder.png";
 	  protect = false;
@@ -589,7 +606,7 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 	node = new BookmarkNode (
 	  BTN_id, "folder", level, BTN.parentId, BTN.dateAdded, protect,
 	  BTN.title, uri, fetchedUri, undefined,
-	  children, BTN.dateGroupModified
+	  children, BTN.dateGroupModified, inBSP2Trash
 	);
   }
   else if (type == "separator") {
@@ -664,7 +681,7 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 		uri = savedBkmkUriList[BTN_id];
 		if ((uri == "/icons/nofavicontmp.png")  // Last time we stopped the sidebar
 			|| (uri == "/icons/waiting.gif")    // it didn't have time to fetch that
-		   ) {                                  // favicon .. so let's do it now.
+		   ) {									// favicon .. so let's do it now.
 		  uri = undefined;
 		}
 	  }
@@ -716,23 +733,73 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 	let children = parentBN.children;
 	if (children == undefined) { // No list of children so far
 	  parentBN.children = [node];
-//	  node.index = 0;
 	}
 	else if (index >= children.length) { // Append child at end
-//	  node.index =
 	  children.push(node);
 	}
 	else { // Insert child at position
 	  children.splice(index, 0, node);
-	  // Reindex next children
-//	  let len = children.length;
-//	  for (let i=index+1 ; i<len ; i++) {
-//		children[i].index = i;
-//	  }
 	}
   }
 
   return(node);
+}
+
+// Trim content of a folder based on timestamps of its BN's - used for the BSP2 trash.
+// Note: remain at first level (do not recurse inside folder items)
+//
+// BN: BookmarkNode folder to trim
+// retention: duration in past to keep things, in milliseconds  
+function BN_folderTrim (BN, retention) {
+  let children = BN.children;
+  let len;
+  if ((children != undefined) && ((len = children.length) > 0)) {
+	let trimTime = (new Date ()).getTime() - retention;
+	let i;
+	for (let j=0 ; j<len ;j++) {
+	  i = children[j];
+	  if (i.trashDate < trimTime) { // Remove node (definitely)
+		browser.bookmarks.removeTree(i.id);
+	  }
+	}
+  } 
+}
+
+// Empty a folder from its content - used for the BSP2 trash
+// Note: remain at first level (do not recurse inside folder items)
+//
+// BN: BookmarkNode folder to trim
+function BN_folderClean (BN) {
+  let children = BN.children;
+  let len;
+  if ((children != undefined) && ((len = children.length) > 0)) {
+	for (let j=0 ; j<len ;j++) {
+	  browser.bookmarks.removeTree(children[j].id);
+	}
+  } 
+}
+
+// Set trash state recursively on a bookmark item and its possible content
+//
+// BN: BookmarkNode folder to mark / unmark
+// is_inTrash: Boolean
+function BN_markTrash (BN, is_inTrash) {
+  if (is_inTrash) {
+	BN.inBSP2Trash = true;
+	BN.trashDate = (new Date ()).getTime();
+  }
+  else {
+	BN.inBSP2Trash = false;
+  }
+  if (BN.type == "folder") {
+	let children = BN.children;
+	let len;
+	if ((children != undefined) && ((len = children.length) > 0)) {
+	  for (let j=0 ; j<len ;j++) {
+		BN_markTrash(children[j], is_inTrash);
+	  }
+	}
+  } 
 }
 
 /*
@@ -847,7 +914,6 @@ function BN_trace (BN) {
   trace("BookmarkNode");
   trace("  id:                "+BN.id);
   trace("  type:              "+BN.type);
-//  trace("  index:             "+BN.index);
   trace("  level:             "+BN.level);
   trace("  parentId:          "+BN.parentId);
   trace("  dateAdded:         "+BN.dateAdded);
@@ -870,6 +936,8 @@ function BN_trace (BN) {
 	trace("  children_length:   "+BN.children.length);
   }
   trace("  dateGroupModified: "+BN.dateGroupModified);
+  trace("  inBSP2Trash:       "+BN.inBSP2Trash);
+  trace("  trashDate:         "+BN.trashDate);
   trace("  unmodifiable:      "+BN.unmodifiable);
 }
 
@@ -1068,6 +1136,10 @@ function scanBNTree (BN, faviconWorker, doStats = true) {
 							  // they are to be counted as bookmarks
 		if (doStats)
 		  countFolders++;
+		if (BN.title == BSP2TrashName) {
+		  bsp2TrashFldrBNId = bnId;
+		  bsp2TrashFldrBN = BN;
+		}
 	  }
 	  else if (url.startsWith("place:")) { // Remember pointers at special folders ..
 //BN.type = "bookmark";
@@ -1099,7 +1171,7 @@ function scanBNTree (BN, faviconWorker, doStats = true) {
 	if (doStats)
 	  countSeparators++;
   }
-  else {
+  else { // Presumably a bookmark
 	let bnId = BN.id;
 	if (type == "bookmark") {
 	  if (bnId.startsWith("place:")) { // Do not count special bookmarks under special place: folders

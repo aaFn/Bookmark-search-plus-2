@@ -107,7 +107,7 @@
     <input type="number" id="spacesize" step="2" min="0" max="10" required disabled>
     <span> px</span>
     <br/>
-    <input type="checkbox" id="matchtheme">
+    <input type="checkbox" id="matchtheme" checked>
     <label for="matchtheme">Match active FF theme colors (FF >= 57). <i>Disables colors override option</i></label>
     <br/>
     <input type="checkbox" id="setcolors">
@@ -116,7 +116,7 @@
     <span> and background color to </span>
     <input type="color" id="bckgndcolor"><span id="bcstring"> (#FFFFFF)</span>
     <br/>
-    <label for="command1">Sidebar shortcut (FF >= 60):</label>
+    <label for="command1">&nbsp;&nbsp;&bull;&nbsp;&nbsp;Sidebar shortcut (FF >= 60):</label>
 	<select id="command1">
       <option value="Ctrl">Ctrl</option>
       <option value="Alt">Alt</option>
@@ -179,17 +179,23 @@
     <button type="button" id="resetcommand">Reset</button>
   </p>
   <p>
-    <b>Bookmark history:</b><br/>
-    <label for="historyretention">Bookmark history retention : </label>
+    <b>Bookmark history & undo/redo:</b><br/>
+    <input type="checkbox" id="trashEnabled" checked>
+    <label for="trashEnabled">Create & use BSP2 trash folder to undo bookmark deletes (workaround for FF API limitations) <i>CAREFUL - disabling this option will really delete all your "deleted" bookmarks still in the folder, and restrain BSP2 undo capabilities (a delete undo will be a re-create, from history)</i></label>
+    <br/>
+    <label for="historyretention">&nbsp;&nbsp;&bull;&nbsp;&nbsp;Bookmark History & Trash-folder retention : </label>
     <input type="number" id="historyretention" step="1" min="1" max="9999" required>
     <span> days (default 30 - Pruning happens only at each Firefox or BSP2 restart)</span>
     <br>
-    <button type="button" id="historyclear">Clear history now</button>
+    <button type="button" id="historyclear">Clear History & Trash-folder now</button>
   </p>
   <p>
     <b>Traces / debug:</b><br/>
     <input type="checkbox" id="traceEnabled">
     <label for="traceEnabled">Activate traces</label>
+    <br/>
+    <input type="checkbox" id="trashVisible">
+    <label for="trashVisible">Show BSP2 trash folder and its content</label>
     <br/>
     <button type="button" id="resetmigr16x16" disabled>Re-trigger 16x16 favicon migration</button>
   </p>

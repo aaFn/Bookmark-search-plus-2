@@ -438,6 +438,8 @@ let bkmkDrag = []; // Unique list of dragged BookmarkNode(s), [] if empty
 // Declared in BookmarkNode.js
 //var countBookmarks, countFolders, countSeparators, countOddities, countFetchFav;
 //var mostVisitedBNId, recentTagBNId, recentBkmkBNId;
+//var bsp2TrashFldrBNId;
+
 
 let startTime, endLoadTime, endGetTreetime, endDisplayTime;
 let loadDuration, treeLoadDuration, treeBuildDuration, saveDuration;
@@ -489,136 +491,125 @@ function saveFldrOpen () {
 /*
  * Append a bookmark inside the search result sidebar table
  *
- * BTN = BookmarkTreeNode or BookmarkNode (a poor man's kind of "polymorphism" in Javascript ..)
- * 
- * Returns: true if the record could be added, or false if a problem occurred
+ * BN = BookmarkNode
  */
-function appendResult (BTN) {
-//  trace("Displaying <<"+BTN.id+">><<"+BTN.title+">><<"+BTN.type+">><<"+BTN.url+">>");
-  let type = getType(BTN);
+function appendResult (BN) {
+//trace("Displaying <<"+BN.id+">><<"+BN.title+">><<"+BN.type+">><<"+BN.url+">>");
+  let type = BN.type;
   if (((searchFilter_option == "fldr") && (type == "bookmark"))
 	  || ((searchFilter_option == "bkmk") && (type == "folder"))
 	 ) { // Filter out the result, but continue with next ones
-	return(true);
+	return;
   }
 
-  let rc = false;
   // Append new bookmark row inside the search results table
   let row = resultsTable.insertRow();
   row.draggable = true; // Adding this, but with no handler, avoids that the anchor inside
   						// can be dragged .. not sure of exactly why, but this is what I observe !
-  let BTN_id = row.dataset.id = BTN.id; // Keep unique id of bookmark in the data-id attribute
+  let BN_id = row.dataset.id = BN.id; // Keep unique id of bookmark in the data-id attribute
   row.dataset.rslt = "true"; // Mark that this is a result row for easy identification
-  let BN = curBNList[BTN_id];
-  if (BN == undefined) {
-	if (BTN_id != MobileBookmarks) { // Desynchro !! => reload bookmarks from FF API
-	  // Signal reload to background, and then redisplay to all
-	  sendAddonMessage("reloadFFAPI_auto");
-	}
-	else { // Skip that one and continue with other results
-	  rc = true;
-	}
+  curResultRowList[BN_id] = row;
+  // Set cut status of the row (dim it), if corresponding to a cut row
+  if ((isClipboardOpCut == true) && (bkmkClipboardIds[BN_id] != undefined)) {
+	row.classList.add("cut");
   }
-  else {
-	curResultRowList[BTN_id] = row;
-	// Set cut status of the row (dim it), if corresponding to a cut row
-	if ((isClipboardOpCut == true) && (bkmkClipboardIds[BTN_id] != undefined)) {
-	  row.classList.add("cut");
+
+  // Add bookmark items in row
+  let cell = row.insertCell();
+  cell.classList.add("brow");
+  cell.draggable = false;
+  cell.tabIndex = 0;
+
+  // Append proper contents to the cell:
+  // - a <div> of class "rbkmkitem_f" or "rbkmkitem_b",
+  //   for respectively folder or bookmark, containing:
+  //   - a <div> (class "rtwistiexx") if a folder
+  //   - an <div>, or <img> if special folder, (class "favicon")
+  //   - and a <span> with text (class "favtext")
+  if (type == "folder") {				// Folder
+	// Mark that row as folder
+	row.dataset.type = "folder";
+
+	// Create elements
+	let div2;
+	let span;
+	if (BN.fetchedUri) { // Special bookmark folder with special favicon
+	  div2 = RSFolderTempl.cloneNode(true);
+	  let img = div2.firstElementChild.nextElementSibling;
+	  img.src = BN.faviconUri;
+	  span = img.nextElementSibling;
+	}
+	else {
+	  div2 = RFolderTempl.cloneNode(true);
+	  span = div2.firstElementChild.nextElementSibling.nextElementSibling;
+	}
+	if (BN.inBSP2Trash) { // Set to italics
+	  span.style.fontStyle = "italic";
 	}
 
-	// Add bookmark items in row
-	let cell = row.insertCell();
-	cell.classList.add("brow");
-	cell.draggable = false;
-	cell.tabIndex = 0;
+	let title = BN.title;
+	if (showPath_option) {
+	  div2.title = BN_path(BN.parentId);
+	}
+	else {
+	  div2.title = title;
+	}
+	span.textContent = title;
+//	span.draggable = false;
+	cell.appendChild(div2);
+  }
+  else {								// "bookmark"
+	// Mark that row as bookmark
+	row.dataset.type = "bookmark";
 
-	// Append proper contents to the cell:
-	// - a <div> of class "rbkmkitem_f" or "rbkmkitem_b",
-	//   for respectively folder or bookmark, containing:
-	//   - a <div> (class "rtwistiexx") if a folder
-	//   - an <div>, or <img> if special folder, (class "favicon")
-	//   - and a <span> with text (class "favtext")
-	if (type == "folder") {				// Folder
-	  // Mark that row as folder
-	  row.dataset.type = "folder";
-
-	  // Create elements
-	  let div2;
-	  let span;
-	  if (BN.fetchedUri) { // Special bookmark folder with special favicon
-		div2 = RSFolderTempl.cloneNode(true);
-		let img = div2.firstElementChild.nextElementSibling;
-		img.src = BN.faviconUri;
-		span = img.nextElementSibling;
-	  }
-	  else {
-		div2 = RFolderTempl.cloneNode(true);
-		span = div2.firstElementChild.nextElementSibling.nextElementSibling;
-	  }
-
-	  let title = BTN.title;
-	  if (showPath_option) {
-		div2.title = BN_path(BTN.parentId);
-	  }
-	  else {
-		div2.title = title;
+	// Create elements
+	let url = BN.url;
+	if (url == undefined) {
+	  url = "<undefined!>";
+	}
+	let title = BN.title;
+	let anchor;
+	let span;
+	// Retrieve current uri or set to nofavicon.png by default
+	let uri = BN.faviconUri;
+	if (disableFavicons_option || (uri == undefined)) { // Clone with nofavicon image background
+	  anchor = RNFBookmarkTempl.cloneNode(true);
+	  span = anchor.firstElementChild.nextElementSibling;
+	}
+	else { // clone normal one, and fill image
+	  anchor = RBookmarkTempl.cloneNode(true);
+	  let img = anchor.firstElementChild;
+	  img.src = uri;
+	  span = img.nextElementSibling;
+	}
+	if (BN.inBSP2Trash) { // Set to italics
+	  span.style.fontStyle = "italic";
+	}
+	if (!url.startsWith("place:")) {
+	  anchor.href = url;
+	}
+	if (showPath_option) {
+	  anchor.title = BN_path(BN.parentId);
+	  if (title == "") {
+		title = suggestDisplayTitle(url);
 	  }
 	  span.textContent = title;
-//	  span.draggable = false;
-	  cell.appendChild(div2);
 	}
-	else {								// "bookmark"
-	  // Mark that row as bookmark
-	  row.dataset.type = "bookmark";
-
-	  // Create elements
-	  let url = BTN.url;
-	  if (url == undefined) {
-		url = "<undefined!>";
-	  }
-	  let title = BTN.title;
-	  let anchor;
-	  let span;
-	  // Retrieve current uri or set to nofavicon.png by default
-	  let uri = BN.faviconUri;
-	  if (disableFavicons_option || (uri == undefined)) { // Clone with nofavicon image background
-		anchor = RNFBookmarkTempl.cloneNode(true);
-		span = anchor.firstElementChild.nextElementSibling;
-	  }
-	  else { // clone normal one, and fill image
-		anchor = RBookmarkTempl.cloneNode(true);
-		let img = anchor.firstElementChild;
-		img.src = uri;
-		span = img.nextElementSibling;
-	  }
-	  if (!url.startsWith("place:")) {
-		anchor.href = url;
-	  }
-	  if (showPath_option) {
-		anchor.title = BN_path(BTN.parentId);
-		if (title == "") {
-		  title = suggestDisplayTitle(url);
-		}
-		span.textContent = title;
+	else {
+	  if (title == "") {
+		anchor.title = url;
+		span.textContent = suggestDisplayTitle(url);
 	  }
 	  else {
-		if (title == "") {
-		  anchor.title = url;
-		  span.textContent = suggestDisplayTitle(url);
-		}
-		else {
-		  anchor.title = title+"\n"+url;
-		  span.textContent = title;
-		}
+		anchor.title = title+"\n"+url;
+		span.textContent = title;
 	  }
-//	  anchor.draggable = false;
-	  anchor.style.marginLeft = "16px";
-
-	  cell.appendChild(anchor);
 	}
-	rc = true;
+//	anchor.draggable = false;
+	anchor.style.marginLeft = "16px";
+
+	cell.appendChild(anchor);
   }
-  return(rc);
 }
 
 /*
@@ -836,11 +827,18 @@ function displayResults (a_BTN) {
 //trace("Matching BTN.id: "+i.id+" "+i.title+" "+url);
 	  if ((url == undefined)           // folder (or separator ...)
 		  || !url.startsWith("place:") // "place:" results behave strangely .. (they have no title !!)
-	     ) {
+		 ) {
 		// Append to the search result table
-		if ((i.type != "separator") && (i.id != TagsFolder)) { // Do not display separators nor Tags folder in search results
-		  if (!appendResult(i)) {
+		let BTN_id = i.id;
+		if ((i.type != "separator") && (BTN_id != TagsFolder) && (BTN_id != MobileBookmarks)) { // Do not display separators nor Tags nor MobileBookmarks folders in search results
+		  let BN = curBNList[BTN_id];
+		  if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
+			// Signal reload to background, and then redisplay to all
+			sendAddonMessage("reloadFFAPI_auto");
 			break; // Break loop in case of error
+		  }
+		  if ((trashEnabled_option && trashVisible_option) || (BN.inBSP2Trash != true)) { // Don't display BSP2 trash folder results except on debug
+			appendResult(BN);
 		  }
 		}
 	  }
@@ -1347,8 +1345,8 @@ function migr16x16OnLoad () {
  * inserting a bookmark later in the middle, the calling code has to set it appropriately.
  */
 function insertBookmarkBN (BN, index = -1, children = undefined) {
-//let t1 = new Date();
-//trace(t1.getTime()+" Displaying <<"+BN.id+">><<"+BN.title+">><<"+BN.type+">><<"+BN.url+">> at level: "+level+" highest_open_level: "+highest_open_level+" and index: "+index);
+//let t1 = (new Date ()).getTime();
+//trace(t1+" Displaying <<"+BN.id+">><<"+BN.title+">><<"+BN.type+">><<"+BN.url+">> at level: "+level+" highest_open_level: "+highest_open_level+" and index: "+index);
 //console.log("BN: "+BN.id+" type: "+BN.type+" dateAdded: "+BN.dateAdded+" dateGroupModified: "+BN.dateGroupModified);
 
   // Insert new row at given place, or append a new row, inside the bookmarks table
@@ -1416,6 +1414,9 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
 	  div2 = FolderTempl.cloneNode(true);
 	  span = (twistie = div2.firstElementChild).nextElementSibling.nextElementSibling;
 	}
+	if (BN.inBSP2Trash) { // Set to italics
+	  span.style.fontStyle = "italic";
+	}
 	// Look at children to set the twistie
 //	if (!delayLoad_option)
 	  children = BN.children;
@@ -1471,6 +1472,9 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
 		span = anchor.firstElementChild.nextElementSibling;
 	  }
 	}
+	if (BN.inBSP2Trash) { // Set to italics
+	  span.style.fontStyle = "italic";
+	}
 	// We can attach an href attribute to <div> !!
 	// Much better as it avoids any special behavior of <a> on clicks and look/CSS ..
 	if (!url.startsWith("place:")) {
@@ -1505,85 +1509,82 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
  * Relies on a global variable insertRowIndex to be set by the caller, and maintains it
  *    = integer, position in bookmarksTable where to insert. (This is because there is
  *      no "pass by reference" in javascript ... only pass by value :-( )
- *
- * Returns the last inserted row
  */
 let insertRowIndex;
 function insertBkmks (BN, parentRow, parentLevel = undefined, parentOpen = undefined) {
-  // Retrieve parent in the bookmarks table if not supplied
-  if (parentLevel == undefined) { // Retrieve infos
-	// There must be a parent .. root is never created
-	// Assumption is also that "toolbar_____", "menu________", "unfiled_____"
-	// and "mobile______" are never created either, and everything
-	// falls under one of them (at least ..).
+  if ((trashEnabled_option && trashVisible_option) || (BN.inBSP2Trash != true)) { // Don't display BNs in BSP2 trash, except on debug
+	// Retrieve parent in the bookmarks table if not supplied
+	if (parentLevel == undefined) { // Retrieve infos
+	  // There must be a parent .. root is never created
+	  // Assumption is also that "toolbar_____", "menu________", "unfiled_____"
+	  // and "mobile______" are never created either, and everything
+	  // falls under one of them (at least ..).
 
-	// Retrieve level of parent, and open information
-	parentLevel = BN.level - 1;
-	parentOpen = curFldrOpenList[BN.parentId];
+	  // Retrieve level of parent, and open information
+	  parentLevel = BN.level - 1;
+	  parentOpen = curFldrOpenList[BN.parentId];
 
-	// Update parent twistiexx class if we insert under an empty folder
-	// Note: this only happens when we don't know the parent ...
-	let twistie = parentRow.firstElementChild.firstElementChild.firstElementChild;
-	if (twistie.classList.contains("twistiena")) { // It was empty
-	  if (parentOpen) {
-		twistie.classList.replace("twistiena", "twistieao");
-	  }
-	  else {
-		twistie.classList.replace("twistiena", "twistieac");
-	  }
-	}
-  }
-
-  // Verify what should be the visibility status of the inserted row
-  if (parentRow.hidden) { // Parent is not visible, so this row shouldn't be either
-	highest_open_level = 0; // Min possible, to make it simple ..
-  }
-  else { // Parent is visible, child visiblity depends on its open state ..
-	if (parentOpen)
-	  highest_open_level = parentLevel + 1; // Will be visible
-	else { // Parent is closed, but lets verify if its contents is open because of a search ..
-	  	   // If so, then the insert should be immediately visible.
-	  let nextRow = parentRow.nextElementSibling;
-	  if (nextRow != null) {
-		let nextLevel = parseInt(nextRow.dataset.level, 10);
-		if ((nextLevel == parentLevel+1) && !nextRow.hidden) {
-		  highest_open_level = nextLevel; // Will be visible
+	  // Update parent twistiexx class if we insert under an empty folder
+	  // Note: this only happens when we don't know the parent ...
+	  let twistie = parentRow.firstElementChild.firstElementChild.firstElementChild;
+	  if (twistie.classList.contains("twistiena")) { // It was empty
+		if (parentOpen) {
+		  twistie.classList.replace("twistiena", "twistieao");
 		}
 		else {
+		  twistie.classList.replace("twistiena", "twistieac");
+		}
+	  }
+	}
+
+	// Verify what should be the visibility status of the inserted row
+	if (parentRow.hidden) { // Parent is not visible, so this row shouldn't be either
+	  highest_open_level = 0; // Min possible, to make it simple ..
+	}
+	else { // Parent is visible, child visiblity depends on its open state ..
+	  if (parentOpen)
+		highest_open_level = parentLevel + 1; // Will be visible
+	  else { // Parent is closed, but lets verify if its contents is open because of a search ..
+		// If so, then the insert should be immediately visible.
+		let nextRow = parentRow.nextElementSibling;
+		if (nextRow != null) {
+		  let nextLevel = parseInt(nextRow.dataset.level, 10);
+		  if ((nextLevel == parentLevel+1) && !nextRow.hidden) {
+			highest_open_level = nextLevel; // Will be visible
+		  }
+		  else {
+			highest_open_level = parentLevel; // Will be hidden
+		  }
+		}
+		else { // We reached the end of bookmarks table, no children
 		  highest_open_level = parentLevel; // Will be hidden
 		}
 	  }
-	  else { // We reached the end of bookmarks table, no children
-		highest_open_level = parentLevel; // Will be hidden
+	}
+
+	// Insert the new bookmark at its place
+	let bnId = BN.id;
+	let row;
+	if (insertRowIndex == bookmarksTable.rows.length) {
+	  row = insertBookmarkBN(BN); // Append row
+	  insertRowIndex++;
+	}
+	else { 
+	  row = insertBookmarkBN(BN, insertRowIndex++);
+	}
+
+	// If BN is a folder, proceed with inserting its children if any (= case of Move or Sort)
+	if (BN.type == "folder") {
+	  let children = BN.children;
+	  let len;
+	  if ((children != undefined) && ((len = children.length) > 0)) {
+		let is_open = curFldrOpenList[bnId]; // Retrieve our intended open state
+		for (let i=0 ; i<len ; i++) {
+		  insertBkmks(children[i], row, parentLevel+1, is_open);
+		}
 	  }
 	}
   }
-
-  // Insert the new bookmark at its place
-  let row;
-  if (insertRowIndex == bookmarksTable.rows.length) {
-	row = insertBookmarkBN(BN); // Append row
-	insertRowIndex++;
-  }
-  else { 
-	row = insertBookmarkBN(BN, insertRowIndex++);
-  }
-
-  // If BN is a folder, proceed with inserting its children if any (= case of Move or Sort)
-  if (BN.type == "folder") {
-	let children = BN.children;
-	let len;
-	if ((children != undefined) && ((len = children.length) > 0)) {
-	  let childRow;
-	  let is_open = curFldrOpenList[BN.id]; // Retrieve our intended open state
-	  for (let i=0 ; i<len ; i++) {
-		childRow = insertBkmks(children[i], row, parentLevel+1, is_open);
-	  }
-	  row = childRow; // Get last inserted in row, for return()
-	}
-  }
-
-  return(row);
 }
 
 /*
@@ -1608,7 +1609,6 @@ function bkmkCreated (BN, index) {
   // Find insertion point, setting it in global variable insertRowIndex
   // We need to retrieve the insertion point the hard way if we do not want to call
   // getSubtree() which is very very long ...
-  let row;
   let parentRow = curRowList[parentId];
   // Introduce robustness in case the BN tree is empty and index is not 0, as that seems to occur some times
   let children = parentBN.children;
@@ -1623,12 +1623,12 @@ function bkmkCreated (BN, index) {
 		 // Note that in such multi operations, things have been all processed in background first for the copy,
 		 //       so the BN tree is not anymore in sync with display.
 	let previousBN = BN_lastDescendant(children[index-1]);
-	row = curRowList[previousBN.id];
+	let row = curRowList[previousBN.id];
 	insertRowIndex = row.rowIndex + 1; // Can be at end of bookmarks table
   }
 
   // We got the insertion point, proceed to insertion
-  row = insertBkmks(BN, parentRow);
+  insertBkmks(BN, parentRow);
 
   // Save new current info and refresh search
   let type = BN.type;
@@ -1921,7 +1921,7 @@ function bkmkMoved (bnId, curParentId, targetParentId, targetIndex) {
   // State of parent folders may change, so save folder open state
   saveFldrOpen();
 
-  if (showPath_option) {
+  if (showPath_option || (trashEnabled_option && trashVisible_option)) {
 	// Trigger an update as results can change, if there is a search active
 	triggerUpdate();
   }
@@ -4576,7 +4576,7 @@ function createBkmkItem (parentId, insertIndex, title, url, type, is_openPropert
 	  );
 	}
   }
-  else { // Create before of after a bookmark item
+  else { // Create before or after a bookmark item
 	if (beforeFF57) {
 	  if (type == "separator") { // Cannot create separators in FF 56
 		creating = new Promise (
@@ -4607,7 +4607,7 @@ function createBkmkItem (parentId, insertIndex, title, url, type, is_openPropert
 	}
   }
   if (is_openProperties) { // Open the Properties window
-	creating.then(createBookmark);
+	creating.then((type == "bookmark") ? createBookmark : createFolder);
   }
 }
 
@@ -4652,7 +4652,7 @@ async function createBkmkItem_async (parentId, insertIndex, title, url, type) {
 	  );
 	}
   }
-  else { // Create before of after a bookmark item
+  else { // Create before or after a bookmark item
 	if (beforeFF57) {
 	  if (type == "separator") { // Cannot create separators in FF 56
 		creating = new Promise (
@@ -4684,6 +4684,26 @@ async function createBkmkItem_async (parentId, insertIndex, title, url, type) {
   }
   let newBTN = await creating; // Created BookmarkTreeNode
   return(newBTN);
+}
+
+/*
+ * Handle FF API call for bookmark removal (with handling of BSP2 trash, if enabled)
+ * 
+ * bnId = Id of BookmarkNode to delete
+ */
+function removeBkmkItem (bnId) {
+  // If BSP2 trash enabled, move the bookmark item to trash instead (except if already in trash)
+  let BN = curBNList[bnId];
+  if (trashEnabled_option && !BN.inBSP2Trash) { // Move at end of trash
+	browser.bookmarks.move(
+	  bnId,
+	  {parentId: bsp2TrashFldrBNId
+	  }
+	);
+  }
+  else { // Really delete the bookmark item
+	browser.bookmarks.removeTree(bnId);
+  }
 }
 
 /*
@@ -4995,8 +5015,8 @@ console.log("tabs length: "+len);
  * index = integer position in parent (undefined if at end)
  */
 async function pasteBkmk (a_BN, parentId, index = undefined) {
-//let t1 = new Date();
-//trace(t1.getTime()+" Paste BN: "+BN+" Parent: "+parentBN+" index: "+index+" recur: "+recurLevel);
+//let t1 = (new Date ()).getTime();
+//trace(t1+" Paste BN: "+BN+" Parent: "+parentBN+" index: "+index+" recur: "+recurLevel);
   let len = a_BN.length;
   let BN;
   for (let i=0 ; i<len ; i++) { // Go through list of BookmarkNodes
@@ -5010,8 +5030,8 @@ async function pasteBkmk (a_BN, parentId, index = undefined) {
 	else {
 	  newBTN = await createBkmkItem_async(parentId, index++, BN.title, BN.url, BN.type);
     }
-//let t2 = new Date();
-//trace(t2.getTime()+" Paste node creation delay: "+(t2.getTime() - t1.getTime()));
+//let t2 = (new Date ()).getTime();
+//trace(t2+" Paste node creation delay: "+(t2.getTime() - t1.getTime()));
 	let children = BN.children;
 	if ((children != undefined) && (children.length > 0)) { // There are children to copy ...
 	  // Recursively call pasteBkmk on children
@@ -5034,9 +5054,9 @@ async function copyBkmk (a_BN, parentId, index = undefined) {
 }
 
 /*
- * Move bookmark at the designated place.
+ * Move bookmark(s) at the designated place.
  * 
- * a_BN = Array of BookmarkNodes to move
+ * a_BN = Array of BookmarkNodes to move (=> need to remain synchronous to keep order)
  * newParentId = String, Id of new parent to move into
  * newIndex = integer position in parent (undefined if at end)
  * 
@@ -5444,7 +5464,7 @@ function keyHandler (e) {
 		if (row.dataset.protect != "true") { // Non protected row
 		  // Delete bookmark item in that row
 		  let BN_id = row.dataset.id;
-		  browser.bookmarks.removeTree(BN_id);
+		  removeBkmkItem(BN_id);
 		}
 	  }
 	}
@@ -5692,129 +5712,48 @@ function menuOpenAllInTabs (BN_id) {
 /*
  * Handle new bookmark item action on context menu
  * 
- * BN_id = String identifying the bookmark item before which or inside which to insert
+ * tgtBN_id = String identifying the bookmark item before which or inside which to insert
  * bkmkType = integer, described by constants below
  */
 const NEWB = 0;
 const NEWF = 1;
 const NEWS = 2;
-function menuNewBkmkItem (BN_id, bkmkType) {
-  let BN = curBNList[BN_id];
+function menuNewBkmkItem (tgtBN_id, bkmkType) {
+  let tgtBN = curBNList[tgtBN_id];
 
   // Create new bookmark just before if BN is a separator or a bookmark,
   // or append inside if BN is a folder.
-  let BN_type = BN.type;
-  if (beforeFF57) {
-	switch (bkmkType) {
-	  case NEWB:
-	  	if (BN_type == "folder") {
-		  browser.bookmarks.create(
-			{parentId: BN_id,
-			 title: "New bookmark",
-			 url: "about:blank"
-			}
-		  )
-		  .then(createBookmark);
-	  	}
-		else {
-		  browser.bookmarks.create(
-			{index: BN_getIndex(BN),
-			 parentId: BN.parentId,
-			 title: "New bookmark",
-			 url: "about:blank"
-			}
-		  )
-		  .then(createBookmark);
-		}
-	  	break;
-	  case NEWF:
-		if (BN_type == "folder") {
-		  browser.bookmarks.create(
-			{parentId: BN_id,
-			 title: "New folder"
-			}
-		  )
-		  .then(createFolder);
-	  	}
-		else {
-		  browser.bookmarks.create(
-			{index: BN_getIndex(BN),
-			 parentId: BN.parentId,
-			 title: "New folder"
-			}
-		  )
-		  .then(createFolder);
-		}
-		break;
-	  case NEWS:
-		let msg = "Creating separators is not supported in WebExtension API before FF 57 !"; 
-		trace(msg);
-		console.log(msg);
-		break;
-	}
+  let tgtBN_type = tgtBN.type;
+  if (beforeFF57 && (bkmkType == NEWS)) {
+	let msg = "Creating separators is not supported in WebExtension API before FF 57 !"; 
+	trace(msg);
+	console.log(msg);
   }
-  else { // Post FF 57
+  else {
 	switch (bkmkType) {
 	  case NEWB:
-		if (BN_type == "folder") {
-		  browser.bookmarks.create(
-			{parentId: BN_id,
-			 title: "New bookmark",
-			 type: "bookmark",
-			 url: "about:blank"
-			}
-		  )
-		  .then(createBookmark);
+		if (tgtBN_type == "folder") {
+		  createBkmkItem (tgtBN_id, undefined, "New bookmark", "about:blank", "bookmark", true);
 		}
 		else {
-		  browser.bookmarks.create(
-			{index: BN_getIndex(BN),
-			 parentId: BN.parentId,
-			 title: "New bookmark",
-			 type: "bookmark",
-			 url: "about:blank"
-			}
-		  )
-		  .then(createBookmark);
+		  createBkmkItem (tgtBN.parentId, BN_getIndex(tgtBN), "New bookmark", "about:blank", "bookmark", true);
 		}
 		break;
 	  case NEWF:
-		if (BN_type == "folder") {
-		  browser.bookmarks.create(
-			{parentId: BN_id,
-			 title: "New folder",
-			 type: "folder"
-			}
-		  )
-		  .then(createFolder);
+		if (tgtBN_type == "folder") {
+		  createBkmkItem (tgtBN_id, undefined, "New folder", undefined, "folder", true);
 		}
 		else {
-		  browser.bookmarks.create(
-			{index: BN_getIndex(BN),
-			 parentId: BN.parentId,
-			 title: "New folder",
-			 type: "folder"
-			}
-		  )
-		  .then(createFolder);
+		  createBkmkItem (tgtBN.parentId, BN_getIndex(tgtBN), "New folder", undefined, "folder", true);
 		}
 		break;
 	  case NEWS:
-		if (BN_type == "folder") {
-		  browser.bookmarks.create(
-			{parentId: BN_id,
-			 type: "separator"
-			}
-		  );
+		if (tgtBN_type == "folder") {
+		  createBkmkItem (tgtBN_id, undefined, undefined, undefined, "separator", false);
 		}
 		else {
-		  browser.bookmarks.create(
-			{index: BN_getIndex(BN),
-			 parentId: BN.parentId,
-			 type: "separator"
-			}
-		  );
-		} 
+		  createBkmkItem (tgtBN.parentId, BN_getIndex(tgtBN), undefined, undefined, "separator", false);
+		}
 		break;
 	}
   }
@@ -6081,7 +6020,7 @@ function clickHandler (e) {
 	  menuAction = true;
 	  let row = bookmarksTable.rows[getMenuRowIndex(target)];
 	  // Delete bookmark item in that row
-	  browser.bookmarks.removeTree(row.dataset.id);
+	  removeBkmkItem(row.dataset.id);
 	}
 	else if (classList.contains("menusort")) { // Sort folder contents by name
 	  // Can only be on a folder and a bookmarks table row
@@ -6276,7 +6215,7 @@ function onClickedContextMenuHandler (info, tab) {
 		break;
 	  case "bsp2del":
 		// Delete bookmark
-		browser.bookmarks.removeTree(bnId);
+		removeBkmkItem(bnId);
 		break;
 	  case "bsp2sort":
 		// Sort folder content
@@ -6396,6 +6335,7 @@ function handleMsgResponse (message) {
 	  mostVisitedBNId = message.mostVisitedBNId;
 	  recentTagBNId = message.recentTagBNId; 
 	  recentBkmkBNId = message.recentBkmkBNId;
+	  bsp2TrashFldrBNId = message.bsp2TrashFldrBNId;
 
 	  f_initializeNext();
 	}
@@ -6512,6 +6452,7 @@ function handleAddonMessage (request, sender, sendResponse) {
 		let useAltFldr_option_old = useAltFldr_option;
 		let altNoFavImg_option_old = altNoFavImg_option;
 		let useAltNoFav_option_old = useAltNoFav_option;
+		let trashVisible_option_old = trashVisible_option;
 		let traceEnabled_option_old = traceEnabled_option;
 
 		// Function to process option changes
@@ -6570,6 +6511,39 @@ function handleAddonMessage (request, sender, sendResponse) {
 			  || (useAltNoFav_option_old != useAltNoFav_option)
 		     ) {
 			setPanelNoFaviconImg(useAltNoFav_option, altNoFavImg_option);
+		  }
+		  // If BSP2 trash folder visibility changed
+		  if (trashVisible_option_old != trashVisible_option) {
+			if (trashVisible_option) { // Insert BSP2 trash foder and all its children, with handling of parent twistie
+			  // Get parent of BSP2 Trash folder BN
+			  let BN = curBNList[bsp2TrashFldrBNId];
+			  let parentId = BN.parentId;
+			  let parentBN = curBNList[parentId];
+			  let parentRow = curRowList[parentId];
+
+			  // Retrieve row position where to insert.
+			  // Introduce robustness in case the BN tree is empty and index is not 0, as that seems to occur some times
+			  let children = parentBN.children;
+			  let index = BN_getIndex(BN, parentBN);
+  			  if ((index == 0) || (children == undefined)) { // Insert just after parent row
+				// Note that this also takes care of the case where parent had so far no child
+				insertRowIndex = parentRow.rowIndex + 1; // Can be at end of bookmarks table
+			  }
+			  else { // Insert just after previous row
+				let previousBN = BN_lastDescendant(children[index-1]);
+				let row = curRowList[previousBN.id];
+				insertRowIndex = row.rowIndex + 1; // Can be at end of bookmarks table
+			  }
+
+			  // We got the insertion point, proceed to insertion
+			  insertBkmks(BN, parentRow);
+			}
+			else { // Delete all BSP2 trash folder and its children, if any (with cleanup and handling od parent twistie)
+			  removeBkmks(curRowList[bsp2TrashFldrBNId], true);
+			}
+
+			// Trigger an update as results can change, if there is a search active
+			triggerUpdate();
 		  }
 		  // If trace option changed
 		  if (traceEnabled_option_old != traceEnabled_option) {
@@ -6730,6 +6704,9 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  else if (msg.startsWith("recentTagBNId")) { // Recreated (typically on restore bookmarks), so note the id
 		recentTagBNId = request.bnId;
 	  }
+	  else if (msg.startsWith("bsp2TrashFldrBNId")) { // Recreated, so note the id
+		bsp2TrashFldrBNId = request.bnId;
+	  }
 	}
 
 	// Answer
@@ -6812,15 +6789,15 @@ let tt1, tt2;
 async function completeFavicons (BN = undefined) {
   let children;
   if (BN == undefined) { // We are at start
-	let t1 = new Date ();
+	let t1 = (new Date ()).getTime();
 	tt1 = Performance.now();
 	children = rootBN.children;
 	let len = children.length;
 	for (let i=0 ; i<len ; i++) {
 	  await completeFavicons(children[i]);
 	}
-	let t2 = new Date ();
-	trace("Favicon display duration: "+(t2.getTime() - t1.getTime())+" ms", true);
+	let t2 = (new Date ()).getTime();
+	trace("Favicon display duration: "+(t2 - t1)+" ms", true);
   }
   else if ((BN.type == "folder") && ((children = BN.children) != undefined)) {
 	// If there are children, recursively explore them
@@ -6886,9 +6863,9 @@ function completeDisplay () {
   WaitingImg.hidden = true; // Stop displaying the waiting glass
 //  if (delayLoad_option)
 //	Bookmarks.appendChild(docFragment); // Display the table of bookmarks + reflow
-  endDisplayTime = new Date ();
-  trace("Display duration: "+(endDisplayTime.getTime() - endGetTreetime.getTime())+" ms", true);
-  trace("Total duration: "+(endDisplayTime.getTime() - startTime.getTime())+" ms", true);
+  endDisplayTime = (new Date ()).getTime();
+  trace("Display duration: "+(endDisplayTime - endGetTreetime)+" ms", true);
+  trace("Total duration: "+(endDisplayTime - startTime)+" ms", true);
 
   // Finish displaying favicons asynchronously
   if (!disableFavicons_option && !immediateFavDisplay_option) {
@@ -7002,14 +6979,18 @@ function completeDisplay () {
  * BN = BookmarkNode
  */
 function displayTreeBN (BN) {
-  insertBookmarkBN(BN);
+  if ((trashEnabled_option && trashVisible_option)
+	  || (BN.inBSP2Trash != true)
+	 ) { // Don't display BNs in BSP2 trash, except on debug
+	insertBookmarkBN(BN);
 
-  // If there are children, recursively display them
-  let children;
-  if ((BN.type == "folder") && ((children = BN.children) != undefined)) {
-	let len = children.length;
-	for (let i=0 ; i<len ; i++) {
-	  displayTreeBN(children[i]);
+	// If there are children, recursively display them
+	let children;
+	if ((BN.type == "folder") && ((children = BN.children) != undefined)) {
+	  let len = children.length;
+	  for (let i=0 ; i<len ; i++) {
+		displayTreeBN(children[i]);
+	  }
 	}
   }
 }
@@ -7032,10 +7013,10 @@ async function exploreWidth (BTN, level) {
   // If folder, get children first to know the type of twisitie to set ..
   if (getType(BTN) == "folder") {
 //    trace(BTN.id+" children: "+BTN.children, true);
-	let t1 = new Date();
+	let t1 = (new Date ()).getTime();
 	let children = await browser.bookmarks.getChildren(BTN.id);
-	let t2 = new Date();
-	trace(BTN.id+" children load duration: "+(t2.getTime() - t1.getTime())+" ms", true);
+	let t2 = (new Date ()).getTime();
+	trace(BTN.id+" children load duration: "+(t2 - t1)+" ms", true);
 	trace("      Number of children nodes: "+children.length, true);
 	insertBookmark(BTN, level, -1, children);
 
@@ -7490,6 +7471,7 @@ function initialize2 () {
 	mostVisitedBNId = backgroundPage.mostVisitedBNId;
 	recentTagBNId = backgroundPage.recentTagBNId;
 	recentBkmkBNId = backgroundPage.recentBkmkBNId;
+	bsp2TrashFldrBNId = backgroundPage.bsp2TrashFldrBNId;
 
 	// Get options and curBNList / rootBN
 	refreshOptionsBgnd(backgroundPage);
@@ -7498,8 +7480,8 @@ function initialize2 () {
 	curBNList = backgroundPage.curBNList;
 	rootBN = backgroundPage.rootBN;
   }
-  endGetTreetime = new Date ();
-  trace("Get tree duration: "+(endGetTreetime.getTime() - endLoadTime.getTime())+" ms", true);
+  endGetTreetime = (new Date ()).getTime();
+  trace("Get tree duration: "+(endGetTreetime - endLoadTime)+" ms", true);
 
   // Set the scene ..
   setupUI();
@@ -7608,7 +7590,7 @@ function initialize () {
   // Watch for background script messages
   browser.runtime.onMessage.addListener(handleAddonMessage);
 
-  startTime = new Date();
+  startTime = (new Date ()).getTime();
   if (backgroundPage == undefined) { // Private window, load by ourselves, except SavedBNList
 	waitMsg("Load saved state..");
 	let p = readFullLStore(true, waitMsg);
@@ -7620,8 +7602,8 @@ function initialize () {
 		myWindowId = windowInfo.id;
 
 		// Process read values from Store (they are already in Global variables from libstore.js)
-		endLoadTime = new Date();
-		trace("Load local store duration (full): "+(loadDuration = (endLoadTime.getTime() - startTime.getTime()))+" ms", true);
+		endLoadTime = (new Date ()).getTime();
+		trace("Load local store duration (full): "+(loadDuration = (endLoadTime - startTime))+" ms", true);
 		TracePlace.hidden = !traceEnabled_option;
 
 		if (backgroundReady) {
@@ -7659,8 +7641,8 @@ function initialize () {
 		myWindowId = windowInfo.id;
 
 		// Process read values from Store (they are already in Global variables from libstore.js)
-		endLoadTime = new Date();
-		trace("Load local store duration (folders only): "+(loadDuration = (endLoadTime.getTime() - startTime.getTime()))+" ms", true);
+		endLoadTime = (new Date ()).getTime();
+		trace("Load local store duration (folders only): "+(loadDuration = (endLoadTime - startTime))+" ms", true);
 
 		if (backgroundPage.ready) {
 //		  console.log("Background is Ready 1");

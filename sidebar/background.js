@@ -45,7 +45,7 @@ const SidebarScanInterval = 1000; // Every 1 s
 //const DfltTextColor = "#222426"; // Default text color
 //const DfltBckgndColor = "white"; // Default background color
 
-const CvtCanvas = document.createElement('canvas'); // For image conversion to 16 x 16
+const CvtCanvas = document.createElement('canvas'); // For image conversion to 16 x 16 and to Base64 URI
 CvtCanvas.height = 16;
 CvtCanvas.width = 16;
 const CvtCtx = CvtCanvas.getContext("2d");
@@ -84,6 +84,7 @@ browser.runtime.getPlatformInfo()
 //Declared in BookmarkNode.js
 //var countBookmarks = 0, countFolders = 0, countSeparators = 0, countOddities = 0;
 //var mostVisitedBNId, mostVisitedBN, recentTagBNId, recentTagBN, recentBkmkBNId, recentBkmkBN;
+//var bsp2TrashFldrBNId, bsp2TrashFldrBN;
 
 var loadDuration, treeLoadDuration, treeBuildDuration, saveDuration;
 var isSlowSave = false;
@@ -182,8 +183,8 @@ function endSaveBNList () { // Save finished
 
   // One time performance measurement at start
   if (endSaveTime == undefined) {
-	endSaveTime = new Date();
-	trace("Save duration: "+(saveDuration = (endSaveTime.getTime() - endTreeBuildTime.getTime()))+" ms", true);
+	endSaveTime = (new Date ()).getTime();
+	trace("Save duration: "+(saveDuration = (endSaveTime - endTreeBuildTime))+" ms", true);
 	if (saveDuration > SaveMinHysteresis) {
 	  isSlowSave = true;
 	  trace("isSlowSave: true");
@@ -209,8 +210,7 @@ const saveObject0 = {savedBNList: undefined, savedHNList: undefined, fTime: unde
 const saveObject1 = {savedBNListBak: undefined, savedHNListBak: undefined, fTimeBak: undefined, fIndex: 1};
 let executeSaveTimerID;
 function executeSaveBNList () {
-  let curDate = new Date ();
-  lastSaveTime = curDate.getTime();
+  lastSaveTime = (new Date ()).getTime();
   if (executeSaveTimerID != undefined) {
 	executeSaveTimerID = undefined;
   }
@@ -283,11 +283,9 @@ function executeSaveBNList () {
 
 function saveBNList () {
 //trace("saveBNList");
-//let t1 = new Date();
 
   // Recalculate hysteresis in function of call frequency
-  let curDate = new Date ();
-  let curTime = curDate.getTime();
+  let curTime = (new Date ()).getTime();
   if (lastSaveCallTime != undefined) {
 	let delay = curTime - lastSaveCallTime; // In ms
 	if (delay < SaveMinHysteresis) { // Doing favicon fetching or doing too often, increase to maximum hysteresis
@@ -627,8 +625,7 @@ function refreshMostVisited (a_MVU) {
   let listBN = [];
   let BTN;
   let node;
-  let curDate = new Date ();
-  let curTime = curDate.getTime();
+  let curTime = (new Date ()).getTime();
   let i;
   for (let j=0 ; j<len ; j++) {
 	i = a_MVU[j];
@@ -829,7 +826,7 @@ async function sortFolder (bnId) {
  */
 function reloadFFAPI (is_autoDetected) {
   // Make sure completeBookmarks will behave properly on this tree reload
-  endLoadTime = new Date();
+  endLoadTime = (new Date()).getTime();
   savedBNList = curBNList;
   savedHNList = curHNList;
   faviconWorkerPostMessage({data: ["hysteresis"]});
@@ -863,6 +860,41 @@ function reloadFFAPI (is_autoDetected) {
   }
   // Make sure we save the last known state, including history
   saveBNList();
+}
+
+/*
+ * Create BSP2 trash folder 
+ */
+function createBSP2TrashFolder () {
+  if (bsp2TrashFldrBNId == undefined) { // Only create once !
+	if (beforeFF57) {
+	  browser.bookmarks.create(
+		{parentId: OtherBookmarks,
+		 title: BSP2TrashName
+		}
+	  );
+	}
+	else {
+	  browser.bookmarks.create(
+		{parentId: OtherBookmarks,
+		 title: BSP2TrashName,
+		 type: "folder"
+		}
+	  );
+	}
+  }
+  else { // It already exists, simply trim its content
+	BN_folderTrim(curBNList[bsp2TrashFldrBNId], historyRetention_option * 24 * 3600000);
+  }
+}
+
+/*
+ * Create BSP2 trash folder 
+ */
+function removeBSP2TrashFolder () {
+  if (bsp2TrashFldrBNId != undefined) { // Only remove if present !
+	browser.bookmarks.removeTree(bsp2TrashFldrBNId);
+  }
 }
 
 /*
@@ -992,6 +1024,8 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  let useAltFldr_option_old = useAltFldr_option;
 	  let altNoFavImg_option_old = altNoFavImg_option;
 	  let useAltNoFav_option_old = useAltNoFav_option;
+	  let trashEnabled_option_old = trashEnabled_option;
+	  let trashVisible_option_old = trashVisible_option;
 	  let traceEnabled_option_old = traceEnabled_option;
 	  refreshOptionsLStore()
 	  .then(
@@ -1049,6 +1083,16 @@ function handleAddonMessage (request, sender, sendResponse) {
 			  sendAddonMessage("reload");
 			}
 		  }
+		  else if (trashEnabled_option_old != trashEnabled_option) {
+			// Create or delete the BSP2 trash folder, as required
+			if (trashEnabled_option) { // Create BSP2 trash folder
+			  createBSP2TrashFolder();
+  			}
+			else { // Delete BSP2 trash folder and all its content
+			  removeBSP2TrashFolder();
+			}
+			sendAddonMessage("savedOptions");
+		  }
 		  else if ((enableCookies_option_old != enableCookies_option)
 			  	   || (enableFlipFlop_option_old != enableFlipFlop_option)
 			  	   || (advancedClick_option_old != advancedClick_option)
@@ -1059,6 +1103,7 @@ function handleAddonMessage (request, sender, sendResponse) {
 			   	   || (searchOnEnter_option_old != searchOnEnter_option)
 			  	   || (reversePath_option_old != reversePath_option)
 			  	   || (closeSibblingFolders_option_old != closeSibblingFolders_option)
+				   || (trashVisible_option_old != trashVisible_option)
 			       || (traceEnabled_option_old != traceEnabled_option)
 			       || (matchTheme_option_old != matchTheme_option)
 			       || (setColors_option_old != setColors_option)
@@ -1145,8 +1190,9 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  let BN_id = msg.substring(5); // Get bookmark item Id
 	  sortFolder(BN_id);
 	}
-	else if (msg.startsWith("clearHistory")) { // Clear bookmark history, typically from History window
+	else if (msg.startsWith("clearHistory")) { // Clear bookmark history and BSP2 trash, sent from options page
 	  historyListClear(curHNList);
+	  BN_folderClean(bsp2TrashFldrBN);
 	  // Save new current info
 	  saveBNList();
 	}
@@ -1178,7 +1224,8 @@ function handleAddonMessage (request, sender, sendResponse) {
 		 countOddities: countOddities,
 		 mostVisitedBNId: mostVisitedBNId,
 		 recentTagBNId: recentTagBNId, 
-		 recentBkmkBNId: recentBkmkBNId
+		 recentBkmkBNId: recentBkmkBNId,
+		 bsp2TrashFldrBNId: bsp2TrashFldrBNId
 		}
 	  );
 	  json = undefined;
@@ -1324,7 +1371,7 @@ function convertOnLoad () {
   if ((nh > 0) && (nw > 0) && ((nh != 16) || (nw != 16))) {
 //console.log("converting");
 	try {
-	  if ((nh > 16) && (nw > 16)) { // Only downscaling .. avoid FF canvas native algo, not really good
+	  if ((nh > 16) && (nw > 16)) { // Downscale and get URI
 //console.log("  downscale");
 		// Get ImageData.data of the image
 		let srcIDData;
@@ -1333,7 +1380,7 @@ function convertOnLoad () {
 		CvtCtx2.drawImage(CvtImage, 0, 0);
 		srcIDData = CvtCtx2.getImageData(0, 0, nw, nh).data;
 
-		// Downscale into CvtImageData
+		// Downscale into CvtImageData .. avoid FF canvas native algo, not really good
 		downscaleImg(srcIDData, CvtIDData, nh, nw);
 
 		// Put CvtImage into CvtCtx and get base64 uri
@@ -1341,7 +1388,7 @@ function convertOnLoad () {
 		convertedUri = CvtCanvas.toDataURL();
 //console.log("  convertedUri: "+convertedUri);
 	  }
-	  else {
+	  else { // Only get URI
 		//Ctx.fillRect(0, 0, 16, 16);
 		CvtCtx.clearRect(0, 0, 16, 16);
 		CvtCtx.drawImage(CvtImage, 0, 0, 16, 16);
@@ -1723,11 +1770,12 @@ function signalMigrate16x16 (migr16x16ConvertList, migr16x16Len) {
  *
  * BTN = BookmarkTreeNode
  * level = integer, the tree depth
+ * inBSP2TRash (optional) = Boolean, true is inside BSP2 trash, else undefined/false
  * 
  * Return created BookmarkNode tree
  */
 //let countDuplicates = 0;
-function buildTree (BTN, level) {
+function buildTree (BTN, level, inBSP2Trash = undefined) {
   let BTN_id = BTN.id;
 /*
   // Detect objects which would be structurally duplicated = appear several times
@@ -1746,6 +1794,13 @@ function buildTree (BTN, level) {
 */
 //  let node = curBNList[BTN_id] = BN_create(BTN, level, faviconWorker);
   let node = curBNList[BTN_id] = BN_create(BTN, level, faviconWorkerPostMessage);
+  if (inBSP2Trash == true) { // Set flag on the BN + a trashDate corresponding to now
+	node.inBSP2Trash = true;
+	node.trashDate = (new Date ()).getTime();
+  }
+  if (BTN_id == bsp2TrashFldrBNId) { // Added BN was recognized as the BSP2 trash
+	inBSP2Trash = true; // Propagate corresponding attribute to all children of it
+  }
 
   // If there are children, recursively build them
   if (beforeFF57) {
@@ -1766,7 +1821,7 @@ function buildTree (BTN, level) {
 											  ((countSeparators++ == 0) ? true : false)
 											 );
 		  }
-		  children[j++] = buildTree(i, level+1);
+		  children[j++] = buildTree(i, level+1, inBSP2Trash);
 		}
 	  }
 	}
@@ -1778,7 +1833,7 @@ function buildTree (BTN, level) {
 		let children = node.children; // Array of proper length was created by BN_create
 		let len = btnChildren.length;
 		for (let j=0 ; j<len ; j++) {
-		  children[j] = buildTree(btnChildren[j], level+1);
+		  children[j] = buildTree(btnChildren[j], level+1, inBSP2Trash);
 		}
 	  }
 	}
@@ -1842,19 +1897,32 @@ function bkmkCreatedHandler (id, BTN) {
   let parentId = BTN.parentId;
   let parentBN = curBNList[parentId];
   let index = BTN.index;
-//let t1 = new Date();
-//trace(t1.getTime()+" Create event on: "+id+" type: "+BTN.type+" parentId: "+parentId+" index: "+index);
+//let t1 = (new Date()).getTime();
+//trace(t1+" Create event on: "+id+" type: "+BTN.type+" parentId: "+parentId+" index: "+index);
 
-  // Create the new BN tree and insert it under its parent
-  let BN = buildTree(BTN, parentBN.level+1);
+  // Create the new BN tree and insert it under its parent + maintain inBSP2Trash and trashDate fields
+  let inBSP2Trash = trashEnabled_option && parentBN.inBSP2Trash;
+  let BN = buildTree(BTN, parentBN.level+1, inBSP2Trash);
   BN_insert(BN, parentBN, index);
 
   // Record action
   historyListAdd(curHNList, HNACTION_BKMKCREATE,
 	  			 false, undefined, id, BTN.type, BN_aPath(parentId), parentId, index,
-	  			 BTN.title, BN.faviconUri, BTN.url);
+	  			 BTN.title, BN.faviconUri, BTN.url, inBSP2Trash);
   // Save new current info
   saveBNList();
+
+  // If we receive creation of the BSP2 trash folder, then rebuild pointer
+  // and tell open sidebars before they are notified of its creation, to recognize it
+  if (id == bsp2TrashFldrBNId) {
+	bsp2TrashFldrBN = BN;
+	// Notify open sidebars of new id
+	sendAddonMsgComplex({
+	  source: "background",
+	  content: "bsp2TrashFldrBNId",
+	  bnId: bsp2TrashFldrBNId
+	});
+  }
 
   // Signal to sidebars to make them display it (must work with Private window sidebars
   // also, which have their own separate copy of curBNList).
@@ -1875,8 +1943,8 @@ function bkmkCreatedHandler (id, BTN) {
   // - Then re-create of all bookmarks one by one. This includes the special folders like Most Visited,
   //   Recent Tags or Recently Bookmarked.
   if (id == recentBkmkBNId) {
-	recentBkmkBN = curBNList[recentBkmkBNId];
-	// Notify open sidebars or ('possibly new) id'
+	recentBkmkBN = BN;
+	// Notify open sidebars of (possibly new) id
 	sendAddonMsgComplex({
 	  source: "background",
 	  content: "recentBkmkBNId",
@@ -1889,9 +1957,9 @@ function bkmkCreatedHandler (id, BTN) {
   // If we receive creation of the Most recent special folder (typically on restore bookmarks),
   // then rebuild pointer and refresh its content also
   if (id == mostVisitedBNId) {
-	mostVisitedBN = curBNList[mostVisitedBNId];
+	mostVisitedBN = BN;
 	triggerRefreshMostVisited();
-	// Notify open sidebars or ('possibly new) id'
+	// Notify open sidebars of (possibly new) id
 	sendAddonMsgComplex({
 	  source: "background",
 	  content: "mostVisitedBNId",
@@ -1902,8 +1970,8 @@ function bkmkCreatedHandler (id, BTN) {
   // If we receive creation of the Recent tags special folder (typically on restore bookmarks),
   // then rebuild pointer
   if (id == recentTagBNId) {
-	recentTagBN = curBNList[recentTagBNId];
-	// Notify open sidebars or ('possibly new) id'
+	recentTagBN = BN;
+	// Notify open sidebars of (possibly new) id
 	sendAddonMsgComplex({
 	  source: "background",
 	  content: "recentTagBNId",
@@ -1942,7 +2010,7 @@ function bkmkRemovedHandler (id, removeInfo) {
 	let type = BN.type;
 	historyListAdd(curHNList, HNACTION_BKMKREMOVE,
 				   false, undefined, id, type, BN_aPath(parentId), parentId, removeInfo.index,
-				   BN.title, BN.faviconUri, BN.url, BN_serialize(BN),
+				   BN.title, BN.faviconUri, BN.url, BN.inBSP2Trash, BN_serialize(BN),
 				   undefined, undefined, undefined, undefined, undefined,
 				   (type == "folder") ? BN_childIds(BN) : undefined // To increase chances to find childIds in case of desynchro
 				  );
@@ -1996,6 +2064,7 @@ function bkmkChangedHandler (id, changeInfo) {
 					   historyListSearchFaviconUri(curHNList, id, BTN),
 					   historyListSearchUrl(curHNList, id),
 					   undefined,
+					   undefined,
 					   undefined, undefined, undefined, cTitle, cUrl);
 		reloadFFAPI(true);
 	  }
@@ -2038,7 +2107,7 @@ function bkmkChangedHandler (id, changeInfo) {
 	let parentId = BN.parentId;
 	historyListAdd(curHNList, HNACTION_BKMKCHANGE,
 				   false, undefined, id, type, BN_aPath(parentId), parentId, BN_getIndex(BN),
-				   oTitle, uri, oUrl, undefined,
+				   oTitle, uri, oUrl, BN.inBSP2Trash, undefined,
 				   undefined, undefined, undefined, cTitle, cUrl,
 				   (type == "folder") ? BN_childIds(BN) : undefined // To increase chances to find childIds in case of desynchro
 				  );
@@ -2085,11 +2154,18 @@ function bkmkMovedHandler (id, moveInfo) {
 	  function (a_BTN) {
 		// Record action sent to us at source of detecting the problem
 		let BTN = a_BTN[0];
-		historyListAdd(curHNList, HNACTION_BKMKMOVE_DESYNC,
+		historyListAdd(curHNList,
+					   (trashEnabled_option && (targetParentId == bsp2TrashFldrBNId) // Imperfect, but not daring a double error by fetching possibly non existing parent
+						? HNACTION_BKMKREMOVETOTRASH_DESYNC
+						: (trashEnabled_option && (curParentId == bsp2TrashFldrBNId) // Same ..
+						   ? HNACTION_BKMKCREATEFROMTRASH_DESYNC
+						   : HNACTION_BKMKMOVE_DESYNC
+						  )
+					   ),
 					   false, undefined, id, BTN.type, BN_aPath(curParentId), curParentId, moveInfo.oldIndex,
 					   BTN.title,
 					   historyListSearchFaviconUri(curHNList, id, BTN),
-					   BTN.url, undefined,
+					   BTN.url, undefined, undefined,
 					   BN_aPath(targetParentId), targetParentId, targetIndex
 					  );
 		reloadFFAPI(true);
@@ -2103,13 +2179,25 @@ function bkmkMovedHandler (id, moveInfo) {
 	// as this is only a move.
 	BN_delete(BN, curParentId, false);
 	// Then insert it at new place, again not touching the list
+	let curInBSP2Trash = BN.inBSP2Trash; // Remember current trash state
+	let tgtInBSP2Trash;
+	if (trashEnabled_option) { // Maintain inBSP2Trash and trashDate fields
+	  BN_markTrash(BN, tgtInBSP2Trash = targetParentBN.inBSP2Trash);
+	}
 	BN_insert(BN, targetParentBN, targetIndex, false);
 
 	// Record action
 	let type = BN.type;
-	historyListAdd(curHNList, HNACTION_BKMKMOVE,
+	historyListAdd(curHNList,
+				   ((tgtInBSP2Trash == true)
+					? HNACTION_BKMKREMOVETOTRASH
+					: ((trashEnabled_option && curInBSP2Trash)
+					   ? HNACTION_BKMKCREATEFROMTRASH
+					   : HNACTION_BKMKMOVE
+					  )
+				   ),
 				   false, undefined, id, type, BN_aPath(curParentId), curParentId, moveInfo.oldIndex,
-				   BN.title, BN.faviconUri, BN.url, undefined, // To increase chances to find last title or url in case of desynchro
+				   BN.title, BN.faviconUri, BN.url, BN.inBSP2Trash, undefined, // To increase chances to find last title or url in case of desynchro
 				   BN_aPath(targetParentId), targetParentId, targetIndex, undefined, undefined,
 				   (type == "folder") ? BN_childIds(BN) : undefined // To increase chances to find childIds in case of desynchro
 				  );
@@ -2159,7 +2247,7 @@ function bkmkReorderedHandler (id, reorderInfo, recHistory = true) {
 			  			 false, undefined, id, "folder", BN_aPath(parentId), parentId, BTN.index,
 			  			 BTN.title,
 			  			 historyListSearchFaviconUri(curHNList, id, BTN),
-			  			 undefined, undefined,
+			  			 undefined, undefined, undefined, // This is a folder => no URL
 			  			 undefined, undefined, undefined, undefined, undefined,
 			  			 // Can't know the old childIds value !!! Hopefully, it will be sooner in the past history
 			  			 historyListSearchChildIds(curHNList, id),
@@ -2188,7 +2276,7 @@ function bkmkReorderedHandler (id, reorderInfo, recHistory = true) {
 		let parentId = folderBN.parentId;
 		historyListAdd(curHNList, HNACTION_BKMKREORDER,
 					   false, undefined, id, "folder", BN_aPath(parentId), parentId, BN_getIndex(folderBN),
-					   folderBN.title, folderBN.faviconUri, undefined, undefined, // To increase chances to find last title and favicon in history when searching for it
+					   folderBN.title, folderBN.faviconUri, undefined, undefined, undefined, // To increase chances to find last title and favicon in history when searching for it
 					   undefined, undefined, undefined, undefined, undefined,
 					   BN_childIds(folderBN), childIds
 					  );
@@ -2489,6 +2577,14 @@ function completeBookmarks () {
 //faviconWorker.postMessage(["nohysteresis"]);
   faviconWorkerPostMessage({data: ["nohysteresis"]});
 
+  // Align BSP2 trash folder existence with option
+  if (trashEnabled_option) { // If it should, create it if not already existing, else trim it
+	createBSP2TrashFolder();
+  }
+  else { // Make sure it is removed
+	removeBSP2TrashFolder();
+  }
+
   // Get trimmed history
   if (savedHNList == undefined) {
 	curHNList = new HistoryList ();
@@ -2611,9 +2707,9 @@ function buildBookmarkId (a_BTN, id, level, force = true) {
  * a_BTN = array of BookmarkTreeNode
  */
 function storeAndConvertTree (a_BTN) {
-//  trace("storeAndConvertTree");
-  endTreeLoadTime = new Date();
-  trace("(FF API) Tree load duration: "+(treeLoadDuration = (endTreeLoadTime.getTime() - endLoadTime.getTime()))+" ms", true);
+//trace("storeAndConvertTree");
+  endTreeLoadTime = (new Date ()).getTime();
+  trace("(FF API) Tree load duration: "+(treeLoadDuration = (endTreeLoadTime - endLoadTime))+" ms", true);
 
   // Build the BookmarkNode tree
   let root = a_BTN[0]; // Id is "root________" and type is "folder"
@@ -2640,8 +2736,8 @@ function storeAndConvertTree (a_BTN) {
   else {
 	rootBN.children = [child1, child2, child3, child4];
   }
-  endTreeBuildTime = new Date();
-  trace("Tree build duration: "+(treeBuildDuration = (endTreeBuildTime.getTime() - endTreeLoadTime.getTime()))+" ms", true);
+  endTreeBuildTime = (new Date ()).getTime();
+  trace("Tree build duration: "+(treeBuildDuration = (endTreeBuildTime - endTreeLoadTime))+" ms", true);
 
   // Remember most recent and most visisted BookmarkNodes, and then complete things
   if (mostVisitedBNId != undefined)
@@ -2650,6 +2746,8 @@ function storeAndConvertTree (a_BTN) {
 	recentTagBN = curBNList[recentTagBNId]; 
   if (recentBkmkBNId != undefined)
 	recentBkmkBN = curBNList[recentBkmkBNId];
+  if (bsp2TrashFldrBNId != undefined)
+	bsp2TrashFldrBN = curBNList[bsp2TrashFldrBNId];
   completeBookmarks();
 }
 
@@ -2702,14 +2800,14 @@ function initialize2 () {
 	else { // We got a full Bookmark node saved structure and we are on an add-on update or reload
 	  // Use the saved structure as current one
 	  curBNList = savedBNList;
-	  endTreeLoadTime = new Date();
+	  endTreeLoadTime = (new Date ()).getTime();
 	  bypassedFFAPI = true;
-	  trace("(Bypass FF API) Tree load duration: "+(treeLoadDuration = (endTreeLoadTime.getTime() - endLoadTime.getTime()))+" ms", true);
+	  trace("(Bypass FF API) Tree load duration: "+(treeLoadDuration = (endTreeLoadTime - endLoadTime))+" ms", true);
 
 	  // Scan tree to get stats and if we have still favicons to fetch, trigger that.
 	  scanBNTree(rootBN, faviconWorkerPostMessage);
-	  endTreeBuildTime = new Date();
-	  trace("Tree build duration: "+(treeBuildDuration = (endTreeBuildTime.getTime() - endTreeLoadTime.getTime()))+" ms", true);
+	  endTreeBuildTime = (new Date ()).getTime();
+	  trace("Tree build duration: "+(treeBuildDuration = (endTreeBuildTime - endTreeLoadTime))+" ms", true);
 
 	  completeBookmarks();
 	}
@@ -2792,7 +2890,7 @@ browser.management.getSelf()
 
 // Load options and tree (but not the folders state)
 trace("Load saved state..", true);
-startTime = new Date();
+startTime = (new Date ()).getTime();
 readFullLStore(false, trace)
 .then(
   function () {
@@ -2868,8 +2966,8 @@ readFullLStore(false, trace)
 	  migration_spfldr = true;
 	}
 
-	endLoadTime = new Date();
-	trace("Load local store duration: "+(loadDuration = (endLoadTime.getTime() - startTime.getTime()))+" ms", true);
+	endLoadTime = (new Date ()).getTime();
+	trace("Load local store duration: "+(loadDuration = (endLoadTime - startTime))+" ms", true);
 
 	// Wait for getting the install status
 	if (justInstalled != undefined) { // Already received the information
@@ -2910,32 +3008,32 @@ readFullLStore(false, trace)
 /*
 let count = 20;
 function test() {
-  let endLoadTime = new Date();
+  let endLoadTime = (new Date ()).getTime();
   browser.bookmarks.get(Root)
   .then(
     function (a_BTN) {
-	  let t2 = new Date();
-	  console.log("Root get duration: "+(t2.getTime() - endLoadTime.getTime())+" ms");
+	  let t2 = (new Date ()).getTime();
+	  console.log("Root get duration: "+(t2 - endLoadTime)+" ms");
 	  console.log("      Root.id      : "+a_BTN[0].id);
 	  console.log("      Root.children: "+a_BTN[0].children);
 	  browser.bookmarks.getChildren(Root)
  	  .then(
  	    function (a_BTN1) {
- 		  let t3 = new Date();
- 		  console.log("Root getChildren duration: "+(t3.getTime() - t2.getTime())+" ms");
+ 		  let t3 = (new Date ()).getTime();
+ 		  console.log("Root getChildren duration: "+(t3 - t2)+" ms");
  		  console.log("      Number of children: "+a_BTN1.length);
  	      browser.bookmarks.getSubTree(Root)
  	      .then(
  	        function (a_BTN2) {
- 	    	  let t4 = new Date();
- 	    	  console.log("Root getSubTree duration: "+(t4.getTime() - t3.getTime())+" ms");
+ 	    	  let t4 = (new Date ()).getTime();
+ 	    	  console.log("Root getSubTree duration: "+(t4 - t3)+" ms");
  	    	  console.log("      Root.children: "+a_BTN2[0].children);
  	    	  console.log("      Number of children: "+a_BTN2[0].children.length);
  	  	      browser.bookmarks.getTree()
  	  	      .then(
  	  	        function (a_BTN3) {
- 	  	    	  let t5 = new Date();
- 	  	    	  console.log("(Root) getTree duration: "+(t5.getTime() - t4.getTime())+" ms");
+ 	  	    	  let t5 = (new Date ()).getTime();
+ 	  	    	  console.log("(Root) getTree duration: "+(t5 - t4)+" ms");
  	  	    	  console.log("      Root.children: "+a_BTN3[0].children);
  	  	    	  console.log("      Number of children: "+a_BTN3[0].children.length);
  	  	    	  if (count-- > 0)   test();

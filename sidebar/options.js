@@ -63,6 +63,8 @@ const Opt4 = document.createElement("option");
 Opt4.value = Opt4.text = "MacCtrl";
 const Command3Select = document.querySelector("#command3");
 const ResetCommandButton = document.querySelector("#resetcommand");
+const TrashEnabledInput = document.querySelector("#trashEnabled");
+const TrashVisibleInput = document.querySelector("#trashVisible");
 const HistoryRetentionInput = document.querySelector("#historyretention");
 const HistoryClearButton = document.querySelector("#historyclear"); // Assuming it is an HTMLButtonElement
 const TraceEnabledInput = document.querySelector("#traceEnabled");
@@ -74,6 +76,7 @@ const ResetMigr16x16Button = document.querySelector("#resetmigr16x16");
 //const DfltTextColor = "#222426"; // Default text color
 //const DfltBckgndColor = "white"; // Default background color
 //const DfltHistoryRetention = "30"; // 30 days default
+//const BSP2TrashName = "BSP2 trash folder for undo of bookmark deletes - DO NOT DELETE !" // Placed under Other bookmarks
 
 
 /*
@@ -247,6 +250,8 @@ function saveOptions (e) {
 	altNoFavImgSrc = undefined;
   }
   let useAltNoFav = (!UseAltNoFavInput.disabled) && UseAltNoFavInput.checked;
+  let trashEnabled = TrashEnabledInput.checked;
+  TrashVisibleInput.disabled = !trashEnabled;
   let historyRetention = DfltHistoryRetention;
   if (HistoryRetentionInput.validity.valid) {
 	historyRetention = HistoryRetentionInput.value;
@@ -286,6 +291,8 @@ function saveOptions (e) {
 	,altnofavimg_option: altNoFavImgSrc
 	,usealtnofav_option: useAltNoFav
 	,sidebarcommand_option: sidebarCommand
+	,trashenabled_option: trashEnabled
+	,trashvisible_option: TrashVisibleInput.checked
 	,historyretention_option: historyRetention
 	,traceEnabled_option: TraceEnabledInput.checked
   })
@@ -720,6 +727,22 @@ function restoreOptions () {
 	ResetCommandButton.disabled = true;
   }
   
+  let trashEnabled = true;
+  if (trashEnabled_option_file != undefined) {
+	trashEnabled = TrashEnabledInput.checked = trashEnabled_option_file;
+  }
+  else {
+	TrashEnabledInput.checked = true;
+  }
+
+  if (trashVisible_option_file != undefined) {
+	TrashVisibleInput.checked = trashVisible_option_file;
+  }
+  else {
+	TrashVisibleInput.checked = false;
+  }
+  TrashVisibleInput.disabled = !trashEnabled;
+
   if (historyRetention_option_file != undefined) {
 	HistoryRetentionInput.value = historyRetention_option_file;
   }
@@ -1176,6 +1199,8 @@ function initialize2 () {
   Command2Select.addEventListener("change", changeSidebarCommand);
   Command3Select.addEventListener("change", changeSidebarCommand);
   ResetCommandButton.addEventListener("click", resetSidebarCommand);
+  TrashEnabledInput.addEventListener("click", saveOptions);
+  TrashVisibleInput.addEventListener("click", saveOptions);
   HistoryRetentionInput.addEventListener("change", changeHistoryRetention);
   HistoryClearButton.addEventListener("click", historyClearHandler);
   TraceEnabledInput.addEventListener("click", saveOptions);

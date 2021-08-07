@@ -18,7 +18,7 @@ body {
   width: calc(100% - 0px);
   display: grid;
   grid-template-columns: min-content minmax(400px, auto);
-  grid-template-rows: 400px minmax(200px, auto);
+  grid-template-rows: 420px minmax(200px, auto);
 }
 
 #pane {

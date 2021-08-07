@@ -11,7 +11,7 @@ const DfltFontSize = 12; // 12px default
 const DfltSpaceSize = 0; // 0px default
 const DfltTextColor = "#222426"; // Default text color
 const DfltBckgndColor = "#ffffff"; // Default background color
-const DfltHistoryRetention = "30"; // 30 days default
+const DfltHistoryRetention = "30"; // 30 days default - Align trash retention on it also
 
 
 /*
@@ -38,7 +38,7 @@ var setFontSize_option; // Boolean
 var fontSize_option; // Integer
 var setSpaceSize_option; // Boolean
 var spaceSize_option; // Integer
-var matchTheme_option; // Boolean
+var matchTheme_option; // Boolean - true by default
 var setColors_option; // Boolean
 var textColor_option; // DOMString
 var bckgndColor_option; // DOMString
@@ -52,7 +52,9 @@ var searchField_option; // String
 var searchScope_option; // String
 var searchMatch_option; // String
 var searchFilter_option; // String
-var historyDispURList_option; // Boolean
+var trashEnabled_option; // Boolean - true by default
+var trashVisible_option; // Boolean
+var historyDispURList_option; // Boolean - Used to group undo/redo as sublist under related bookmark action - true by default
 var historyRetention_option; // Integer
 var traceEnabled_option; // Boolean
 var savedBkmkUriList; // Used to receive the favicon uri saved in storage - Will be deleted at end
@@ -96,6 +98,8 @@ var searchField_option_file; // String
 var searchScope_option_file; // String
 var searchMatch_option_file; // String
 var searchFilter_option_file; // String
+var trashEnabled_option_file; // Boolean
+var trashVisible_option_file; // Boolean
 var historyDispURList_option_file; // Boolean
 var historyRetention_option_file; // Integer
 var traceEnabled_option_file; // Boolean
@@ -202,6 +206,10 @@ function refreshOptionsBgnd(backgroundPage) {
 	searchMatch_option = backgroundPage.searchMatch_option;
 	searchFilter_option_file = backgroundPage.searchFilter_option_file;
 	searchFilter_option = backgroundPage.searchFilter_option;
+	trashEnabled_option_file = backgroundPage.trashEnabled_option_file;
+	trashEnabled_option = backgroundPage.trashEnabled_option;
+	trashVisible_option_file = backgroundPage.trashVisible_option_file;
+	trashVisible_option = backgroundPage.trashVisible_option;
 	historyDispURList_option_file = backgroundPage.historyDispURList_option_file;
 	historyDispURList_option = backgroundPage.historyDispURList_option;
 	historyRetention_option_file = backgroundPage.historyRetention_option_file;
@@ -257,6 +265,8 @@ function refreshOptionsLStore() {
 					, "searchscope_option"
 					, "searchmatch_option"
 					, "searchfilter_option"
+					, "trashenabled_option"
+					, "trashvisible_option"
 					, "historydispurlist_option"
 					, "historyretention_option"
 					, "traceEnabled_option"
@@ -551,6 +561,22 @@ function refreshOptionsLStore() {
 					searchFilter_option = "all";
 				}
 
+				// -- Read TE option..
+				if ((trashEnabled_option_file = res.trashenabled_option) != undefined) {
+					trashEnabled_option = trashEnabled_option_file;
+				}
+				else {
+					trashEnabled_option = true;
+				}
+
+				// -- Read TV option..
+				if ((trashVisible_option_file = res.trashvisible_option) != undefined) {
+					trashVisible_option = trashVisible_option_file;
+				}
+				else {
+					trashVisible_option = false;
+				}
+
 				// -- Read HDUL option..
 				if ((historyDispURList_option_file = res.historydispurlist_option) != undefined) {
 					historyDispURList_option = historyDispURList_option_file;
@@ -694,6 +720,8 @@ function launchReadFullLStore(isSidebar) {
 				, "searchscope_option"
 				, "searchmatch_option"
 				, "searchfilter_option"
+				, "trashenabled_option"
+				, "trashvisible_option"
 				, "historydispurlist_option"
 				, "historyretention_option"
 				, "traceEnabled_option"
@@ -741,6 +769,8 @@ function launchReadFullLStore(isSidebar) {
 				, "searchscope_option"
 				, "searchmatch_option"
 				, "searchfilter_option"
+				, "trashenabled_option"
+				, "trashvisible_option"
 				, "historydispurlist_option"
 				, "historyretention_option"
 				, "traceEnabled_option"
@@ -1096,6 +1126,22 @@ function readFullOptions(res, isSidebar, waitMsg) {
 	}
 	else {
 		searchFilter_option = "all";
+	}
+
+	waitMsg("Read TE option..");
+	if ((trashEnabled_option_file = res.trashenabled_option) != undefined) {
+		trashEnabled_option = trashEnabled_option_file;
+	}
+	else {
+		trashEnabled_option = true;
+	}
+
+	waitMsg("Read TV option..");
+	if ((trashVisible_option_file = res.trashvisible_option) != undefined) {
+		trashVisible_option = trashVisible_option_file;
+	}
+	else {
+		trashVisible_option = false;
 	}
 
 	waitMsg("Read HDUL option..");
