@@ -483,7 +483,7 @@ function hideFFContextMenu () {
  * Show path submenu, and update its submenu item with bookmark path string
  */
 function showFFContextMenu (bnId) {
-  if ((bnId == HistoryFolderV)
+  if ((bnId == HistoryFolderV) // Bookmark library values
 	  || (bnId == DownloadsFolderV)
 	  || (bnId == TagsFolderV)
 	  || (bnId == AllBookmarksV)
@@ -550,7 +550,7 @@ function createBAContextMenu () {
 }
 
 /*
- * Disable show in sidebar submenu
+ * Disable show in sidebar browser action icon submenu
  */
 function disableBAShowBkmk () {
   browser.menus.update(
@@ -562,7 +562,7 @@ function disableBAShowBkmk () {
 }
 
 /*
- * Enable show in sidebar submenu
+ * Enable show in sidebar browser action icon submenu
  */
 function enableBAShowBkmk () {
   browser.menus.update(

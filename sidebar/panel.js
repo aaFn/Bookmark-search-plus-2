@@ -750,7 +750,6 @@ function refreshFaviconSearch (btnId, uri) {
 		  let tmpElem = document.createElement("img"); // Assuming it is an HTMLImageElement
 		  tmpElem.classList.add("favicon");
 		  tmpElem.draggable = false; // True by default for <img>
-		  bkmkitem.replaceChild(tmpElem, oldImg);
 		  tmpElem.src = uri;
 		  bkmkitem.replaceChild(tmpElem, oldImg);
 		}
@@ -910,12 +909,12 @@ function updateSearch () {
 
 		  if (searchMatch_option == "words") { // Build array of words to match
 			isRegExp = false;
-			a_matchStr = strLowerNormalize(value).split(" ");
+			a_matchStr = strLowerNormalize(value).split(" "); // Ignore case and diacritics
 		  }
 		  else {
 			isRegExp = true;
 			try {
-			  matchRegExp = new RegExp (strNormalize(value), "i"); // Do normalized insensitive case matching
+			  matchRegExp = new RegExp (strNormalize(value), "i"); // Ignore case and diacritics
 			}
 			catch (e) { // If malformed regexp, do not continue, match nothing
 			  a_BN = [];
@@ -5628,38 +5627,50 @@ function keyHandler (e) {
 		menuPasteBkmkItem(BN_id, (type == "folder")); // If folder, paste into it
 	  }
 	}
-	else if (!is_ctrlKey && key.match(PatternAlphanumeric)) { // An alphanumeric key, accummulate and use to jump to next matching bookmark item
+	else if (!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (key.length == 1)
+			 && key.match(PatternAlphanumeric)) { // An alphanumeric key, accummulate and use to jump to next matching bookmark item
 	  // Stop the search timeout
 	  clearTimeout(searchTimerID);
 	  let nextRow;
 	  if (searchStr.length == 0) { // If first typed char, start on next record
-		searchStr = key.toLowerCase(); // Case insensitive compare
+		searchStr = strLowerNormalize(key); // Case & diacritics insensitive compare
 		nextRow = row.nextElementSibling;
 	  }
 	  else { // Else, give a chance to current row
-	    searchStr += key.toLowerCase(); // Case insensitive compare
-	    nextRow = row;
+		searchStr += strLowerNormalize(key); // Case & diacritics insensitive compare
+		nextRow = row;
 	  }
 	  // Search next bookmark item matching searchStr (or do not move if none)
 	  let cell;
 	  let type;
-	  let found = false;
-	  while (!found && (nextRow != null)) {
-		// Compare with searchStr
-		cell = nextRow.firstElementChild;
-		let span;
-		if (type == "folder") {
-		  span = cell.firstElementChild.firstElementChild.nextElementSibling.nextElementSibling;
+	  let found;
+	  do {
+		if (nextRow == null) { // Wrap at start
+		  if (isResultRow) {
+			nextRow = resultsTable.rows[0]; // Note: always visible
+		  }
+		  else {
+			nextRow = bookmarksTable.rows[0]; // Note: always visible
+		  }
 		}
-		else {
-		  span = cell.firstElementChild.firstElementChild.nextElementSibling;
+		if (nextRow == row) { // Nothing found, let's not loop infinitely'
+		  break;
 		}
-		found = (span.textContent.toLowerCase().startsWith(searchStr));
-		// If not found, go to next visible non separator row
-		while (((nextRow = nextRow.nextElementSibling) != null)
-			   && ((nextRow.hidden) || ((type = nextRow.dataset.type) == "separator"))
-			  );
+		if (!(nextRow.hidden) && ((type = nextRow.dataset.type) != "separator")) {
+		  // Compare with searchStr
+		  cell = nextRow.firstElementChild;
+		  let span;
+		  if (type == "folder") {
+			span = cell.firstElementChild.firstElementChild.nextElementSibling.nextElementSibling;
+		  }
+		  else {
+			span = cell.firstElementChild.firstElementChild.nextElementSibling;
+		  }
+		  found = (strLowerNormalize(span.textContent).startsWith(searchStr));
+		}
+		nextRow = nextRow.nextElementSibling;
 	  }
+	  while (!found);
 	  if (found) {
 		if (isResultRow) { // Set result cursor and selection if in search panel
 		  setCellHighlight(rcursor, cell, rbkmkSelectIds);
@@ -6404,7 +6415,9 @@ function handleMsgResponse (message) {
   // Is always called, even is destination didn't specifically reply (then message is undefined)
   if (message != undefined) {
 	let msg = message.content;
-//console.log("Background sent a response: <<"+msg+">> received in sidebar:"+myWindowId);
+if (traceEnabled_option) {
+  console.log("Background sent a response: <<"+msg+">> received in sidebar:"+myWindowId);
+}
 	if (msg == "savedCurBnId") { // Restore last saved cursor position
 	  goBkmkItem(message.bnId);
 	}
@@ -6425,7 +6438,9 @@ function handleMsgResponse (message) {
 	else if (msg == "Ready") {
 	  backgroundReady = true; // Signal background ready for private windows for asking curBNList
 	  if (waitingInitBckgnd) { // We were waiting for it to continue
-//console.log("Background is Ready 3");
+if (traceEnabled_option) {
+  console.log("Background is Ready 3");
+}
 		f_initializeNext();
 	  }
 	}
@@ -6503,17 +6518,21 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  // When coming from sidebar:
 	  //   sender.url: moz-extension://28a2a188-53d6-4f91-8974-07cd0d612f9e/sidebar/panel.html
 	  let msg = request.content;
-//console.log("Got message <<"+msg+">> from "+request.source+" in "+myWindowId);
-//console.log("  sender.tab: "+sender.tab);
-//console.log("  sender.frameId: "+sender.frameId);
-//console.log("  sender.id: "+sender.id);
-//console.log("  sender.url: "+sender.url);
-//console.log("  sender.tlsChannelId: "+sender.tlsChannelId);
+if (traceEnabled_option) {
+  console.log("Got message <<"+msg+">> from "+request.source+" in "+myWindowId);
+  console.log("  sender.tab: "+sender.tab);
+  console.log("  sender.frameId: "+sender.frameId);
+  console.log("  sender.id: "+sender.id);
+  console.log("  sender.url: "+sender.url);
+  console.log("  sender.tlsChannelId: "+sender.tlsChannelId);
+}
 
 	  if (msg == "Ready") { // Background initialization is ready
 		backgroundReady = true; // Signal background ready for private windows for asking curBNList
 		if (waitingInitBckgnd) { // We were waiting for it to continue
-//console.log("Background is Ready 2");
+if (traceEnabled_option) {
+  console.log("Background is Ready 2");
+}
 		  f_initializeNext();
 		}
 	  }
@@ -7690,12 +7709,16 @@ function initialize () {
 		TracePlace.hidden = !traceEnabled_option;
 
 		if (backgroundReady) {
-//console.log("Background is Ready 2");
+if (traceEnabled_option) {
+  console.log("Background is Ready 2");
+}
 		  initializePriv();
 		  WaitMsg.textContent = "Load from background..";
 		}
 		else {
-//console.log("Waiting on Background 2");
+if (traceEnabled_option) {
+  console.log("Waiting on Background 2");
+}
 		  f_initializeNext = initializePriv;
 		  waitingInitBckgnd = true;
 		  WaitMsg.textContent = "Wait background load..";
@@ -7728,11 +7751,15 @@ function initialize () {
 		trace("Load local store duration (folders only): "+(loadDuration = (endLoadTime - startTime))+" ms", true);
 
 		if (backgroundPage.ready) {
-//		  console.log("Background is Ready 1");
+if (traceEnabled_option) {
+  console.log("Background is Ready 1");
+}
 		  initialize2();
 		}
 		else { // Wait for Background to complete initialization
-//		  console.log("Waiting on Background 1");
+if (traceEnabled_option) {
+  console.log("Waiting on Background 1");
+}
 		  f_initializeNext = initialize2;
 		  waitingInitBckgnd = true;
 		  WaitMsg.textContent = "Wait background load..";

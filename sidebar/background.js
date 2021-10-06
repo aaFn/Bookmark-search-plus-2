@@ -902,14 +902,16 @@ function removeBSP2TrashFolder () {
  */
 function handleMsgResponse (message) {
   // Is always called, even if destination didn't specifically reply (then message is undefined)
-//  console.log("Sidebar sent a response: <<"+message.content+">> received in background");
+  if (traceEnabled_option) {
+	console.log("Sidebar sent a response: <<"+message.content+">> received in background");
+  }
 }
 
 function handleMsgError (error) {
   // Do not log communication error generated when there is no sidebar to receive
-  if (!error.message.startsWith("Could not establish connection. Receiving end does not exist.")) {
-    console.log("Error: "+error);
-  }
+if (!error.message.startsWith("Could not establish connection. Receiving end does not exist.")) {
+  console.log("Error: "+error);
+}
 }
 
 /*
@@ -980,12 +982,14 @@ function handleAddonMessage (request, sender, sendResponse) {
 	// When coming from sidebar:
 	//   sender.url: moz-extension://28a2a188-53d6-4f91-8974-07cd0d612f9e/sidebar/panel.html
 	let msg = request.content;
-//console.log("Got message <<"+msg+">> from "+request.source+" in background");
-//console.log("  sender.tab: "+sender.tab);
-//console.log("  sender.frameId: "+sender.frameId);
-//console.log("  sender.id: "+sender.id);
-//console.log("  sender.url: "+sender.url);
-//console.log("  sender.tlsChannelId: "+sender.tlsChannelId);
+if (traceEnabled_option) {
+  console.log("Got message <<"+msg+">> from "+request.source+" in background");
+  console.log("  sender.tab: "+sender.tab);
+  console.log("  sender.frameId: "+sender.frameId);
+  console.log("  sender.id: "+sender.id);
+  console.log("  sender.url: "+sender.url);
+  console.log("  sender.tlsChannelId: "+sender.tlsChannelId);
+}
 
 	if (msg.startsWith("saveCurBnId")) {
 	  let windowId = parseInt(request.source.slice(8), 10);
@@ -1252,14 +1256,14 @@ function handleAddonMessage (request, sender, sendResponse) {
 	}
 	else if (ready && msg.startsWith("getBackground")) { // Asked to resend ready message .. if we are ready
 	  sendResponse(
-	    {content: "Ready"		
-	    }
+		{content: "Ready"		
+		}
 	  );
 	}
 	else {
 	  sendResponse(
-	    {content: "Background response to "+request.source		
-	    }
+		{content: "Background response to "+request.source		
+		}
 	  );
 	}
   }
@@ -2341,6 +2345,7 @@ function tabModified (tabId, changeInfo, tabInfo) {
 	  .then(
 		function (a_BTN) { // An array of BookmarkTreeNode
 		  let len = a_BTN.length;
+//console.log("A tab was updated - tabUrl: "+tabUrl);
 //console.log("Results: "+len);
 		  if (len > 0) { // This is a bookmarked tab
 			// Show a bookmarked BSP2 star for this tab
@@ -2443,28 +2448,29 @@ function onShownContextMenuHandler (info, tab) {
 	  is_onBSP2Icon = true;
 	}
   }
-  let menuIds = info.menuIds;
+//let menuIds = info.menuIds;
 //console.log("menu shown on <"+bnId+"> with contexts=["+contexts+"] menuIds=["+menuIds+"]"
 //			+"\n menuItemId="+info.menuItemId+" pageUrl="+info.pageUrl+" targetElementId="+info.targetElementId+" viewType="+info.viewType
 //			+"\n tab="+tab);
 
   if (is_onBkmk && (bnId != undefined) && (bnId.length > 0)) {
 	// Check if we are in BSP2 sidebar or not
-	let is_inBSP2Sidebar = false;
-	len = menuIds.length;
-	for (let i=0 ; i<len ; i++) {
-	  if (menuIds[i].includes("bsp2")) {
-		is_inBSP2Sidebar = true;
-		break;
-	  }
-	}
-	if (is_inBSP2Sidebar) { // Bookmark context menu inside BSP2 sidebar, make our Path menu invisible
-	  						// Rest of the menu is taken care of by the panel code
-	  hideFFContextMenu();
-	}
-	else { // Show Bookmark context menu outside of our sidebar
+//	let is_inBSP2Sidebar = false;
+//	len = menuIds.length;
+//	for (let i=0 ; i<len ; i++) {
+//	  if (menuIds[i].includes("bsp2")) {
+//		is_inBSP2Sidebar = true;
+//		break;
+//	  }
+//	}
+//	if (is_inBSP2Sidebar) { // Bookmark context menu inside BSP2 sidebar, make our Path menu invisible
+//	  						// Rest of the menu is taken care of by the panel code
+//	  hideFFContextMenu();
+//	}
+//	else { // Show Bookmark context menu outside of our sidebar
+//console.log("show path: "+bnId);
 	  showFFContextMenu(bnId);
-	}
+//	}
   }
   else if (is_onBSP2Icon) { // Check if we should enable the "Show bookmark in sidebar.." submenu
 	// Submenu disabled by default
@@ -2630,10 +2636,10 @@ function completeBookmarks () {
 
 	// Add BSP2 specific context menu / submenu on bookmarks, on sidebar and on browser action
 	if (!beforeFF62) {
-	  createFFContextMenu();
 	  if (!beforeFF64) {
 		createBSP2ContextMenu();
 	  }
+	  createFFContextMenu(); // Place it after BSP2 internam menu to show that also inside sidebar, but at end
 	  createBAContextMenu();
 
 	  // Note: this is called each time the context menu is appearing, not only on bookmarks.
