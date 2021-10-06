@@ -1,6 +1,23 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.97 Bugs & Improvements
+    - Allow wrapping to start of list, when searching for next bookmark item matching with typed sequence of
+      alphanumeric characters.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/181
+    - Corrected a bug where function keys like "F1" or special keys can result in a string search (e.g. bookmarks
+      starting with "F1")
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/194 
+    - Added traces of messages exchanged with background task for chasing a sporadic case of synchronization lockup
+      inside Private windows, in Linux FF. Activate through the traces option.
+    - Enabled the path context submenu (to show path to selected bookmark) also inside BSP2, as an additional easy
+      way to show path to a bookmark, for disambiguation or simply to find under which folder we are, on long lists
+      inside lengthy folders, without having to scroll up to it.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/84
+    - Improve key search by being both case and diacritics insensitive.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/199
+    - Corrected a bug where image was replaced twice on favicon refresh happening on a nofavicon bookmark, resulting
+      in an error message on the browser console.
 - 2.0.96 Bugs
     - Corrected a bug introduced in 2.0.95 when deleting a node while BSP2 trash folder is invisible, which resulted in a
       code exception while refreshing display, preventing from visually removing node from display.
