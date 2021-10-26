@@ -1,6 +1,8 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.99 Bugs
+    - Corrected a regression on favicon refresh after a tab switch, introduced in 2.0.98.
 - 2.0.98 Improvements
     - Implemented cleaner processing of keys, so as to pass back to FF non processed key events for further processing
       by it.
