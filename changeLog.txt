@@ -1,6 +1,27 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.98 Improvements
+    - Implemented cleaner processing of keys, so as to pass back to FF non processed key events for further processing
+      by it.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/194
+    - Corrected a bug where the alternate no-favicon image was not properly handled in search result pane and in
+      history window, when enabled.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/202
+    - Corrected a regression where the bookmark item spacing option was ignored in the search result pane.
+    - Corrected a bug of showing blank square favicon on bookmarks in the Most visited folder, when favicon fetching is
+      disabled.
+    - Corrected a bug where "about:" bookmarks were not protected in the Most visited and in the Recently bookmarked
+      folders.
+    - Corrected a bug where a tab was erroneously shown as bookmarked (and then the "Show Bookmark in Sidebar" action
+      enabled), when corresponding to a bookmark in BSP2 trash, considered as deleted so not visible.
+    - Tentative correction of a sporadic bug where a second instance of the sidebar would answer before the background
+      task to messages of a first sidebar, leading to a synchronization lockup inside Private windows on Linux FF.
+    - Added a context menu action to "Bookmark Tab Here" in the sidebar, inserting bookmark for current tab at cursor
+      position, inside selected folder or before selected bookmark item.
+      Press Ctrl at same time than click on menu action to open the Property window after creation, to edit the newly
+      created bookmark.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/200
 - 2.0.97 Bugs & Improvements
     - Allow wrapping to start of list, when searching for next bookmark item matching with typed sequence of
       alphanumeric characters.
