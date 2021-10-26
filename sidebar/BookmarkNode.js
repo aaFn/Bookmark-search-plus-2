@@ -622,10 +622,14 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 	);
   }
   else { // Presumably "bookmark" type
+    let forceProtect; // In case the general protection rule does not apply
 	if (type == "bookmark") {
 	  if (!BTN_id.startsWith("place:")) { // Do not count special bookmarks under special place: folders
 										  // -> tagged with "place:" before their id when inserted
 		countBookmarks++;
+	  }
+	  else {
+		forceProtect = true;
 	  }
 	}
 	else {
@@ -715,6 +719,9 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 	  }
 	}
 
+	if (forceProtect != undefined) { // General rule does not apply (e.g. BTN_id starting with "place:")
+	  protect = forceProtect;
+	}
 	node = new BookmarkNode (
 	  BTN_id, type, level, BTN.parentId, BTN.dateAdded, protect,
 	  title, uri, fetchedUri, url
@@ -1198,8 +1205,8 @@ function scanBNTree (BN, faviconWorker, doStats = true) {
 	let url = BN.url;
 	if ((url == undefined) || url.startsWith("file:")) { // Change nothing
 	}
-	else if (url.startsWith("about:")) { // Change nothing also, except if protect is set
-	  BN.protect = false;
+	else if (url.startsWith("about:")) { // Change nothing also, except if protect is set unduly
+	  BN.protect = bnId.startsWith("place:"); 
 	}
 	else if (migration_spfldr && url.startsWith("place:")) { // Change nothing also, but transform (and remember pointers) ..
 	  // These are now special folders, still counted as bookmarks

@@ -673,7 +673,7 @@ function appendBookmarkHN (id, HN) {
 		row.draggable = true; // Note: it is false by default for <tr>
 		let img;
 		let uri;
-		if (disableFavicons_option || ((uri = HN.faviconUri) == undefined)) { // Clone with nofavicon image background
+		if (((uri = HN.faviconUri) == undefined) || (uri == "/icons/nofavicon.png")) { // Clone with nofavicon image background
 		  if (HN.multi_HNref) { // Item is part of a multi-selection operation
 			div = ItemNFBMultiSelTempl.cloneNode(true);
 			seqnum = div.firstElementChild;
@@ -1435,9 +1435,28 @@ function setPanelFolderImg (useAltFldr_option, altFldrImg_option) {
   cssStyleRule = getStyleRule(cssRules, ".ffavicon");
   style = cssStyleRule.style; // A CSSStyleDeclaration object
   style.setProperty("background-image", (useAltFldr_option ? "url(\""+altFldrImg_option+"\")"
-	  													   : "url(\"/icons/folder.png\")"
-	  									)
-	  			   );
+														   : "url(\"/icons/folder.png\")"
+										)
+				   );
+}
+
+/*
+ * Set no-favicon image as per options
+ */
+function setPanelNoFaviconImg (useAltNoFav_option, altNoFavImg_option) {
+  // Retrieve the CSS rules to modify
+  let a_ss = document.styleSheets;
+  let ss = a_ss[0];
+  let cssRules = ss.cssRules;
+  let cssStyleRule;
+  let style;
+
+  cssStyleRule = getStyleRule(cssRules, ".nofavicon");
+  style = cssStyleRule.style; // A CSSStyleDeclaration object
+  style.setProperty("background-image", (useAltNoFav_option ? "url(\""+altNoFavImg_option+"\")"
+															: "url(\"/icons/nofavicon.png\")"
+										)
+				   );
 }
 
 /*
@@ -1579,7 +1598,9 @@ function handleMsgResponse (message) {
   // Is always called, even is destination didn't specifically reply (then message is undefined)
   if (message != undefined) {
 	let msg = message.content;
-//console.log("Background sent a response: <<"+msg+">> received in options");
+if (traceEnabled_option) {
+  console.log("Background sent a response: <<"+msg+">> received in options");
+}
 	if (msg == "getStats") {
 	}
 	// -> Never happens from traces
@@ -1617,12 +1638,14 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  // When coming from sidebar:
 	  //   sender.url: moz-extension://28a2a188-53d6-4f91-8974-07cd0d612f9e/sidebar/panel.html
 	  let msg = request.content;
-//console.log("Got message <<"+msg+">> from "+request.source+" in "+myWindowId);
-//console.log("  sender.tab: "+sender.tab);
-//console.log("  sender.frameId: "+sender.frameId);
-//console.log("  sender.id: "+sender.id);
-//console.log("  sender.url: "+sender.url);
-//console.log("  sender.tlsChannelId: "+sender.tlsChannelId);
+if (traceEnabled_option) {
+  console.log("Got message <<"+msg+">> from "+request.source+" in "+myWindowId);
+  console.log("  sender.tab: "+sender.tab);
+  console.log("  sender.frameId: "+sender.frameId);
+  console.log("  sender.id: "+sender.id);
+  console.log("  sender.url: "+sender.url);
+  console.log("  sender.tlsChannelId: "+sender.tlsChannelId);
+}
 
 	  if (msg.startsWith("savedOptions")) { // Option page changed something to options, reload them
 		// Look at what changed
@@ -1637,6 +1660,8 @@ function handleAddonMessage (request, sender, sendResponse) {
 		let reversePath_option_old = reversePath_option;
 		let altFldrImg_option_old = altFldrImg_option;
 		let useAltFldr_option_old = useAltFldr_option;
+		let altNoFavImg_option_old = altNoFavImg_option;
+		let useAltNoFav_option_old = useAltNoFav_option;
 //		let traceEnabled_option_old = traceEnabled_option;
 
 		// Function to process option changes
@@ -1651,8 +1676,14 @@ function handleAddonMessage (request, sender, sendResponse) {
 		  // If folder image options changed
 		  if ((useAltFldr_option && (altFldrImg_option_old != altFldrImg_option))
 			  || (useAltFldr_option_old != useAltFldr_option)
-		     ) {
+			 ) {
 			setPanelFolderImg(useAltFldr_option, altFldrImg_option);
+		  }
+		  // If no-favicon image options changed
+		  if ((useAltNoFav_option && (altNoFavImg_option_old != altNoFavImg_option))
+			  || (useAltNoFav_option_old != useAltNoFav_option)
+			 ) {
+			setPanelNoFaviconImg(useAltNoFav_option, altNoFavImg_option);
 		  }
 		}
 
@@ -1685,13 +1716,13 @@ function handleAddonMessage (request, sender, sendResponse) {
 		let uri = request.uri;
 		refreshFavicon (curHNList.hnList, bnId, uri);
 	  }
-	}
 
-	// Answer
-	sendResponse(
-	  {content: "History:"+myWindowId+" response to "+request.source		
-	  }
-	);
+	  // Answer (only to background task, to not perturbate dialog between sidebars or other add-on windows, and background)
+	  sendResponse(
+		{content: "History:"+myWindowId+" response to "+request.source		
+		}
+	  );
+	}
   }
   catch (error) {
 	console.log("Error processing message: "+request.content);
@@ -1853,6 +1884,11 @@ function initialize2 () {
   // Set folder image as per options
   if (useAltFldr_option) {
 	setPanelFolderImg(true, altFldrImg_option);
+  }
+
+  // Set no-favicon image as per options
+  if (useAltNoFav_option) {
+	setPanelNoFaviconImg(true, altNoFavImg_option);
   }
 
   // Show historyDispURList_option on screen radio buttons

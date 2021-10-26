@@ -121,15 +121,17 @@ function handleMsgResponse (message) {
   // Is always called, even is destination didn't specifically reply (then message is undefined)
   if (message != undefined) {
 	let msg = message.content;
-//    console.log("Background sent a response: <<"+msg+">> received in options");
-    if (msg == "getStats") {
-      countBookmarks = message.countBookmarks;
-      countFetchFav = message.countFetchFav;
-      countFolders = message.countFolders;
-      countSeparators = message.countSeparators;
-      countOddities = message.countOddities;
-      displayStats();
-    }
+if (traceEnabled_option) {
+  console.log("Background sent a response: <<"+msg+">> received in options");
+}
+	if (msg == "getStats") {
+	  countBookmarks = message.countBookmarks;
+	  countFetchFav = message.countFetchFav;
+	  countFolders = message.countFolders;
+	  countSeparators = message.countSeparators;
+	  countOddities = message.countOddities;
+	  displayStats();
+	}
   }
 }
 

@@ -367,6 +367,7 @@ tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
 tmpElem1.classList.add("favtext");
 tmpElem1.draggable = false; // False by default for <span>
 RNFBookmarkTempl.appendChild(tmpElem1);
+
 tmpElem1 = undefined;
 
 
@@ -572,7 +573,7 @@ function appendResult (BN) {
 	let span;
 	// Retrieve current uri or set to nofavicon.png by default
 	let uri = BN.faviconUri;
-	if (disableFavicons_option || (uri == undefined)) { // Clone with nofavicon image background
+	if ((uri == undefined) || (uri == "/icons/nofavicon.png")) { // Clone with nofavicon image background
 	  anchor = RNFBookmarkTempl.cloneNode(true);
 	  span = anchor.firstElementChild.nextElementSibling;
 	}
@@ -2584,7 +2585,7 @@ function resultsMouseHandler (e) {
 	else if (className.startsWith("rbkmkitem_")) {
 	  let cell;
 	  row = (cell = target.parentElement).parentElement;
-	  // If Alt key or advanced, open in current tab (remainon current target), else show => go to .brow
+	  // If Alt key or advanced, open in current tab (remain on current target), else show => go to .brow
 	  if (!advancedClick_option && !e.altKey) {
 		target = cell;
 		className = target.className;
@@ -2627,7 +2628,7 @@ function resultsMouseHandler (e) {
 		else if (e.shiftKey) { // Open in new window
 		  browser.windows.create({url: href});
 		}
-		else { // Opein current tab, except if we are running BSP2 inside a tab and Alt is not pressed
+		else { // Open in current tab, except if we are running BSP2 inside a tab and Alt is not pressed
 		  if (isInSidebar || e.altKey) {
 			browser.tabs.update({url: href});
 		  }
@@ -2734,7 +2735,7 @@ function bkmkMouseHandler (e) {
 	  else if (e.shiftKey) { // Open in new window
 		browser.windows.create({url: href});
 	  }
-	  else { // Opein current tab, except if we are running BSP2 inside a tab and Alt is not pressed
+	  else { // Open in current tab, except if we are running BSP2 inside a tab and Alt is not pressed
 		if (isInSidebar || e.altKey) {
 		  browser.tabs.update({url: href});
 		}
@@ -5252,9 +5253,15 @@ function keyHandler (e) {
 	let menuClosed = clearMenu();
 
 	// Clear searchbox input and any search result when Esc is pressed within it
+	let searchCleared = false;
 	if (((target.id == "searchtext") || !menuClosed)
 	    && (SearchTextInput.value.length > 0)) {
 	  clearSearchTextHandler();
+	  searchCleared = true;
+	}
+
+	if (menuClosed || searchCleared) { // We used up the key, don't pass it for further processing
+	  e.preventDefault();
 	}
   }
   else if (target.id == "searchtext") {
@@ -5271,10 +5278,11 @@ function keyHandler (e) {
 		  cell.focus();
 		}
 	  }
-	  e.preventDefault();
+	  e.preventDefault(); // Don't pass the key event for further processing
 	}
   }
   else if (classList.contains(SelectHighlight)) { // Keyboard actions on an highlighted (=> focused) cell
+	let keyProcessed = false;
 	if (key == "ArrowDown") {
 	  if (!myMenu_open) {
 		// Find next visible row and highlight it
@@ -5290,6 +5298,7 @@ function keyHandler (e) {
 		  }
 		  cell.focus();
 		}
+		keyProcessed = true;
 	  }
 	}
 	else if (key == "ArrowUp") {
@@ -5307,6 +5316,7 @@ function keyHandler (e) {
 		  }
 		  cell.focus();
 		}
+		keyProcessed = true;
 	  }
 	}
 	else if (key == "PageDown") {
@@ -5359,6 +5369,7 @@ function keyHandler (e) {
 		  }
 		  cell.focus();
 		}
+		keyProcessed = true;
 	  }
 	}
 	else if (key == "PageUp") {
@@ -5411,6 +5422,7 @@ function keyHandler (e) {
 		  }
 		  cell.focus();
 		}
+		keyProcessed = true;
 	  }
 	}
 	else if (key == "End") {
@@ -5437,6 +5449,7 @@ function keyHandler (e) {
 		  setCellHighlight(cursor, cell, bkmkSelectIds);
 		}
 		cell.focus();
+		keyProcessed = true;
 	  }
 	}
 	else if (key == "Home") {
@@ -5457,6 +5470,7 @@ function keyHandler (e) {
 		  setCellHighlight(cursor, cell, bkmkSelectIds);
 		}
 		cell.focus();
+		keyProcessed = true;
 	  }
 	}
 	else if (!isResultRow && (key == "ArrowLeft")) {
@@ -5482,6 +5496,7 @@ function keyHandler (e) {
 			cell.focus();
 		  }
 		}
+		keyProcessed = true;
 	  }
 	}
 	else if (!isResultRow && (key == "ArrowRight")) {
@@ -5511,6 +5526,7 @@ function keyHandler (e) {
 			}
 		  }
 		}
+		keyProcessed = true;
 	  }
 	}
 	else if (!isResultRow && (key == "Delete")) {
@@ -5548,6 +5564,7 @@ function keyHandler (e) {
 		  let BN_id = row.dataset.id;
 		  removeBkmkItem(BN_id);
 		}
+		keyProcessed = true;
 	  }
 	}
 	else if (key == "Enter") {
@@ -5582,7 +5599,7 @@ function keyHandler (e) {
 			else if (e.shiftKey) { // Open in new window
 			  browser.windows.create({url: href});
 			}
-			else { // Opein current tab, except if we are running BSP2 inside a tab and Alt is not pressed
+			else { // Open in current tab, except if we are running BSP2 inside a tab and Alt is not pressed
 			  if (isInSidebar || e.altKey) {
 				browser.tabs.update({url: href});
 			  }
@@ -5595,6 +5612,7 @@ function keyHandler (e) {
 			handleFolderClick(twistie);
 		  }
 		}
+		keyProcessed = true;
 	  }
 	}
 	else if ((key.toLowerCase() == "c") && is_ctrlKey) { // Copy
@@ -5605,6 +5623,7 @@ function keyHandler (e) {
 		else {
 		  menuCopyBkmkItem(bkmkSelectIds);
 		}
+		keyProcessed = true;
 	  }
 	}
 	else if ((key.toLowerCase() == "x") && is_ctrlKey) { // Cut
@@ -5615,20 +5634,26 @@ function keyHandler (e) {
 		else {
 		  menuCutBkmkItem(bkmkSelectIds);
 		}
+		keyProcessed = true;
 	  }
 	}
 	else if ((key.toLowerCase() == "v") && is_ctrlKey) { // Paste
-	  let rowIndex = row.rowIndex;
-	  if (!myMenu_open && !isResultRow && (bkmkClipboard.length > 0)	// Paste only if there is something to paste
-		  && !noPasteZone.isInZone(rowIndex)							// Do not paste in the no paste zone
-		 ) {
-		let BN_id = row.dataset.id;
-		let type = row.dataset.type;
-		menuPasteBkmkItem(BN_id, (type == "folder")); // If folder, paste into it
+	  if (!myMenu_open) {
+		let rowIndex = row.rowIndex;
+		if (!myMenu_open && !isResultRow && (bkmkClipboard.length > 0)	// Paste only if there is something to paste
+			&& !noPasteZone.isInZone(rowIndex)							// Do not paste in the no paste zone
+		   ) {
+		  let BN_id = row.dataset.id;
+		  let type = row.dataset.type;
+		  menuPasteBkmkItem(BN_id, (type == "folder")); // If folder, paste into it
+		}
+		keyProcessed = true;
 	  }
 	}
 	else if (!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (key.length == 1)
-			 && key.match(PatternAlphanumeric)) { // An alphanumeric key, accummulate and use to jump to next matching bookmark item
+			 && key.match(PatternAlphanumeric)
+			 && !myMenu_open
+			) { // An alphanumeric key, accummulate and use to jump to next matching bookmark item
 	  // Stop the search timeout
 	  clearTimeout(searchTimerID);
 	  let nextRow;
@@ -5682,6 +5707,7 @@ function keyHandler (e) {
 	  }
 	  // Rearm the search timeout
 	  searchTimerID = setTimeout(searchTimeoutHandler, SearchTimeout); //
+	  keyProcessed = true;
 	}
 /*
 	else if ((key == "F2") && !isResultRow) { // Attempt at in-place edit
@@ -5699,9 +5725,12 @@ console.log("type: "+type);
 	  console.log("span: "+span);
 	  span.contentEditable = true;
 	  span.focus();
+	  keyProcessed = true;
 	}
 */
-	e.preventDefault();
+	if (keyProcessed) { // We used up the key, don't pass it for further processing
+	  e.preventDefault();
+	}
   }
 //  else {
 //	SearchTextInput.focus(); // Focus on search box when a key is typed ...
@@ -5808,11 +5837,13 @@ function menuOpenAllInTabs (BN_id) {
  * 
  * tgtBN_id = String identifying the bookmark item before which or inside which to insert
  * bkmkType = integer, described by constants below
+ * is_openProp = boolean, true if we have to open the Property window
  */
-const NEWB = 0;
-const NEWF = 1;
-const NEWS = 2;
-function menuNewBkmkItem (tgtBN_id, bkmkType) {
+const NEWB       = 0;
+const NEWF       = 1;
+const NEWS       = 2;
+const NEWBCURTAB = 3;
+function menuNewBkmkItem (tgtBN_id, bkmkType, is_openProp = true) {
   let tgtBN = curBNList[tgtBN_id];
 
   // Create new bookmark just before if BN is a separator or a bookmark,
@@ -5827,18 +5858,18 @@ function menuNewBkmkItem (tgtBN_id, bkmkType) {
 	switch (bkmkType) {
 	  case NEWB:
 		if (tgtBN_type == "folder") {
-		  createBkmkItem (tgtBN_id, undefined, "New bookmark", "about:blank", "bookmark", true);
+		  createBkmkItem (tgtBN_id, undefined, "New bookmark", "about:blank", "bookmark", is_openProp);
 		}
 		else {
-		  createBkmkItem (tgtBN.parentId, BN_getIndex(tgtBN), "New bookmark", "about:blank", "bookmark", true);
+		  createBkmkItem (tgtBN.parentId, BN_getIndex(tgtBN), "New bookmark", "about:blank", "bookmark", is_openProp);
 		}
 		break;
 	  case NEWF:
 		if (tgtBN_type == "folder") {
-		  createBkmkItem (tgtBN_id, undefined, "New folder", undefined, "folder", true);
+		  createBkmkItem (tgtBN_id, undefined, "New folder", undefined, "folder", is_openProp);
 		}
 		else {
-		  createBkmkItem (tgtBN.parentId, BN_getIndex(tgtBN), "New folder", undefined, "folder", true);
+		  createBkmkItem (tgtBN.parentId, BN_getIndex(tgtBN), "New folder", undefined, "folder", is_openProp);
 		}
 		break;
 	  case NEWS:
@@ -5848,6 +5879,21 @@ function menuNewBkmkItem (tgtBN_id, bkmkType) {
 		else {
 		  createBkmkItem (tgtBN.parentId, BN_getIndex(tgtBN), undefined, undefined, "separator", false);
 		}
+		break;
+	  case NEWBCURTAB:
+		browser.tabs.query({windowId: myWindowId, active: true})
+		.then (
+		  function (a_tabs) {
+			let tab = a_tabs[0];
+//console.log(tab.title+" - "+tab.url);
+			if (tgtBN_type == "folder") {
+			  createBkmkItem (tgtBN_id, undefined, tab.title, tab.url, "bookmark", is_openProp);
+			}
+			else {
+			  createBkmkItem (tgtBN.parentId, BN_getIndex(tgtBN), tab.title, tab.url, "bookmark", is_openProp);
+			}
+		  }
+		);
 		break;
 	}
   }
@@ -6049,6 +6095,13 @@ function clickHandler (e) {
 	  menuAction = true;
 	  // Retrieve parent context menu, the rowIndex and row on which it is
 	  goParent(getMenuRow(target));
+	}
+	else if (classList.contains("menunewbtab")) { // Bookmark current tab here
+	  // Can only be on bookmarks table row
+	  menuAction = true;
+	  let row = bookmarksTable.rows[getMenuRowIndex(target)];
+	  // Retrieve bookmark item in that row
+	  menuNewBkmkItem(row.dataset.id, NEWBCURTAB, e.altKey);
 	}
 	else if (classList.contains("menunewb")) { // Create a new bookmark
 	  // Can only be on bookmarks table row
@@ -6269,6 +6322,10 @@ function onClickedContextMenuHandler (info, tab) {
 		// Show parent of the row
 		goParent(curRowList[bnId]);
 		break;
+	  case "bsp2newbtab":
+		// Bookmark current tab here
+		menuNewBkmkItem(bnId, NEWBCURTAB, (info.modifiers.indexOf("Ctrl") >= 0));
+		break;
 	  case "bsp2newb":
 		// New bookmark
 		menuNewBkmkItem(bnId, NEWB);
@@ -6412,7 +6469,7 @@ function noDefaultAction (e) {
  */
 let f_initializeNext;
 function handleMsgResponse (message) {
-  // Is always called, even is destination didn't specifically reply (then message is undefined)
+  // Is always called, even if destination didn't specifically reply (then message is undefined)
   if (message != undefined) {
 	let msg = message.content;
 if (traceEnabled_option) {
@@ -6590,8 +6647,8 @@ if (traceEnabled_option) {
 		  // If set colors option changed, or if one of the colors changed while that option is set
 		  if (setColors_option_old != setColors_option
 			  || (setColors_option && ((textColor_option_old != textColor_option)
-				  					   || (bckgndColor_option_old != bckgndColor_option)
-				   					  )
+									   || (bckgndColor_option_old != bckgndColor_option)
+				 					  )
 				 )
 			 ) {
 			if (setColors_option) {
@@ -6605,13 +6662,13 @@ if (traceEnabled_option) {
 		  // If folder image options changed
 		  if ((useAltFldr_option && (altFldrImg_option_old != altFldrImg_option))
 			  || (useAltFldr_option_old != useAltFldr_option)
-		     ) {
+			 ) {
 			setPanelFolderImg(useAltFldr_option, altFldrImg_option);
 		  }
 		  // If no-favicon image options changed
 		  if ((useAltNoFav_option && (altNoFavImg_option_old != altNoFavImg_option))
 			  || (useAltNoFav_option_old != useAltNoFav_option)
-		     ) {
+			 ) {
 			setPanelNoFaviconImg(useAltNoFav_option, altNoFavImg_option);
 		  }
 		  // If BSP2 trash folder visibility changed
@@ -6759,7 +6816,7 @@ if (traceEnabled_option) {
 		let tabId = request.tabId;
 		let bnId = request.bnId;
 		if (myWindowId == wId) { // This is for us
-//console.log("Received message in "+wId+" to show "+bnId+" for tab "+tabId);
+console.log("Received message in "+wId+" to show "+bnId+" for tab "+tabId);
 		  // Use the search mode to allow coming back to normal view after show
 		  // This consists in disabling the searchbox and putting some text in it to reflect the action,
 		  // then execute a search and show for bnId
@@ -6809,13 +6866,13 @@ if (traceEnabled_option) {
 	  else if (msg.startsWith("bsp2TrashFldrBNId")) { // Recreated, so note the id
 		bsp2TrashFldrBNId = request.bnId;
 	  }
-	}
 
-	// Answer
-	sendResponse(
-	  {content: "Sidebar:"+myWindowId+" response to "+request.source		
-	  }
-	);
+	  // Answer (only to background task, to not perturbate dialog between another sidebar or add-on window, and background)
+	  sendResponse(
+		{content: "Sidebar:"+myWindowId+" response to "+request.source		
+		}
+	  );
+	}
   }
   catch (error) {
 	console.log("Error processing message: "+request.content);
@@ -7409,9 +7466,9 @@ function setPanelFolderImg (useAltFldr_option, altFldrImg_option) {
   cssStyleRule = getStyleRule(cssRules, ".ffavicon");
   style = cssStyleRule.style; // A CSSStyleDeclaration object
   style.setProperty("background-image", (useAltFldr_option ? "url(\""+altFldrImg_option+"\")"
-	  													   : "url(\"/icons/folder.png\")"
-	  									)
-	  			   );
+														   : "url(\"/icons/folder.png\")"
+										)
+				   );
 }
 
 /*
@@ -7428,9 +7485,9 @@ function setPanelNoFaviconImg (useAltNoFav_option, altNoFavImg_option) {
   cssStyleRule = getStyleRule(cssRules, ".nofavicon");
   style = cssStyleRule.style; // A CSSStyleDeclaration object
   style.setProperty("background-image", (useAltNoFav_option ? "url(\""+altNoFavImg_option+"\")"
-	  														: "url(\"/icons/nofavicon.png\")"
-	  									)
-	  			   );
+															: "url(\"/icons/nofavicon.png\")"
+										)
+				   );
 }
 
 /*
@@ -7505,6 +7562,16 @@ function setupUI () {
 	style.setProperty("padding-bottom", padding+"px");
 
 	cssStyleRule = getStyleRule(cssRules, ".bkmkitem_s");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.setProperty("padding-top", padding+"px");
+	style.setProperty("padding-bottom", padding+"px");
+
+	cssStyleRule = getStyleRule(cssRules, ".rbkmkitem_b");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.setProperty("padding-top", padding+"px");
+	style.setProperty("padding-bottom", padding+"px");
+
+	cssStyleRule = getStyleRule(cssRules, ".rbkmkitem_f");
 	style = cssStyleRule.style; // A CSSStyleDeclaration object
 	style.setProperty("padding-top", padding+"px");
 	style.setProperty("padding-bottom", padding+"px");

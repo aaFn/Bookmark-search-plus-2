@@ -640,14 +640,15 @@ function refreshMostVisited (a_MVU) {
 //	BTN.unmodifiable      = undefined;
 	BTN.url               = i.url;
 	node = BN_create(BTN, 2, undefined); // Do not fetch any favicon yet
-	let uri = i.favicon;
-	if (uri != undefined) { // Only with FF63+, when the favicon is known by FF
-	  node.faviconUri = uri;
-	  node.fetchedUri = true;
-	  // Convert to 16x16 if needed
-	  cvt16x16Add(bnId, uri);
+	if (!disableFavicons_option) { // Try to get the favicon URI if available (and not disabled)
+	  let uri = i.favicon;
+	  if (uri != undefined) { // Only with FF63+, when the favicon is known by FF
+		node.faviconUri = uri;
+		node.fetchedUri = true;
+		// Convert to 16x16 if needed
+		cvt16x16Add(bnId, uri);
+	  }
 	}
-	node.protect = true;
 	listBN.push(node);
   }
 
@@ -679,7 +680,6 @@ function refreshRecentBkmks (a_BTN) {
 	bnId = i.id;
 	i.id = "place:" + bnId;
 	node = BN_create(i, 2, undefined); // Do not fetch any favicon yet
-	node.protect = true;
 	// Get favicon of origin BN if existing
 	origBN = curBNList[bnId];
 	if (origBN != undefined) {
@@ -2348,34 +2348,50 @@ function tabModified (tabId, changeInfo, tabInfo) {
 //console.log("A tab was updated - tabUrl: "+tabUrl);
 //console.log("Results: "+len);
 		  if (len > 0) { // This is a bookmarked tab
-			// Show a bookmarked BSP2 star for this tab
-			browser.browserAction.setIcon(
-			  {path: "icons/star2bkmked.png",
-			   tabId: tabId
-			  }
-			);
-			// If there is a favicon and we are collecting them, refresh BookmarkNode with it
+			// If there is a favicon and we are collecting them, refresh all BookmarkNodes with it
 			let tabFaviconUrl = tabInfo.favIconUrl;
-			if (!disableFavicons_option				// Ignore if disableFavicons_option is set
-				&& !pauseFavicons_option				// Ignore if pauseFavicons_option is set
-				&& (tabFaviconUrl != undefined)
-				&& (!tabFaviconUrl.startsWith("chrome://global/skin/icons/")) // Internal icon, we can't fetch it, security error
-			   ) {
-			  let bnId;
-			  for (let i=0 ; i<len ; i++) {
-				bnId = a_BTN[i].id;
-//console.log("Matching BTN.id: "+bnId+" "+a_BTN[i].url);
-				// Load the favicon as a data: URI
-				if (tabFaviconUrl.startsWith("data:")) { // Cool, already in good format for us !
-				  setFavicon(bnId, tabFaviconUrl);
-				}
-				else { // Fetch favicon
-				  // Presumably a bookmark, so no need for cloneBTN(), there is no tree below
-//				  faviconWorker.postMessage(["iconurl", bnId, tabFaviconUrl, enableCookies_option]);
-				  faviconWorkerPostMessage({data: ["iconurl", bnId, tabFaviconUrl, enableCookies_option]});
-//trace("Retrieval demand 2 sent for icon:"+tabFaviconUrl);
-				}
+			let is_refreshFav = !disableFavicons_option			// Ignore if disableFavicons_option is set
+								&& !pauseFavicons_option		// Ignore if pauseFavicons_option is set
+								&& (tabFaviconUrl != undefined)
+								&& (!tabFaviconUrl.startsWith("chrome://global/skin/icons/")) // Internal icon, we can't fetch it, security error
+								;
+			let bnId, foundBN_Id;
+			let BN;
+			for (let i=0 ; i<len ; i++) {
+			  bnId = a_BTN[i].id;
+			  BN = curBNList[bnId];
+			  if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
+				reloadFFAPI(true);
+				break;
 			  }
+			  if (!BN.inBSP2Trash && (foundBN_Id == undefined)) { // Keep only the first one not in trash
+				foundBN_Id = bnId;
+			  }
+//console.log("Matching BTN.id: "+bnId+" "+a_BTN[i].url+" foundBN_Id: "+foundBN_Id);
+			  // Load the favicon as a data: URI
+			  if (is_refreshFav && tabFaviconUrl.startsWith("data:")) { // Cool, already in good format for us !
+				setFavicon(bnId, tabFaviconUrl);
+			  }
+			  else { // Fetch favicon
+				// Presumably a bookmark, so no need for cloneBTN(), there is no tree below
+//				faviconWorker.postMessage(["iconurl", bnId, tabFaviconUrl, enableCookies_option]);
+				faviconWorkerPostMessage({data: ["iconurl", bnId, tabFaviconUrl, enableCookies_option]});
+//trace("Retrieval demand 2 sent for icon:"+tabFaviconUrl);
+			  }
+			}
+			// Show a bookmarked BSP2 star for this tab, if there is a corresponding bookmark not in BSP2 trash
+			if (foundBN_Id != undefined) {
+			  browser.browserAction.setIcon(
+				{path: "icons/star2bkmked.png",
+				 tabId: tabId
+				}
+			  );
+			}
+			else { // Reset to global BSP2 icon
+			  browser.browserAction.setIcon(
+				{tabId: tabId
+				}
+			  );
 			}
 		  }
 		  else { // Reset to global BSP2 icon
@@ -2500,15 +2516,25 @@ function onShownContextMenuHandler (info, tab) {
 //console.log("Results: "+len);
 		  if ((len > 0)
 			  && (menuInstanceId == lastMenuInstanceId) // Menu was not closed and we are still in the same menu instance
-		     ) { // Show submenu
-			// Take only the first one if there are multiple
-			let bnId = a_BTN[0].id;
-			let BN = curBNList[bnId];
-			if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
-			  reloadFFAPI(true);
+			 ) { // Show submenu
+			// Take the first one not in BSP2 trash if there are multiple
+			let bnId, foundBN_Id;
+			let BN;
+			let len = a_BTN.length;
+			for (let i=0 ; i<len ; i++) {
+			  bnId = a_BTN[i].id;
+			  BN = curBNList[bnId];
+			  if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
+				reloadFFAPI(true);
+				break;
+			  }
+			  if (!BN.inBSP2Trash) {
+				foundBN_Id = bnId;
+				break;
+			  }
 			}
-			else { // enable the submenu, and remember the bnId for it
-			  lastMenuBnId = bnId;
+			if (foundBN_Id != undefined) { // Enable the submenu, and remember corresponding bnId for it
+			  lastMenuBnId = foundBN_Id;
 			  enableBAShowBkmk();
 			}
 		  }
