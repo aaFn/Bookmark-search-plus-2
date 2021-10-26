@@ -5996,8 +5996,8 @@ function menuRefreshFav (BN_id) {
   // Trigger asynchronous favicon retrieval process
   let url = BN.url;
   if ((url != undefined)
-   	  && !url.startsWith("file:")	  // file: has no favicon => no fetch
-   	  && !url.startsWith("about:")) { // about: is protected - security error .. => no fetch
+	  && !url.startsWith("file:")	  // file: has no favicon => no fetch
+	  && !url.startsWith("about:")) { // about: is protected - security error .. => no fetch
    	// This is a bookmark, so here no need for cloneBN(), there is no tree below
 //    faviconWorker.postMessage(["get2", BN_id, url, enableCookies_option]);
 	let postMsg = ["get2", BN_id, url, enableCookies_option];

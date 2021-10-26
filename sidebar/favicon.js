@@ -678,7 +678,6 @@ function faviconWorkerPostMessage (e) { // e is of type MessageEvent,
 	reqQueue.length = 0; // No more request
   }
   else {
-	let url = data[1];
 	if (action == "get2") { // If this is a manual refresh favicon request, or an existing bookmark,
 	  						// put the request at front of the queue, and reset hysteresis to
 	  						// normal Cadence value.

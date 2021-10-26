@@ -2369,14 +2369,16 @@ function tabModified (tabId, changeInfo, tabInfo) {
 			  }
 //console.log("Matching BTN.id: "+bnId+" "+a_BTN[i].url+" foundBN_Id: "+foundBN_Id);
 			  // Load the favicon as a data: URI
-			  if (is_refreshFav && tabFaviconUrl.startsWith("data:")) { // Cool, already in good format for us !
-				setFavicon(bnId, tabFaviconUrl);
-			  }
-			  else { // Fetch favicon
-				// Presumably a bookmark, so no need for cloneBTN(), there is no tree below
-//				faviconWorker.postMessage(["iconurl", bnId, tabFaviconUrl, enableCookies_option]);
-				faviconWorkerPostMessage({data: ["iconurl", bnId, tabFaviconUrl, enableCookies_option]});
+			  if (is_refreshFav) {
+				if (tabFaviconUrl.startsWith("data:")) { // Cool, already in good format for us !
+				  setFavicon(bnId, tabFaviconUrl);
+				}
+				else { // Fetch favicon
+				  // Presumably a bookmark, so no need for cloneBTN(), there is no tree below
+//				  faviconWorker.postMessage(["iconurl", bnId, tabFaviconUrl, enableCookies_option]);
+				  faviconWorkerPostMessage({data: ["iconurl", bnId, tabFaviconUrl, enableCookies_option]});
 //trace("Retrieval demand 2 sent for icon:"+tabFaviconUrl);
+				}
 			  }
 			}
 			// Show a bookmarked BSP2 star for this tab, if there is a corresponding bookmark not in BSP2 trash
