@@ -1,6 +1,51 @@
 'use strict';
 
 
+//----- Workaround for top and left position parameters being ignored for panels and bug on popups (szince panel is an alis for popup) -----
+// Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
+//     https://bugzilla.mozilla.org/show_bug.cgi?id=1271047
+//This is also used as workaround for bug 1408446 in Linux (window contents is not painted ..)
+// Cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1408446
+// imposing to resize in order to draw contents - Apparently corrected in FF 59.x -
+const HistoryWidth  = 800;
+const HistoryHeight = 800;
+
+let remembersizes_option;
+let gettingItem = browser.storage.local.get(
+  {historytop_option: 50,
+   historyleft_option: 100,
+   remembersizes_option: false,
+   historyheight_option: HistoryHeight,
+   historywidth_option: HistoryWidth
+  }
+);
+gettingItem.then((res) => {
+  let top = res.historytop_option;
+  let left = res.historyleft_option;
+  remembersizes_option = res.remembersizes_option;
+  let height;
+  let width;
+  if (remembersizes_option) {
+	height = res.historyheight_option;
+	width = res.historywidth_option;
+//console.log("history.js entrance - remembersizes_option set - top="+top+" left="+left+" height="+height+" width="+width);
+  }
+  else {
+	height = HistoryHeight;
+	width = HistoryWidth;
+//console.log("history.js entrance - top="+top+" left="+left);
+  }
+  browser.windows.update(browser.windows.WINDOW_ID_CURRENT,
+						 {left: left,
+						  top: top,
+						  height: height,
+						  width: width
+						 }
+						);
+});
+//----- End of position ignored workaround -----
+
+
 //Retrieve Platform and Background page
 let p_platform = browser.runtime.getPlatformInfo();
 let p_background = browser.runtime.getBackgroundPage();
@@ -50,6 +95,7 @@ const ALogTextArea = document.querySelector("#alog"); // Assuming it is an HTMLT
 const MapAction = {};
 
 const Selhighlight = "selbrow"; // selhighlight class name in CSS
+const HighlightTextColor = "#222426"; // Text color used when hovering or focusing a cell (or dragging over a folder)
 const NBSP = "\xa0";
 
 
@@ -439,6 +485,7 @@ let curHNList; // Current history of HistoryNode - Saved in storage at each modi
 let curRowList = {}; // Current map between id and row for each bookmark item
 let bookmarksTable; // Assuming it is an HTMLTableElement
 let cellHighlight = null; // Current highlight of a row in source bookmarks = cell
+let sidebarTextColor = undefined; // Contains text color if we apply a theme's colors
 
 
 /*
@@ -1422,6 +1469,153 @@ function getStyleRule (cssRules, selectorText) {
 }
 
 /*
+ * Set cssRules background colors to a given value
+ * 
+ * prop = a String holding color value to apply. If null or undefined, goes back to default
+ */
+function setBackgroundColors (cssRules, prop) {
+  let cssStyleRule;
+  let style;
+
+  if ((prop == undefined) || (prop == null)) {
+	prop = "white";
+  }
+
+  cssStyleRule = getStyleRule(cssRules, "#pane");
+  style = cssStyleRule.style; // A CSSStyleDeclaration object
+  style.setProperty("background-color", prop);
+
+  cssStyleRule = getStyleRule(cssRules, "#bookmarks");
+  style = cssStyleRule.style; // A CSSStyleDeclaration object
+  style.setProperty("border-top-color", prop);
+
+  cssStyleRule = getStyleRule(cssRules, ".brow");
+  style = cssStyleRule.style; // A CSSStyleDeclaration object
+  style.setProperty("background-color", prop);
+  style.setProperty("border-color", prop);
+}
+
+/*
+ * Set cssRules text colors to a given value
+ * 
+ * prop = a String holding color value to apply. If null or undefined, goes back to default
+ */
+function setTextColors (cssRules, prop) {
+  let cssStyleRule;
+  let style;
+
+  if ((prop != undefined) && (prop != null)) {
+	sidebarTextColor = prop;
+
+	cssStyleRule = getStyleRule(cssRules, "#pane");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.setProperty("color", prop);
+
+	cssStyleRule = getStyleRule(cssRules, ".favseparator");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.setProperty("border-bottom-color", prop);
+
+	// Force a visible text color when highlighting a cell (= default FF value in nm/default theme mode)
+	cssStyleRule = getStyleRule(cssRules, ".selbrow");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.setProperty("color", HighlightTextColor);
+
+	cssStyleRule = getStyleRule(cssRules, ".brow:hover, .selbrow:hover");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.setProperty("color", HighlightTextColor);
+
+	cssStyleRule = getStyleRule(cssRules, ".brow:focus, .selbrow:focus");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.setProperty("color", HighlightTextColor);
+  }
+  else {
+	sidebarTextColor = undefined;
+
+	cssStyleRule = getStyleRule(cssRules, "#pane");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.removeProperty("color");
+
+	cssStyleRule = getStyleRule(cssRules, ".favseparator");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.setProperty("border-bottom-color", HighlightTextColor);
+
+	// Force a visible text color when highlighting a cell (= default FF value in nm/default theme mode)
+	cssStyleRule = getStyleRule(cssRules, ".selbrow");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.removeProperty("color");
+
+	cssStyleRule = getStyleRule(cssRules, ".brow:hover, .selbrow:hover");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.removeProperty("color");
+
+	cssStyleRule = getStyleRule(cssRules, ".brow:focus, .selbrow:focus");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.removeProperty("color");
+  }
+}
+
+/*
+ * Set back panel colors to default
+ */
+function resetPanelColors () {
+  // Retrieve the CSS rules to modify
+  let a_ss = document.styleSheets;
+  let ss = a_ss[0];
+  let cssRules = ss.cssRules;
+
+  setBackgroundColors(cssRules, undefined);
+  setTextColors(cssRules, undefined);
+}
+
+/*
+ * Initialization colors with those of the current windows theme
+ * 
+ * wTheme is a theme.Theme object
+ */
+function setPanelColors (wTheme) {
+  let propColors = wTheme.colors;
+  if ((propColors == undefined) || (propColors == null)) { // No colors part => reset to default
+														   // (can also happen when active theme is default)
+	resetPanelColors();
+  }
+  else {
+	// Retrieve the CSS rules to modify
+	let a_ss = document.styleSheets;
+	let ss = a_ss[0];
+	let cssRules = ss.cssRules;
+
+	setBackgroundColors(cssRules, propColors.sidebar);
+	setTextColors(cssRules, propColors.sidebar_text);
+  }
+}
+
+/*
+ * Initialization colors with specified ones
+ * 
+ * tc and bc are String
+ */
+function setPanelColorsTB (tc, bc) {
+  // Retrieve the CSS rules to modify
+  let a_ss = document.styleSheets;
+  let ss = a_ss[0];
+  let cssRules = ss.cssRules;
+
+  setBackgroundColors(cssRules, bc);
+  setTextColors(cssRules, tc);
+}
+
+/*
+ * Handle changes to FF window theme
+ */
+function themeRefreshedHandler (updateInfo) {
+  let wId = updateInfo.windowId;
+  if ((wId == undefined) || (wId = myWindowId)) {
+	browser.theme.getCurrent(myWindowId)
+	.then(setPanelColors);
+  }
+}
+
+/*
  * Set folder image as per options
  */
 function setPanelFolderImg (useAltFldr_option, altFldrImg_option) {
@@ -1658,6 +1852,10 @@ if (traceEnabled_option) {
 //		let textColor_option_old = textColor_option;
 //		let bckgndColor_option_old = bckgndColor_option;
 		let reversePath_option_old = reversePath_option;
+		let matchTheme_option_old = matchTheme_option;
+		let setColors_option_old = setColors_option;
+		let textColor_option_old = textColor_option;
+		let bckgndColor_option_old = bckgndColor_option;
 		let altFldrImg_option_old = altFldrImg_option;
 		let useAltFldr_option_old = useAltFldr_option;
 		let altNoFavImg_option_old = altNoFavImg_option;
@@ -1671,6 +1869,38 @@ if (traceEnabled_option) {
 			// Update displayed HN
 			if (cellHighlight != null) {
 			  displayHN(cellHighlight.parentElement.dataset.id);
+			}
+		  }
+		  // If match FF theme option changed
+		  if (matchTheme_option_old != matchTheme_option) {
+			if (matchTheme_option) {
+			  // Align colors with window theme 
+			  browser.theme.getCurrent(myWindowId)
+			  .then(setPanelColors);
+
+			  // Register listener
+			  browser.theme.onUpdated.addListener(themeRefreshedHandler);
+			}
+			else {
+			  resetPanelColors();
+
+			  // Remove listener
+			  browser.theme.onUpdated.removeListener(themeRefreshedHandler);
+			}
+		  }
+		  // If set colors option changed, or if one of the colors changed while that option is set
+		  if (setColors_option_old != setColors_option
+			  || (setColors_option && ((textColor_option_old != textColor_option)
+									   || (bckgndColor_option_old != bckgndColor_option)
+				 					  )
+				 )
+			 ) {
+			if (setColors_option) {
+			  // Align colors with chosen ones 
+			  setPanelColorsTB(textColor_option, bckgndColor_option);
+			}
+			else { // Cannot change while machTheme option is set, so no theme to match, reset ..
+			  resetPanelColors();
 			}
 		  }
 		  // If folder image options changed
@@ -1754,6 +1984,78 @@ function onWheel (aEvent) {
   if (is_ctrlKey && !aEvent.altKey && !is_metaKey && !aEvent.shiftKey) {
 	aEvent.preventDefault();
   }
+}
+
+/*
+ * Handle window close
+ */
+function closeHandler (e) {
+//console.log("Close clicked: "+e.type);
+  // Note that this is unclean ... the promise to be returned by browser.bookmarks.update
+  // or by browser.bookmarks.remove()
+  // will never be able to be dispatched to something stil existing, therefore generating
+  // an error message on the browser console.
+  // Could do something complex by listening in the main code for the windows.onRemoved
+  // event, and then compare with windowId we got at creation to retrieve the btnId and
+  // then update/remove the bookmark .. but I guess I am lazy tonight .. that will be one
+  // more junk message .. too bad for the console ..
+
+  // Get the CSS pixel ratio
+  // Note 1: window.windowUtils does not work ...
+  // Note 2: not reliable ! Is impacted by both the system DPI and the window zoom factor,
+  //         however window.screenX and screenY are only impacted by the window zoom factor :-(
+  //         => Need to rely on browser.windows.getCurrent() instead, which is all in pixels
+//let pixelsPerCSS = window.devicePixelRatio;
+//console.log("closeHandler() - window.devicePixelRatio="+pixelsPerCSS);
+
+  // Get and remember our own position (and size if option is activated), converting to real pixels
+//	let top = Math.floor(window.screenY * pixelsPerCSS);
+//	let left = Math.floor(window.screenX * pixelsPerCSS);
+  browser.windows.getCurrent()
+  .then(
+	function (wInfo) {
+//console.log("closeHandler() - window.devicePixelRatio="+window.devicePixelRatio);
+//console.log("closeHandler() - wInfo.top: "+wInfo.top+" screenY: "+window.screenY);
+//console.log("closeHandler() - calc top: "+(window.screen.top+window.screenY));
+//console.log("closeHandler() - wInfo.left: "+wInfo.left+" screenX: "+window.screenX);
+//console.log("closeHandler() - calc left: "+(window.screen.left+window.screenX));
+	  let top = wInfo.top;
+	  let left = wInfo.left;
+	  if (remembersizes_option) {
+//	  let height = Math.floor(window.outerHeight*pixelsPerCSS);
+//	  let width = Math.floor(window.outerWidth*pixelsPerCSS);
+		let height = wInfo.height;
+		let width = wInfo.width;
+		browser.storage.local.set({
+		  historytop_option: top,
+		  historyleft_option: left,
+		  historyheight_option: height,
+		  historywidth_option: width
+		});
+//console.log("closeHandler() - remembersizes_option set - top="+top+" left="+left+" height="+height+" width="+width);
+	  }
+	  else {
+		browser.storage.local.set({
+		  historytop_option: top,
+		  historyleft_option: left
+		});
+//console.log("closeHandler() - top="+top+" left="+left);
+	  }
+
+/*
+browser.windows.getCurrent()
+.then(
+  function (wInfo) {
+	let top1 = wInfo.top;
+	let left1 = wInfo.left;
+	let height1 = wInfo.height;
+	let width1 = wInfo.width;
+console.log("closeHandler() - browser.windows.getCurrent wInfo - top="+top1+" left="+left1+" height="+height1+" width="+width1);
+  }
+);
+*/
+	}
+  );
 }
 
 /*
@@ -1856,6 +2158,9 @@ function completeDisplay () {
   SearchResult.addEventListener("dragexit", rsltDragExitHandler);
 */
 
+  // Catch button clicks, and window close
+  window.onbeforeunload = closeHandler;
+
   // Go to and show the current active position (cursor)
   goHNItem(curHNList.activeIndex);
   setUndoRedoCursor();
@@ -1879,6 +2184,21 @@ function initialize2 () {
   else if (platformOs == "mac") {
 	isMacOS = true;
 	Body.style.fontSize = "12px";
+  }
+
+  // Align colors with window theme
+  if (matchTheme_option) {
+	browser.theme.getCurrent(myWindowId)
+	.then(setPanelColors);
+
+	// Register listener
+	browser.theme.onUpdated.addListener(themeRefreshedHandler);
+  }
+  else { // If set colors option is set, align colors with specified values
+	if (setColors_option) {
+	  // Align colors with chosen ones 
+	  setPanelColorsTB(textColor_option, bckgndColor_option);
+	}
   }
 
   // Set folder image as per options

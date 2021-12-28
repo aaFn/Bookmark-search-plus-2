@@ -207,7 +207,7 @@ function closeSelf () {
   // Note 2: not reliable ! Is impacted by both the system DPI and the window zoom factor,
   //         however window.screenX and screenY are only impacted by the window zoom factor :-(
   //         => Need to rely on browser.windows.getCurrent() instead, which is all in pixels
-//  let pixelsPerCSS = window.devicePixelRatio;
+//let pixelsPerCSS = window.devicePixelRatio;
 //console.log("closeSelf() - window.devicePixelRatio="+pixelsPerCSS);
 
   // Get and remember our own position, converting to real pixels
@@ -216,15 +216,15 @@ function closeSelf () {
   browser.windows.getCurrent()
   .then(
 	function (wInfo) {
-//	  console.log("closeSelf() - window.devicePixelRatio="+window.devicePixelRatio);
-//	  console.log("closeSelf() - wInfo.top: "+wInfo.top+" screenY: "+window.screenY);
-//	  console.log("closeSelf() - calc top: "+(window.screen.top+window.screenY));
-//	  console.log("closeSelf() - wInfo.left: "+wInfo.left+" screenX: "+window.screenX);
-//	  console.log("closeSelf() - calc left: "+(window.screen.left+window.screenX));
+//console.log("closeSelf() - window.devicePixelRatio="+window.devicePixelRatio);
+//console.log("closeSelf() - wInfo.top: "+wInfo.top+" screenY: "+window.screenY);
+//console.log("closeSelf() - calc top: "+(window.screen.top+window.screenY));
+//console.log("closeSelf() - wInfo.left: "+wInfo.left+" screenX: "+window.screenX);
+//console.log("closeSelf() - calc left: "+(window.screen.left+window.screenX));
 	  let top = wInfo.top;
 	  let left = wInfo.left;
 
-      let saving;
+	  let saving;
 	  if (remembersizes_option) {
 //		let height = Math.floor(window.outerHeight*pixelsPerCSS);
 //		let width = Math.floor(window.outerWidth*pixelsPerCSS);
@@ -294,9 +294,9 @@ function cancelInputHandler () {
 		 {title: btnTitle
 		 }
 	   :
-	     {title: btnTitle,
+		 {title: btnTitle,
 		  url: btnUrl	
-	     }
+		 }
 	  )
 	)
 	.then(
@@ -335,7 +335,7 @@ function closeHandler (e) {
 	// Note 2: not reliable ! Is impacted by both the system DPI and the window zoom factor,
 	//         however window.screenX and screenY are only impacted by the window zoom factor :-(
 	//         => Need to rely on browser.windows.getCurrent() instead, which is all in pixels
-//	let pixelsPerCSS = window.devicePixelRatio;
+//let pixelsPerCSS = window.devicePixelRatio;
 //console.log("closeHandler() - window.devicePixelRatio="+pixelsPerCSS);
 
 	// Get and remember our own position (and size if option is activated), converting to real pixels
@@ -344,11 +344,11 @@ function closeHandler (e) {
 	browser.windows.getCurrent()
 	.then(
 	  function (wInfo) {
-//		console.log("closeHandler() - window.devicePixelRatio="+window.devicePixelRatio);
-//		console.log("closeHandler() - wInfo.top: "+wInfo.top+" screenY: "+window.screenY);
-//		console.log("closeHandler() - calc top: "+(window.screen.top+window.screenY));
-//		console.log("closeHandler() - wInfo.left: "+wInfo.left+" screenX: "+window.screenX);
-//		console.log("closeHandler() - calc left: "+(window.screen.left+window.screenX));
+//console.log("closeHandler() - window.devicePixelRatio="+window.devicePixelRatio);
+//console.log("closeHandler() - wInfo.top: "+wInfo.top+" screenY: "+window.screenY);
+//console.log("closeHandler() - calc top: "+(window.screen.top+window.screenY));
+//console.log("closeHandler() - wInfo.left: "+wInfo.left+" screenX: "+window.screenX);
+//console.log("closeHandler() - calc left: "+(window.screen.left+window.screenX));
 		let top = wInfo.top;
 		let left = wInfo.left;
 		if (remembersizes_option) {

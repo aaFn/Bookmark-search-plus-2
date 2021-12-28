@@ -5244,7 +5244,7 @@ function keyHandler (e) {
   let classList = target.classList;
   let key = e.key;
   let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
-//console.log("Key event: "+e.type+" key: "+key+" char: "+e.char+" target: "+target+" classList: "+classList);
+console.log("Key event: "+e.type+" key: "+key+" char: "+e.char+" target: "+target+" classList: "+classList);
 
   let row = target.parentElement;
   let isResultRow = (row.dataset.rslt == "true");
@@ -5255,7 +5255,8 @@ function keyHandler (e) {
 	// Clear searchbox input and any search result when Esc is pressed within it
 	let searchCleared = false;
 	if (((target.id == "searchtext") || !menuClosed)
-	    && (SearchTextInput.value.length > 0)) {
+		&& (SearchTextInput.value.length > 0)
+	   ) {
 	  clearSearchTextHandler();
 	  searchCleared = true;
 	}
@@ -5656,6 +5657,7 @@ function keyHandler (e) {
 			) { // An alphanumeric key, accummulate and use to jump to next matching bookmark item
 	  // Stop the search timeout
 	  clearTimeout(searchTimerID);
+console.log("key = \'"+key+"\' - searchStr = \'"+searchStr+"\'");
 	  let nextRow;
 	  if (searchStr.length == 0) { // If first typed char, start on next record
 		searchStr = strLowerNormalize(key); // Case & diacritics insensitive compare
@@ -5678,9 +5680,6 @@ function keyHandler (e) {
 			nextRow = bookmarksTable.rows[0]; // Note: always visible
 		  }
 		}
-		if (nextRow == row) { // Nothing found, let's not loop infinitely'
-		  break;
-		}
 		if (!(nextRow.hidden) && ((type = nextRow.dataset.type) != "separator")) {
 		  // Compare with searchStr
 		  cell = nextRow.firstElementChild;
@@ -5694,6 +5693,9 @@ function keyHandler (e) {
 		  found = (strLowerNormalize(span.textContent).startsWith(searchStr));
 		}
 		nextRow = nextRow.nextElementSibling;
+		if (nextRow == row) { // Nothing found, let's not loop infinitely
+		  break;
+		}
 	  }
 	  while (!found);
 	  if (found) {
@@ -6601,6 +6603,7 @@ if (traceEnabled_option) {
 		let showPath_option_old = showPath_option;
 //		let closeSearch_option_old = closeSearch_option;
 //		let noffapisearch_option_old = noffapisearch_option;
+		let reversePath_option_old = reversePath_option;
 //		let openTree_option_old = openTree_option;
 		let matchTheme_option_old = matchTheme_option;
 		let setColors_option_old = setColors_option;
@@ -7372,6 +7375,10 @@ function setTextColors (cssRules, prop) {
 	style = cssStyleRule.style; // A CSSStyleDeclaration object
 	style.removeProperty("color");
 
+	cssStyleRule = getStyleRule(cssRules, ".favseparator");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.setProperty("border-bottom-color", HighlightTextColor);
+
 	// Force a visible text color when highlighting a cell (= default FF value in nm/default theme mode)
 	cssStyleRule = getStyleRule(cssRules, ".selbrow");
 	style = cssStyleRule.style; // A CSSStyleDeclaration object
@@ -7384,10 +7391,6 @@ function setTextColors (cssRules, prop) {
 	cssStyleRule = getStyleRule(cssRules, ".brow:focus, .selbrow:focus");
 	style = cssStyleRule.style; // A CSSStyleDeclaration object
 	style.removeProperty("color");
-
-	cssStyleRule = getStyleRule(cssRules, ".favseparator");
-	style = cssStyleRule.style; // A CSSStyleDeclaration object
-	style.setProperty("border-bottom-color", HighlightTextColor);
   }
 }
 

@@ -247,6 +247,8 @@ function refreshOptionsLStore() {
 					, "searchheight_option"
 					, "popupheight_option"
 					, "popupwidth_option"
+					, "historyheight_option"
+					, "historywidth_option"
 					, "setfontsize_option"
 					, "fontsize_option"
 					, "setspacesize_option"
@@ -415,6 +417,12 @@ function refreshOptionsLStore() {
 				}
 				if (!rememberSizes_option && (res.popupwidth_option != undefined)) {
 					browser.storage.local.remove("popupwidth_option");
+				}
+				if (!rememberSizes_option && (res.historyheight_option != undefined)) {
+					browser.storage.local.remove("historyheight_option");
+				}
+				if (!rememberSizes_option && (res.historywidth_option != undefined)) {
+					browser.storage.local.remove("historywidth_option");
 				}
 				// -- Read SFS option..
 				if ((setFontSize_option_file = res.setfontsize_option) != undefined) {
@@ -702,6 +710,8 @@ function launchReadFullLStore(isSidebar) {
 				, "searchheight_option"
 				, "popupheight_option"
 				, "popupwidth_option"
+				, "historyheight_option"
+				, "historywidth_option"
 				, "setfontsize_option"
 				, "fontsize_option"
 				, "setspacesize_option"
@@ -751,6 +761,8 @@ function launchReadFullLStore(isSidebar) {
 				, "searchheight_option"
 				, "popupheight_option"
 				, "popupwidth_option"
+				, "historyheight_option"
+				, "historywidth_option"
 				, "setfontsize_option"
 				, "fontsize_option"
 				, "setspacesize_option"
@@ -982,6 +994,12 @@ function readFullOptions(res, isSidebar, waitMsg) {
 	}
 	if (!rememberSizes_option && (res.popupwidth_option != undefined)) {
 		browser.storage.local.remove("popupwidth_option");
+	}
+	if (!rememberSizes_option && (res.historyheight_option != undefined)) {
+		browser.storage.local.remove("historyheight_option");
+	}
+	if (!rememberSizes_option && (res.historywidth_option != undefined)) {
+		browser.storage.local.remove("historywidth_option");
 	}
 	waitMsg("Read SFS option..");
 	if ((setFontSize_option_file = res.setfontsize_option) != undefined) {

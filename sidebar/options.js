@@ -782,20 +782,28 @@ function resetSizes  () {
 	"searchheight_option"
 	,"popupheight_option"
 	,"popupwidth_option"
+	,"historypheight_option"
+	,"historywidth_option"
   ]);
   gettingItem.then((res) => {
-    if (res.searchheight_option != undefined) {
-      browser.storage.local.remove("searchheight_option");
-    }
-    if (res.popupheight_option != undefined) {
-      browser.storage.local.remove("popupheight_option");
-    }
-    if (res.popupwidth_option != undefined) {
-      browser.storage.local.remove("popupwidth_option");
-    }
+	if (res.searchheight_option != undefined) {
+	  browser.storage.local.remove("searchheight_option");
+	}
+	if (res.popupheight_option != undefined) {
+	  browser.storage.local.remove("popupheight_option");
+	}
+	if (res.popupwidth_option != undefined) {
+	  browser.storage.local.remove("popupwidth_option");
+	}
+	if (res.historyheight_option != undefined) {
+	  browser.storage.local.remove("historyheight_option");
+	}
+	if (res.historywidth_option != undefined) {
+	  browser.storage.local.remove("historywidth_option");
+	}
 
     // Signal reset to all
-  	sendAddonMessage("resetSizes");
+	sendAddonMessage("resetSizes");
   });
 }
 

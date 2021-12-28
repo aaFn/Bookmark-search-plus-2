@@ -9,6 +9,8 @@ const SelfURL = browser.runtime.getURL("sidebar/panel.html");
 const HistoryURL = browser.runtime.getURL("sidebar/history.html");
 const PopupWidth  = 380;
 const PopupHeight = 190;
+const HistoryWidth  = 800;
+const HistoryHeight = 800;
 
 const BSP2UrlPattern = "moz-extension://" + window.location.host + "/*";
 const MainMenuId = "show-path";  // FF standard menu item on bookmarks
@@ -304,67 +306,83 @@ function openBsp2History () {
   // our current screen, then center it.
   // This avoids having the popup out of screen and unreachable, in case
   // the previous screen went off, or display resolution changed.
-/*
-  let top = res.historytop_option;
-  let left = res.historyleft_option;
-  let scr = window.screen;
-  let adjust = false;
-  if ((left < scr.availLeft) || (left >= scr.availLeft + scr.availWidth)) {
-	adjust = true;
-	left = scr.availLeft + Math.floor((scr.availWidth - PopupWidth) / 2);
-  }
-  if ((top < scr.availTop) || (top >= scr.availTop + scr.availHeight)) {
-	adjust = true;
-	top = scr.availTop + Math.floor((scr.availHeight - PopupHeight) / 2);
-  }
-  if (adjust) { // Save new values
-	browser.storage.local.set({
-	  historytop_option: top,
-	  historyleft_option: left
-	});
-  }
-*/
-  // Open Bookmark history window if not already open, else just focus on it
-  browser.windows.getAll({populate: true, windowTypes: ["popup"]})
-  .then(
-	function (a_Windowinfo) {
-	  let wi, openedWi;
-	  let wTitle = "("+selfName+") - Bookmark History -";
-	  for (wi of a_Windowinfo) {
-		if (wi.title.includes(wTitle)) {
-		  openedWi = wi; 
-		}
-	  }
-	  if (openedWi != undefined) {
-		browser.windows.update(openedWi.id, {focused: true});
-	  }
-	  else {
-		browser.windows.create(
-		  {titlePreface: "Bookmark History",
-		   type: "popup",
-		   url: href,
-		   //----- Workaround for top and left position parameters being ignored for panels -----
-		   //Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
-		   //Make the start size as small as possible so that it briefly flashes in its initial
-		   //position in the least conspicuous way.
-		   //Note: 1,1 does not work, this sets the window in a state reduced to the bar, and no
-		   //internal resize seems to work after that.
-		   //Also tried to start minimized, but the window pops in a big size first before being minimized,
-		   //even less pretty.			   .
-		   //=> .. FF does not seem very clean on all this .. :-( 
-//		   height: PopupHeight,
-//		   width: PopupWidth,
-		   height: 800,
-		   width: 800,
-//		   left: left,
-//		   top: top,
-		   //----- End of position ignored workaround -----
-		   allowScriptsToClose: true
-		  }
-		);
-	  }
+  let gettingItem = browser.storage.local.get(
+	{historytop_option: 50,
+	 historyleft_option: 100
 	}
   );
+  gettingItem.then((res) => {
+	let top = res.historytop_option;
+	let left = res.historyleft_option;
+	let scr = window.screen;
+	let adjust = false;
+	// Also, protect if possible against privacy.resistFingerprinting which does not return the screen size,
+	// but the sidebar size instead !! :-(
+	let al = scr.availLeft;
+	let aw = scr.availWidth;
+	if ((HistoryWidth < aw) // If wider than the reported screen width, do not adjust
+		&& ((left < al) || (left >= al + aw))
+	   ) {
+	  adjust = true;
+	  left = al + Math.floor((aw - HistoryWidth) / 2);
+	}
+	let at = scr.availTop;
+	let ah = scr.availHeight;
+	if ((HistoryHeight < ah) // If higher than the reported screen height, do not adjust
+		&& ((top < at) || (top >= at + ah))
+	   ) {
+	  adjust = true;
+	  top = at + Math.floor((ah - HistoryHeight) / 2);
+	}
+	if (adjust) { // Save new values
+	  browser.storage.local.set({
+		historytop_option: top,
+		historyleft_option: left
+	  });
+	}
+
+	// Open Bookmark history window if not already open, else just focus on it
+	browser.windows.getAll({populate: true, windowTypes: ["popup"]})
+	.then(
+	  function (a_Windowinfo) {
+		let wi, openedWi;
+		let wTitle = "("+selfName+") - Bookmark History -";
+		for (wi of a_Windowinfo) {
+		  if (wi.title.includes(wTitle)) {
+			openedWi = wi; 
+		  }
+		}
+		if (openedWi != undefined) {
+		  browser.windows.update(openedWi.id, {focused: true});
+		}
+		else {
+		  browser.windows.create(
+			{titlePreface: "Bookmark History",
+			 type: "popup",
+			 url: href,
+			 //----- Workaround for top and left position parameters being ignored for panels -----
+			 //Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
+			 //Make the start size as small as possible so that it briefly flashes in its initial
+			 //position in the least conspicuous way.
+			 //Note: 1,1 does not work, this sets the window in a state reduced to the bar, and no
+			 //internal resize seems to work after that.
+			 //Also tried to start minimized, but the window pops in a big size first before being minimized,
+			 //even less pretty.			   .
+			 //=> .. FF does not seem very clean on all this .. :-(  
+//			 height: PopupHeight,
+//			 width: PopupWidth,
+			 height: 800,
+			 width: 800,
+//			 left: left,
+//			 top: top,
+			 //----- End of position ignored workaround -----
+			 allowScriptsToClose: true
+			}
+		  );
+		}
+	  }
+	);
+  });
 }
 
 /*
