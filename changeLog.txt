@@ -1,6 +1,16 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.100 Bugs
+    - Corrected a regression on key-typing search, introduced when adding the wrap at start function of issue #181.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/199
+    - Corrected a bug where an exception was occurring in the BSP2 sidebar when the show path option was enabled,
+      and the reverse path option was toggled on/off. 
+    - Added support to History window for remembering position and size (if corresponding option is enabled for the
+      second one).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/210
+    - Added support to History window for current FF theme in the bookmark history list.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/210
 - 2.0.99 Bugs
     - Corrected a regression on favicon refresh after a tab switch, introduced in 2.0.98.
 - 2.0.98 Improvements
