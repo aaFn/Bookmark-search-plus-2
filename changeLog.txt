@@ -1,6 +1,29 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.101 Bugs & Improvements
+    - Removed recent default FF style on the search text input which was showing a 2px outline on the input when typing
+      text inside it, making it prominent compared to other items in the search box, and to the search box itself.
+    - Added behavior of selecting all available text in the search text input when gaining focus, for easy replace
+      by newly typed characters (to save deleting by backspace or by selecting all first).
+    - Added the same behavior to Title and Address fields of bookmark properties, for easier editing.
+    - Added intuitive behavior that pressing `Enter` in the search text, after search is complete, is selecting the
+      first search result, so that up and down keys (and others ...) can be used on it to navigate or act directly
+      by keyboard, without requiring first a mouse click on it.
+    - Now enable refresh of favicons on tab switching when favicon fetching is paused (since this is not fetching,
+      but this is the only available workaround so far to the FF limitation of not giving access to its favicons DB).
+    - Optimized process of getting favicons on tab switching / tab reload / tab load with a new URL to minimize
+      favicon updates, and corrected a bug where a bookmark with non resolvable favicon URL would inherit the favicon
+      of previous URL in a tab, when changing URL of that tab to the one of the non resolvable bookmark.
+    - Improved robustness on favicon fetching in case of page redirects responses.
+    - Tuned fetch() parameters to increase favicon fetch success rates (removed some cases of Network TypeError
+      related to cors value).
+    - Added a start of (basic) HTML entities interpretation in favicon URLs to get a little more success on favicon
+      fetching (e.g. &amp; is & .. cf. https://developer.mozilla.org/en-US/docs/Glossary/Entity). 
+    - Corrected a bug on favicon fetching where a fetch() timeout was not cancelled, and was randomly aborting a
+      subsequent background fetch.
+    - Corrected a bug where diacritic input keys for "type-to-find" were ignored.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/224
 - 2.0.100 Bugs
     - Corrected a regression on key-typing search, introduced when adding the wrap at start function of issue #181.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/199
