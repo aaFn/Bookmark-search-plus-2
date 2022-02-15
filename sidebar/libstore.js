@@ -658,20 +658,20 @@ function readFoldersLStore(waitMsg) {
 
 				resolve(); // Send promise for anybody waiting ..
 			})
-				.catch( // Asynchronous, like .then
-					function(err) {
-						let msg = "libstore error on loading from local storage 2 : " + err;
-						console.log(msg);
-						if (err != undefined) {
-							let fn = err.fileName;
-							if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
-							console.log("fileName:   "+fn);
-							console.log("lineNumber: " + err.lineNumber);
-						}
-
-						reject(); // Send promise for anybody waiting ..
+			.catch( // Asynchronous, like .then
+				function(err) {
+					let msg = "libstore error on loading from local storage 2 : " + err;
+					console.log(msg);
+					if (err != undefined) {
+						let fn = err.fileName;
+						if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+						console.log("fileName:   "+fn);
+						console.log("lineNumber: " + err.lineNumber);
 					}
-				);
+
+					reject(); // Send promise for anybody waiting ..
+				}
+			);
 		}
 	);
 

@@ -154,6 +154,7 @@ p {
   background-color: white;
   color: black;
   border: 0;
+  outline-style: none;
 }
 
 #cancelsearch {

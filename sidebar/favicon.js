@@ -42,7 +42,7 @@ let fetchTimerID = null;
  * uri is a String
  */
 function answerBack (bnId, uri) {
-//  console.log("Answering [BN.id="+BN.id+",uri=<<"+uri.substr(0,40)+">>]");
+//console.log("Answering [BN.id="+BN.id+",uri=<<"+uri.substr(0,40)+">>]");
 //  postMessage([bnId, uri]);
   try { // Ensure we always come back here even if there is a problem in called code
 	    // in order to restart timer and continue dequeueing, or clear timer as needed.
@@ -92,9 +92,10 @@ function readerError () { // Called when interpretation of a Blob as data uri fa
  * Function to handle a timeout on fetch() request: abort it 
  */
 function fetchTimeoutHandler () {
-//  console.log("timeout");
+//console.log("timeout");
   fetchTimerID = null;
-  fetchController.abort();
+  if (fetchController != null)
+	fetchController.abort();
 }
 
 /*
@@ -104,13 +105,15 @@ function fetchTimeoutHandler () {
  * url is a String
  */
 const MyInitFF56 = {
+  method: "GET",
   credentials: "omit",
-  mode: "cors",
+  mode: "same-origin",
   redirect: "follow"
 };
 const MyInitFF57 = {
+  method: "GET",
   credentials: "omit",
-  mode: "cors",
+  mode: "same-origin",
   redirect: "follow",
   signal: null
 };
@@ -127,7 +130,7 @@ const MyInitFF57 = {
 //const PatternHtmlText = /text\/html\;\s*charset\=/i; // Detect things like "text/html; charset="
 const PatternHtmlText = /text\/html/i; // Detect things like "text/html
 async function getUri (url, enableCookies) {
-  //console.log("Getting favicon contents from "+url);
+//console.log("Getting favicon contents from "+url);
   // Need to recreate the AbortController each time, or else all requests after
   // an abort will abort .. and there appears to be no way to remove / clear the abort signal
   // from the AbortController.
@@ -143,15 +146,14 @@ async function getUri (url, enableCookies) {
   }
   else {
 	myInit = MyInitFF57;
-	let fetchSignal = fetchController.signal;
-	myInit.signal = fetchSignal;
+	myInit.signal = fetchController.signal;
   }
   myInit.credentials = (enableCookies ? "include" : "omit");
 
   let uri;
-  // Set timeout on fetch
-  fetchTimerID = setTimeout(fetchTimeoutHandler, FetchTimeout);
   try {
+	// Set timeout on fetch
+	fetchTimerID = setTimeout(fetchTimeoutHandler, FetchTimeout);
 	let response = await fetch(url, myInit); // A Response object
 	// Remove fetch timeout
 	clearTimeout(fetchTimerID);
@@ -178,7 +180,7 @@ async function getUri (url, enableCookies) {
 		}
 	  }
 	  catch (err) {
-		let msg = "Response.blob Error :-S "+err;
+		let msg = "response.blob error: "+err;
 		console.log(msg, url);
 		if (err != undefined) {
 		  let fn = err.fileName;
@@ -199,7 +201,7 @@ async function getUri (url, enableCookies) {
 	  clearTimeout(fetchTimerID);
 	  fetchTimerID = null;
 	}
-	let msg = "Favicon fetch Error :-S "+err;
+	let msg = "Fetch favicon error: "+err;
 	console.log(msg, url);
   }
 
@@ -398,6 +400,38 @@ function retrieveBaseUrl (text) {
 }
 
 /*
+* Build an URL to fetch from relative expression
+* 
+*  Global variable text is an HTML document string (using global varaible because no pass by reference in Javascript on strings)
+*/
+let text; // USVString
+function buildRelativeUrl (refUrl, relUrl, relBaseUrl = null) {
+  let url;
+
+  let urlObj = new URL (refUrl);
+  if (relUrl.startsWith("//")) { // Scheme (protocol, e.g. https:) relative URL
+	url = urlObj.protocol + relUrl;
+  }
+  else if (relUrl.charAt(0) == '/') { // Root relative URL
+	url = urlObj.origin + relUrl;
+  }
+  else { // Path relative URL ...
+	if (relBaseUrl != null) {
+	  url = urlObj.origin + relBaseUrl + relUrl;
+	}
+	else {
+	  // Need to get to last '/' at end of path, removing all ?xxx=yy and other stuff
+	  let temp = urlObj.origin + urlObj.pathname
+	  let pos = temp.lastIndexOf("/");
+	  url = temp.slice(0, pos+1) + relUrl;
+	}
+  }
+//  URL.revokeObjectURL(urlObj);
+  urlObj = undefined;
+  return(url); // Cannot be undefined, always have a value
+}
+
+/*
  * Handle decoding of HTML entities (&xxx; or &#nnn; sequences) for retrieving favicon links.
  *         https://developer.mozilla.org/en-US/docs/Glossary/Entity
  * HTML entities decode
@@ -406,14 +440,16 @@ function retrieveBaseUrl (text) {
  * @param {string} str Input text
  * @return {string} Filtered text
  */
-/*
 function htmldecode (str) {
-
+/*
   let txt = document.createElement("textarea");
-  txt.// innerHTML = str;  // Setting this generates a security vioalation warning on AMO
+  txt.// innerHTML = str;  // Setting this generates a security vioalation warning on AMO, cannot use it and there is no FF Web API function avaailble for that :-( )
   return(txt.value);
-}
 */
+  let newStr;
+  newStr = str.replaceAll("&amp;", "&");
+  return(newStr);
+}
 
 /*
  * Fetch favicon, and then get its URI
@@ -430,41 +466,46 @@ async function fetchFavicon (bnUrl, enableCookies) {
   // an abort will abort .. and there appears to be no way to remove / clear the abort signal
   // from the AbortController.
   try { // Only supported as of FF 57
-    fetchController = new AbortController();
+	fetchController = new AbortController();
   }
   catch (err) {
-    console.log("handleRequest error: "+err);
+	console.log("fetchFavicon error: "+err);
   }
   let myInit;
   if (fetchController == null) { // we are below FF 57
-    myInit = MyInitFF56;
+	myInit = MyInitFF56;
   }
   else {
-    myInit = MyInitFF57;
-    let fetchSignal = fetchController.signal;
-    myInit.signal = fetchSignal;
+	myInit = MyInitFF57;
+	myInit.signal = fetchController.signal;
   }
   myInit.credentials = (enableCookies ? "include" : "omit");
 
   let uri;
-  // Set timeout on fetch
-  fetchTimerID = setTimeout(fetchTimeoutHandler, FetchTimeout);
   try {
+	// Set timeout on fetch
+	fetchTimerID = setTimeout(fetchTimeoutHandler, FetchTimeout);
+	// First, fetch page at bnUrl
 	let response = await fetch(bnUrl, myInit); // A Response object
- 
-	// Interpret HTML response on the bookmark URL fetch from fetchFavicon, to find favicon
-//console.log("response");
 	// Remove fetch timeout
 	clearTimeout(fetchTimerID);
 	fetchTimerID = null;
-
+//console.log("response");
 //console.log("Status: "+response.status);
-	// Some errors return a page with a favicon, when the site implements a proper error page
+
+	// Interpret HTML response to find favicon URL
+	// Note: some errors return a page with a favicon, when the site implements a proper error page
 	//if (response.status == 200) { // If ok, get contents as a string
+	  let responseUrl = response.url;
 	  try {
-		// Agauin, timeout on fetch
+		// Again, set timeout to not get stuck on waiting response indefinitely
+		// Note: this is using the same fetchController as previous one, since it was not aborted at this stage
 		fetchTimerID = setTimeout(fetchTimeoutHandler, FetchTimeout);
-		let text = await response.text();
+		text = await response.text();
+		// Remove fetch timeout
+		clearTimeout(fetchTimerID);
+		fetchTimerID = null;
+
 		// text is a USVString returned by Response.text()
 //		text = htmldecode(text);
 //console.log("Got text");
@@ -472,69 +513,77 @@ async function fetchFavicon (bnUrl, enableCookies) {
 		let a_faviconUrl = retrieveFaviconUrl(text);
 		let faviconUrl;
 
+		// If we got one or more answers, try them
 		if (a_faviconUrl != null) {
-		  for (faviconUrl of a_faviconUrl) {
+		  for (faviconUrl of a_faviconUrl) { // Try each until getting a response which is ok
+		    faviconUrl = htmldecode(faviconUrl); // Interpret HTML entities (start of ...)
 			if (faviconUrl.startsWith("data:")) { // Cool, it is already a self contained piece ..
 //console.log("Got it directly !");
 			  uri = faviconUrl;
 			  break;
 			}
 			else {
-			  if (!faviconUrl.startsWith("http")) { // Not an absolute URL, make it absolute
-				let urlObj = new URL (response.url); // Use the URL of response in case
-													 // we were redirected ..
-				if (faviconUrl.startsWith("//")) { // Scheme (protocol, e.g. https:) relative URL
-				  faviconUrl = urlObj.protocol + faviconUrl;
+			  if (faviconUrl.startsWith("http")) { // We have an absolute URL
+//console.log("Absolute faviconUrl: <<"+faviconUrl+">>");
+				uri = await getUri(faviconUrl, enableCookies);
+				if (uri != undefined) {
+				  break;
 				}
-				else if (faviconUrl.charAt(0) == '/') { // Root relative URL
-				  // Verify if there is a <base href=..> tag
-				  let baseUrl = retrieveBaseUrl(text);
-//console.log("baseUrl 1: <<"+baseUrl+">>");
-				  if ((baseUrl != null) && (baseUrl.includes("://"))) {
-//					URL.revokeObjectURL(urlObj);
-					urlObj = new URL (baseUrl);
-				  }
-				  faviconUrl = urlObj.origin + faviconUrl;
-				}
-				else { // Just relative URL ...
-				  // Verify if there is a <base href=..> tag
-				  let baseUrl = retrieveBaseUrl(text);
-//console.log("baseUrl 2: <<"+baseUrl+">>");
-				  if (baseUrl != null) {
-					if (baseUrl.includes("://"))
-					  faviconUrl = baseUrl + faviconUrl;
-					else
-					  faviconUrl = urlObj.origin + baseUrl + faviconUrl;
-				  }
-				  else {
-					// Need to get back to closest '/' from end of path, removing all
-					// ?xxx=yy and other stuff
-					let temp = urlObj.origin + urlObj.pathname
-					let pos = temp.lastIndexOf("/");
-					faviconUrl = temp.slice(0, pos+1) + faviconUrl;
-				  }
-				}
-//				URL.revokeObjectURL(urlObj);
-				urlObj = undefined;
 			  }
-			  // We have an absolute URL
-//console.log("faviconUrl 4: <<"+faviconUrl+">>");
-			  uri = await getUri(faviconUrl, enableCookies);
-			  if (uri != undefined) {
-				break;
+			  else { // Not an absolute URL, build it
+				// Verify if there is a <base href=..> tag
+				let baseUrl = retrieveBaseUrl(text);
+//console.log("baseUrl: <<"+baseUrl+">>");
+				let tempUrl;
+				if ((baseUrl != null) && (baseUrl.includes("://"))) {
+//console.log("Re-based relative faviconUrl: <<"+tempUrl+">>");
+				  tempUrl = buildRelativeUrl(baseUrl, faviconUrl);
+				  uri = await getUri(tempUrl, enableCookies);
+				  if (uri != undefined) {
+					break;
+				  }
+				  // Did not work .. let's ignore baseUrl in next tries
+				  baseUrl = null; 
+				}
+
+			    // Else, start by using the URL of response in case we were redirected
+				tempUrl = buildRelativeUrl(responseUrl, faviconUrl, baseUrl);
+//console.log("Relative faviconUrl 1: <<"+tempUrl+">>");
+				uri = await getUri(tempUrl, enableCookies);
+				if (uri != undefined) {
+				  break;
+				}
+
+				// If not succesful, try with initial bookmark URL, if different
+				if (bnUrl != responseUrl) {
+				  tempUrl = buildRelativeUrl(bnUrl, faviconUrl, baseUrl);
+//console.log("Relative faviconUrl 2: <<"+tempUrl+">>");
+				  uri = await getUri(tempUrl, enableCookies);
+				  if (uri != undefined) {
+					break;
+				  }
+				}
 			  }
 			}
 		  }
 		}
 
 		if (uri == undefined) { // If not found, try the old root/favicon.ico method
-		  let urlObj = new URL (response.url); // Use the URL of response in case
-											   // we were redirected ..
+		  // Start by using the URL of response in case we were redirected ..
+		  let urlObj = new URL (response.url);
 		  faviconUrl = urlObj.origin + "/favicon.ico";
-//console.log("faviconUrl 2: <<"+faviconUrl+">>");
+//console.log("Old method faviconUrl 1: <<"+faviconUrl+">>");
+		  uri = await getUri(faviconUrl, enableCookies);
+
+		  // If not succesful, try with initial bookmark URL, if different
+		  if ((uri == undefined) && (bnUrl != responseUrl)) {
+			urlObj = new URL (bnUrl);
+		    faviconUrl = urlObj.origin + "/favicon.ico";
+//console.log("Old method faviconUrl 2: <<"+faviconUrl+">>");
+		    uri = await getUri(faviconUrl, enableCookies);
+		  }
 //		  URL.revokeObjectURL(urlObj);
 		  urlObj = undefined;
-		  uri = await getUri(faviconUrl, enableCookies);
 		}
 
 		if (uri == undefined) {
@@ -547,8 +596,8 @@ async function fetchFavicon (bnUrl, enableCookies) {
 		  clearTimeout(fetchTimerID);
 		  fetchTimerID = null;
 		}
-		let msg = "Error on getting favicon URL : "+err;
-		console.log(msg);
+		let msg = "response.text error: "+err;
+		console.log(msg, bnUrl);
 		if (err != undefined) {
 		  let fn = err.fileName;
 		  if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
@@ -573,7 +622,7 @@ async function fetchFavicon (bnUrl, enableCookies) {
 	  clearTimeout(fetchTimerID);
 	  fetchTimerID = null;
 	}
-	let msg = "Page fetch Error :-S "+err;
+	let msg = "Fetch page error: "+err;
 	console.log(msg, bnUrl);
 	if (err != undefined) {
 	  let fn = err.fileName;

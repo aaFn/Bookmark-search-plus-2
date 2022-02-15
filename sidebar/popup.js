@@ -147,6 +147,13 @@ function onWheel (aEvent) {
 }
 
 /*
+ * Select all text in title input if there is, for easy replace
+ */
+function selectTitleHandler () {
+  TitleInput.select();
+}
+
+/*
  * Handle committed change to the title input
  */
 function titleInputHandler () {
@@ -158,6 +165,13 @@ function titleInputHandler () {
 	  }
 	);
   }
+}
+
+/*
+ * Select all text in address input if there is, for easy replace
+ */
+function selectAddressHandler () {
+  AddressInput.select();
 }
 
 /*
@@ -538,8 +552,10 @@ browser.runtime.getPlatformInfo().then(function(info){
 
 	  // Catch commited changes to each input box contents
 	  TitleInput.addEventListener("change", titleInputHandler);
+	  TitleInput.addEventListener("focus", selectTitleHandler);
 	  AddressInput.addEventListener("input", addressInputModifiedHandler);
 	  AddressInput.addEventListener("change", addressInputHandler);
+	  AddressInput.addEventListener("focus", selectAddressHandler);
 
 	  // Catch button clicks, and window close
 	  AckInput.addEventListener("click", ackInputHandler);

@@ -1004,6 +1004,13 @@ function resetTreeVisiblity () {
 }
 
 /*
+ * Select all text in searchtext if there is, for easy replace
+ */
+function selectSearchTextHandler () {
+  SearchTextInput.select();
+}
+
+/*
  * Manage searches in the Searchbox:
  * - handle visibility and state (enabled / disabled) of the text cancel button
  * - handle appearance of a search result area, and display search results, after a timeout
@@ -1318,7 +1325,7 @@ function migr16x16OnLoad () {
 	}
   }
   else if ((nh != 16) || (nw != 16)) {
-//    console.log("Have to rescale: "+nh+","+nw+" for "+this.src.substr(0,50)+" - "+row.firstElementChild.firstElementChild.title);
+//console.log("Have to rescale: "+nh+","+nw+" for "+this.src.substr(0,50)+" - "+row.firstElementChild.firstElementChild.title);
 	migr16x16Len = migr16x16ConvertList.push(id);
 
     // Set or reset timer to trigger migration
@@ -5243,8 +5250,9 @@ function keyHandler (e) {
   let target = e.target; // Type depends ..
   let classList = target.classList;
   let key = e.key;
+  let normKey;
   let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
-console.log("Key event: "+e.type+" key: "+key+" char: "+e.char+" target: "+target+" classList: "+classList);
+//console.log("Key event: "+e.type+" key: "+key+" char: "+e.char+" target: "+target+" classList: "+classList);
 
   let row = target.parentElement;
   let isResultRow = (row.dataset.rslt == "true");
@@ -5277,6 +5285,7 @@ console.log("Key event: "+e.type+" key: "+key+" char: "+e.char+" target: "+targe
 		  let firstRow = resultsTable.rows[0];
 		  let cell = firstRow.firstElementChild;
 		  cell.focus();
+		  setCellHighlight(rcursor, cell, rbkmkSelectIds);
 		}
 	  }
 	  e.preventDefault(); // Don't pass the key event for further processing
@@ -5652,19 +5661,19 @@ console.log("Key event: "+e.type+" key: "+key+" char: "+e.char+" target: "+targe
 	  }
 	}
 	else if (!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (key.length == 1)
-			 && key.match(PatternAlphanumeric)
+			 && (normKey = strLowerNormalize(key)).match(PatternAlphanumeric)
 			 && !myMenu_open
 			) { // An alphanumeric key, accummulate and use to jump to next matching bookmark item
 	  // Stop the search timeout
 	  clearTimeout(searchTimerID);
-console.log("key = \'"+key+"\' - searchStr = \'"+searchStr+"\'");
+//console.log("key = \'"+key+"\' - normKey = \'"+normKey+"\' - searchStr = \'"+searchStr+"\'");
 	  let nextRow;
 	  if (searchStr.length == 0) { // If first typed char, start on next record
-		searchStr = strLowerNormalize(key); // Case & diacritics insensitive compare
+		searchStr = normKey; // Case & diacritics insensitive compare
 		nextRow = row.nextElementSibling;
 	  }
 	  else { // Else, give a chance to current row
-		searchStr += strLowerNormalize(key); // Case & diacritics insensitive compare
+		searchStr += normKey; // Case & diacritics insensitive compare
 		nextRow = row;
 	  }
 	  // Search next bookmark item matching searchStr (or do not move if none)
@@ -5723,8 +5732,8 @@ console.log("type: "+type);
 	  else if (type == "bookmark") {
 		span = target.firstElementChild.firstElementChild.nextElementSibling;
 	  }
-	  console.log("target: "+target);
-	  console.log("span: "+span);
+console.log("target: "+target);
+console.log("span: "+span);
 	  span.contentEditable = true;
 	  span.focus();
 	  keyProcessed = true;
@@ -6418,10 +6427,10 @@ function searchButtonHandler (e) {
   e.stopImmediatePropagation();
   e.preventDefault();
 /*
-  let button = e.button;
-  let target = e.target;
-  let classList = target.classList;
-  console.log("noDefaultAction event: "+e.type+" button: "+button+" phase: "+e.eventPhase+" target: "+target+" class: "+target.classList);
+let button = e.button;
+let target = e.target;
+let classList = target.classList;
+console.log("noDefaultAction event: "+e.type+" button: "+button+" phase: "+e.eventPhase+" target: "+target+" class: "+target.classList);
 */
   clearMenu(); // Clear any open menu
 
@@ -6893,7 +6902,7 @@ console.log("Received message in "+wId+" to show "+bnId+" for tab "+tabId);
  * Fire when the sidebar is closed
  */
 function closeHandler (e) {
-//  console.log("Sidebar close: "+e.type);
+//console.log("Sidebar close: "+e.type);
 
   // If running in sidebar, signal to background page we are going off
   if (isInSidebar) {
@@ -7230,7 +7239,7 @@ async function delayLoadBkmkId (a_BTN, id, level) {
  */
 function openBookmarksInNewTabs_change (value) {
   openBookmarksInNewTabs_option = value.value;
-//  console.log("openBookmarksInNewTabs_option: "+openBookmarksInNewTabs_option);
+//console.log("openBookmarksInNewTabs_option: "+openBookmarksInNewTabs_option);
 }
 
 /*
@@ -7238,7 +7247,7 @@ function openBookmarksInNewTabs_change (value) {
  */
 function openSearchResultsInNewTabs_change (value) {
   openSearchResultsInNewTabs_option = value.value;
-//  console.log("openSearchResultsInNewTabs_option: "+openSearchResultsInNewTabs_option);
+//console.log("openSearchResultsInNewTabs_option: "+openSearchResultsInNewTabs_option);
 }
 
 /*
@@ -7664,7 +7673,7 @@ function initialize2 () {
 	// Note: to reset the height to CSS default ("20%"), just set
 	//  SearchResult.style.height = "";
 	//  let computedStyle = window.getComputedStyle(SearchResult, null);
-	//  console.log("computed height: "+computedStyle["height"]);
+//console.log("computed height: "+computedStyle["height"]);
 	// will show "20%"
   }
 //	else {
@@ -7683,6 +7692,8 @@ function initialize2 () {
   // Catch changes to the search box contents
   // (including when we clear its contents programmatically ..)
   SearchTextInput.addEventListener("input", manageSearchTextHandler);
+  // On searchbox gaining focus, select all text inside if there is to allow replace
+  SearchTextInput.addEventListener("focus", selectSearchTextHandler);
 
   // Catch clicks on the Cancel search button
   CancelSearchInput.addEventListener("click", cancelSearchTextHandler);

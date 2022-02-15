@@ -126,7 +126,7 @@ let startTime, endLoadTime, endTreeLoadTime, endTreeBuildTime, endSaveTime;
  */
 function trace (text, force = false) {
   if (traceEnabled_option || force) {
-    console.log(text+"\r\n");
+	console.log(text+"\r\n");
   }
 }
 
@@ -1286,7 +1286,7 @@ if (traceEnabled_option) {
  * tab: a tabs.Tab indicating the tab that was active when the icon was clicked
  */
 function buttonClicked (tab) {
-//  console.log("Background received button click");
+//console.log("Background received button click");
   let windowId = tab.windowId;
   // Can't use browser.sidebarAction.isOpen() here, as this is waiting for a Promise,
   // and so when it arrives we are not anymore in the code flow of a user action, so
@@ -2310,7 +2310,7 @@ function bkmkReorderedHandler (id, reorderInfo, recHistory = true) {
 function tabModified (tabId, changeInfo, tabInfo) {
 /*
   trace('-------------------------------------');
-  trace("A tab was updated.\r\n"
+  trace("A tab was updated 1.\r\n"
 	   +"tabId: "+tabId+"\r\n"
 	   +"changeInfo.favIconUrl: "+changeInfo.favIconUrl+"\r\n"
 	   +"changeInfo.status: "+changeInfo.status+"\r\n"
@@ -2326,7 +2326,7 @@ function tabModified (tabId, changeInfo, tabInfo) {
   if (tabInfo.status == "complete") {
 	let tabUrl = tabInfo.url;
 
-//console.log("A tab was updated - tabUrl: "+tabUrl);
+//console.log("A tab was updated 1 - tabUrl: "+tabUrl);
 	if ((tabUrl != undefined)
 		&& (!tabUrl.startsWith("moz-extension://"))
 		&& (!tabUrl.startsWith("about:"))
@@ -2345,16 +2345,23 @@ function tabModified (tabId, changeInfo, tabInfo) {
 	  .then(
 		function (a_BTN) { // An array of BookmarkTreeNode
 		  let len = a_BTN.length;
-//console.log("A tab was updated - tabUrl: "+tabUrl);
+//console.log("A tab was updated 2 - tabUrl: "+tabUrl);
 //console.log("Results: "+len);
 		  if (len > 0) { // This is a bookmarked tab
 			// If there is a favicon and we are collecting them, refresh all BookmarkNodes with it
 			let tabFaviconUrl = tabInfo.favIconUrl;
+			let chgFaviconUrl = changeInfo.favIconUrl;
+			let chgStatus = changeInfo.status;
 			let is_refreshFav = !disableFavicons_option			// Ignore if disableFavicons_option is set
-								&& !pauseFavicons_option		// Ignore if pauseFavicons_option is set
-								&& (tabFaviconUrl != undefined)
-								&& (!tabFaviconUrl.startsWith("chrome://global/skin/icons/")) // Internal icon, we can't fetch it, security error
+/*								&& !pauseFavicons_option		// Ignore if pauseFavicons_option is set */
+								&& (tabFaviconUrl != undefined) // Need a favicon URI
+																// There was no favicon change, justa tab switch OR this is a tab reload with a new URL / favicon
+								&& (((chgFaviconUrl == undefined) && ((chgStatus == undefined) || (chgStatus == "complete")) && (changeInfo.title == undefined) && (changeInfo.url == undefined))		
+									|| (chgFaviconUrl == tabFaviconUrl) 
+								   )
 								;
+			let is_nofavicon = is_refreshFav
+							   && (tabFaviconUrl.startsWith("chrome://global/skin/icons/")); // Internal icon, we can't fetch it, security error
 			let bnId, foundBN_Id;
 			let BN;
 			for (let i=0 ; i<len ; i++) {
@@ -2370,14 +2377,19 @@ function tabModified (tabId, changeInfo, tabInfo) {
 //console.log("Matching BTN.id: "+bnId+" "+a_BTN[i].url+" foundBN_Id: "+foundBN_Id);
 			  // Load the favicon as a data: URI
 			  if (is_refreshFav) {
-				if (tabFaviconUrl.startsWith("data:")) { // Cool, already in good format for us !
+				if (is_nofavicon) {
+				  setNoFavicon(bnId);
+//console.log("Set no favicon: "+tabFaviconUrl);
+				}
+				else if (tabFaviconUrl.startsWith("data:")) { // Cool, already in good format for us !
 				  setFavicon(bnId, tabFaviconUrl);
+//console.log("Directly set favicon: "+tabFaviconUrl);
 				}
 				else { // Fetch favicon
 				  // Presumably a bookmark, so no need for cloneBTN(), there is no tree below
 //				  faviconWorker.postMessage(["iconurl", bnId, tabFaviconUrl, enableCookies_option]);
 				  faviconWorkerPostMessage({data: ["iconurl", bnId, tabFaviconUrl, enableCookies_option]});
-//trace("Retrieval demand 2 sent for icon:"+tabFaviconUrl);
+//console.log("Retrieval demand sent for favicon: "+tabFaviconUrl);
 				}
 			  }
 			}
@@ -2414,10 +2426,10 @@ function tabModified (tabId, changeInfo, tabInfo) {
  * Let's delete it.
  */
 function onVisited(historyItem) {
-//  trace("onVisited event: "+historyItem.url);
+//trace("onVisited event: "+historyItem.url);
   let url = historyItem.url;
   if (url.startsWith(PopupURL)) {
-    browser.history.deleteUrl({url: url});
+	browser.history.deleteUrl({url: url});
   }
 }
 
