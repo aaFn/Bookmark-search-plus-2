@@ -10,7 +10,9 @@
   <div id="searchbox">
     <button type="button" id="sresetflt" class="sreset" title="Reset filters" disabled><div id="sfilters"></div></button>
     <button type="button" id="sbutton" class="swboth sfilterall"><div id="mglass"></div></button>
-    <input id="searchtext" type="text" placeholder="Search bookmarks.." class="fontdflt" size=1 autofocus>
+    <input id="searchtext" type="text" placeholder="Search bookmarks.." class="fontdflt" size=1 list="searchlist" autofocus>
+      <datalist id="searchlist">
+      </datalist>
     <input id="cancelsearch" type="image" src="/icons/empty.png" disabled>
   </div>
   <div id="searchresult" class="rscrollok" hidden=true>

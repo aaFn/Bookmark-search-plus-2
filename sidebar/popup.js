@@ -57,6 +57,7 @@ const PathLabel = document.querySelector("#path"); // Assuming it is an HTMLLabe
 const TitleInput = document.querySelector("#title"); // Assuming it is an HTMLInputElement
 const AddressLabel = document.querySelector("#addrlabel"); // Assuming it is an HTMLLabelElement
 const AddressInput = document.querySelector("#address"); // Assuming it is an HTMLInputElement
+const DateAddedLabel = document.querySelector("#dateadded"); // Assuming it is an HTMLLabelElement
 const AckInput = document.querySelector("#ack"); // Assuming it is an HTMLInputElement
 const CancelInput = document.querySelector("#cancel"); // Assuming it is an HTMLInputElement
 
@@ -79,9 +80,8 @@ let isFolder; // To signal if we are on folder or a bookmark item
 let btnId;
 let btnPath;
 let btnTitle;
-let btnUrl1;
-let btnUrl2;
 let btnUrl;
+let dateAdded;
 
 /*
  * Receive event from keyboard anywhere in the popup
@@ -301,23 +301,28 @@ function ackInputHandler () {
  */
 function cancelInputHandler () {
 //  console.log("Cancel clicked");
-  if (isPropPopup) { // Cancel on properties = set back previous values, and then close
-	browser.bookmarks.update(
-	  btnId,
-	  (isFolder ?
-		 {title: btnTitle
-		 }
-	   :
-		 {title: btnTitle,
-		  url: btnUrl	
-		 }
+  if (isPropPopup) { // Cancel on properties = set back previous values if they changed, and then close
+	if ((TitleInput.value != btnTitle) || (AddressInput.value != btnUrl)) {
+	  browser.bookmarks.update(
+		btnId,
+		(isFolder ?
+		   {title: btnTitle
+		   }
+		 :
+		   {title: btnTitle,
+		    url: btnUrl	
+		  }
+		)
 	  )
-	)
-	.then(
-	  function () {
-		closeSelf();
-	  }
-	);
+	  .then(
+		function () {
+		  closeSelf();
+		}
+	  );
+	}
+	else {
+	  closeSelf();
+	}
   }
   else { // Delete the bookmark, then close
  	// Proceed like native bookmark FF = no undo / redo on such "cancel" => do not use BSP2 trash
@@ -445,6 +450,9 @@ function paramParse (paramStr) {
   else if (param == "url") {
 	btnUrl = decodeURIComponent(value);
   }
+  else if (param == "dateadded") {
+	dateAdded = decodeURIComponent(value);
+  }
 }
 
 
@@ -501,10 +509,10 @@ browser.runtime.getPlatformInfo().then(function(info){
 	  // Parse the url, it will give us our type of window, the BTN.id, BTN.title and BTN.url
 	  let paramsPos = myUrl.indexOf("?");
 
-	  // There should be 5 arguments, url should be the last and can itself contain "&"
+	  // There should be 6 arguments, url should be the last and can itself contain "&"
 	  let paramStr;
 	  let endPos;
-	  for (let i=0 ; i<4 ; i++) {
+	  for (let i=0 ; i<5 ; i++) {
 		endPos = myUrl.indexOf("&", paramsPos+1);
 		if (endPos == -1) { // Reached last param
 		  break;
@@ -530,6 +538,8 @@ browser.runtime.getPlatformInfo().then(function(info){
 	  PathLabel.textContent = btnPath;
 	  TitleInput.value = btnTitle;
 	  TitleInput.select();
+	  let t = new Date (parseInt(dateAdded, 10));
+	  DateAddedLabel.textContent = t.toLocaleString();
 	  if (myType.endsWith("fldr")) { // No URL for folders
 		isFolder = true;
 		AddressLabel.hidden = true;

@@ -172,7 +172,7 @@ ContextMenu["bsp2prop"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_rb
  * propType = "new" or "prop", to indicate creation of a new item, or editing its properties
  * BN_id = String identifying the bookmark item to edit
  */
-function openPropPopup (popupType, BN_id, path, type, title, url) {
+function openPropPopup (popupType, BN_id, path, type, title, url, dateAdded) {
   // Open popup on bookmark item
   let titlePreface;
   let popupUrl;
@@ -195,7 +195,14 @@ function openPropPopup (popupType, BN_id, path, type, title, url) {
 	  winType = "propfldr";
 	  titlePreface = "Properties of « "+title+" »";
 	}
-	popupUrl = PopupURL+"?type="+winType+"&id="+BN_id+"&path="+encodeURIComponent(path)+"&title="+encodeURIComponent(title)+"&url=null";
+	// Keep url as last argument as it can itself have a "&""
+	popupUrl = PopupURL+"?type="+winType
+					   +"&id="+BN_id
+					   +"&path="+encodeURIComponent(path)
+					   +"&title="+encodeURIComponent(title)
+					   +"&dateadded="+encodeURIComponent(dateAdded)
+					   +"&url=null"
+					   ;
   }
   else { // Bookmark
 	let winType;
@@ -207,7 +214,14 @@ function openPropPopup (popupType, BN_id, path, type, title, url) {
 	  winType = "propbkmk";
 	  titlePreface = "Properties of « "+title+" »";
 	}
-	popupUrl = PopupURL+"?type="+winType+"&id="+BN_id+"&path="+encodeURIComponent(path)+"&title="+encodeURIComponent(title)+"&url="+encodeURIComponent(url);
+	// Keep url as last argument as it can itself have a "&""
+	popupUrl = PopupURL+"?type="+winType
+					   +"&id="+BN_id
+					   +"&path="+encodeURIComponent(path)
+					   +"&title="+encodeURIComponent(title)
+					   +"&dateadded="+encodeURIComponent(dateAdded)
+					   +"&url="+encodeURIComponent(url)
+					   ;
   }
   popupUrl = encodeURI(popupUrl);
   let gettingItem = browser.storage.local.get(

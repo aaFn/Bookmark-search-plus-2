@@ -111,6 +111,7 @@ const SearchButtonInput = document.querySelector("#sbutton"); // Assuming it is 
 const MGlassImg = document.querySelector("#mglass"); // Assuming it is an HTMLImgElement
 const MGlassImgStyle = MGlassImg.style;
 const SearchTextInput = document.querySelector("#searchtext"); // Assuming it is an HTMLInputElement
+const SearchDatalist = document.querySelector("#searchlist"); // Assuming it is an HTMLDataListElement
 const CancelSearchInput = document.querySelector("#cancelsearch"); // Assuming it is an HTMLInputElement
 const SearchResult = document.querySelector("#searchresult"); // Assuming it is an HTMLDivElement
 const Bookmarks = document.querySelector("#bookmarks"); // Assuming it is an HTMLDivElement
@@ -437,7 +438,7 @@ let bkmkDragIds = []; // Unique list of dragged Bookmark Id(s), [] if empty
 let bkmkDrag = []; // Unique list of dragged BookmarkNode(s), [] if empty
 
 // Declared in BookmarkNode.js
-//var countBookmarks, countFolders, countSeparators, countOddities, countFetchFav;
+//var countBookmarks, countFolders, countSeparators, countOddities, countFetchFav, countNofavicon;
 //var mostVisitedBNId, recentTagBNId, recentBkmkBNId;
 //var bsp2TrashFldrBNId;
 
@@ -850,6 +851,37 @@ function displayResults (a_BTN) {
 }
 
 /*
+ * Update search history list - Keep only last 3 searches, ordere by most recent
+ */
+function updateSearchList (text) {
+  let options = SearchDatalist.options;
+  let len = options.length;
+  // Find if text is already in history
+  let i;
+  for (i=0 ; i<len ; i++) {
+	if (options[i].value == text)
+	  break;
+  }
+  if (i >= len) { // Not found, add it
+	let option;
+	if (len < 3) { // Simply append at front
+	  option = document.createElement("option");
+	  option.value = text;
+	  SearchDatalist.prepend(option);
+	}
+	else { // Shift values down to make room at top
+	  option = options[2];
+	  let prev;
+	  for (i=1 ; i>=0 ; i--) {
+		option.value = (prev = options[i]).value;
+		option = prev;
+	  }
+	  option.value = text;
+	}
+  }
+}
+
+/*
  * Execute / update a bookmark search and display result
  */
 function updateSearch () {
@@ -867,7 +899,11 @@ function updateSearch () {
 	if (sboxState != SBoxExecuted) {
 	  enableCancelSearch();
 	}
-	if (resultsTable != null) { // Discard previous results table if there is one
+	// Update search history list
+	updateSearchList(value);
+
+	// Discard previous results table if there is one
+	if (resultsTable != null) {
 	  SearchResult.removeChild(resultsTable);
 	  resultsTable = null;
 	  curResultRowList = {};
@@ -4609,7 +4645,7 @@ function createBookmark (BTN) {
 	title = title.slice(0, paramPos);
   }
   let path = BN_path(BTN.parentId);
-  openPropPopup("new", BTN.id, path, BTN.type, title, BTN.url);
+  openPropPopup("new", BTN.id, path, BTN.type, title, BTN.url, BTN.dateAdded);
 
   // Don't call refresh search, it is already called through bkmkCreatedHandler
 }
@@ -4621,7 +4657,7 @@ function createBookmark (BTN) {
  */
 function createFolder (BTN) {
   let path = BN_path(BTN.parentId);
-  openPropPopup("new", BTN.id, path, BTN.type, BTN.title, undefined);
+  openPropPopup("new", BTN.id, path, BTN.type, BTN.title, undefined, BTN.dateAdded);
 
   // Don't call refresh search, it is already called through bkmkCreatedHandler
 }
@@ -6031,7 +6067,7 @@ function menuProp (BN_id) {
 
   // Open popup on bookmark item
   let path = BN_path(BN.parentId);
-  openPropPopup("prop", BN_id, path, BN.type, BN.title, BN.url);
+  openPropPopup("prop", BN_id, path, BN.type, BN.title, BN.url, BN.dateAdded);
 }
 
 /*
@@ -6493,6 +6529,7 @@ if (traceEnabled_option) {
 	  curBNList = message.json;
 	  countBookmarks = message.countBookmarks;
 	  countFetchFav = message.countFetchFav;
+	  countNoFavicon = message.countNoFavicon;
 	  countFolders = message.countFolders;
 	  countSeparators = message.countSeparators;
 	  countOddities = message.countOddities;
@@ -7127,11 +7164,12 @@ function completeDisplay () {
 	else {
 	  // Trace stats
 	  trace("Stats:\r\n------", true);
-	  trace("Bookmarks:         "+countBookmarks, true);
-	  trace("Favicons to fetch: "+countFetchFav, true);
-	  trace("Folders:           "+countFolders, true);
-	  trace("Separators:        "+countSeparators, true);
-	  trace("Oddities:          "+countOddities, true);
+	  trace("Bookmarks:             "+countBookmarks, true);
+	  trace("Favicons to fetch:     "+countFetchFav, true);
+	  trace("Unsuccessful favicons: "+countNoFavicon, true);
+	  trace("Folders:               "+countFolders, true);
+	  trace("Separators:            "+countSeparators, true);
+	  trace("Oddities:              "+countOddities, true);
 	  trace("--------------------", true);
 
 	  let bnId = backgroundPage.newSidebar(myWindowId);
@@ -7646,6 +7684,7 @@ function initialize2 () {
 	trace("isSlowSave: "+isSlowSave, true);
 	countBookmarks = backgroundPage.countBookmarks;
 	countFetchFav = backgroundPage.countFetchFav;
+	countNoFavicon = backgroundPage.countNoFavicon;
 	countFolders = backgroundPage.countFolders;
 	countSeparators = backgroundPage.countSeparators;
 	countOddities = backgroundPage.countOddities;

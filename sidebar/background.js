@@ -830,7 +830,7 @@ function reloadFFAPI (is_autoDetected) {
   savedBNList = curBNList;
   savedHNList = curHNList;
   faviconWorkerPostMessage({data: ["hysteresis"]});
-  countBookmarks = countFolders = countSeparators = countOddities = countFetchFav = 0;
+  countBookmarks = countFolders = countSeparators = countOddities = countFetchFav = countNoFavicon = 0;
 
   browser.bookmarks.getTree()
   .then(storeAndConvertTree, onRejected)
@@ -1045,7 +1045,7 @@ if (traceEnabled_option) {
 			}
 			else {
 			  // Rescan tree to trigger fetching favicon, and save it
-			  countBookmarks = countFolders = countSeparators = countOddities = countFetchFav = 0;
+			  countBookmarks = countFolders = countSeparators = countOddities = countFetchFav = countNoFavicon = 0;
 			  scanBNTree(rootBN, faviconWorkerPostMessage);
 			}
 			// Signal to others the change in option
@@ -1056,7 +1056,7 @@ if (traceEnabled_option) {
 			faviconWorkerPostMessage({data: ["stopfetching"]});
 
 			// Rescan tree to either clear favicons or trigger fetching them, and save it
-			countBookmarks = countFolders = countSeparators = countOddities = countFetchFav = 0;
+			countBookmarks = countFolders = countSeparators = countOddities = countFetchFav = countNoFavicon = 0;
 			scanBNTree(rootBN, faviconWorkerPostMessage);
 			saveBNList();
 
@@ -1160,6 +1160,9 @@ if (traceEnabled_option) {
 		}
 	  );
 	}
+	else if (msg.startsWith("refetchFav")) { // Option page "Re-fetch all unsuccessful favicons" button was pressed
+	  refetchFav();
+	}
 	else if (msg.startsWith("reloadFFAPI")) { // Option page "Reload tree from FF API" button was pressed,
 	  										  // or an anomaly was detected.
 	  reloadFFAPI(msg == "reloadFFAPI_auto");
@@ -1223,6 +1226,7 @@ if (traceEnabled_option) {
 		 json: json,
 		 countBookmarks: countBookmarks,
 		 countFetchFav: countFetchFav,
+		 countNoFavicon: countNoFavicon,
 		 countFolders: countFolders,
 		 countSeparators: countSeparators,
 		 countOddities: countOddities,
@@ -1248,6 +1252,7 @@ if (traceEnabled_option) {
 		{content: "getStats",
 		 countBookmarks: countBookmarks,
 		 countFetchFav: countFetchFav,
+		 countNoFavicon: countNoFavicon,
 		 countFolders: countFolders,
 		 countSeparators: countSeparators,
 		 countOddities: countOddities
@@ -1473,6 +1478,8 @@ function setFavicon (bnId, uri) {
 //console.log("  different uri: "+newUri);
 	  if ((lastUri == "/icons/nofavicontmp.png") && (countFetchFav > 0))
 		countFetchFav--;
+	  else if ((lastUri == "/icons/nofavicon.png") && (countNoFavicon > 0))
+		countNoFavicon--;
 	  cvt16x16Add(bnId, newUri);
 	}
 
@@ -1498,9 +1505,13 @@ function setWaitingFavicon (bnId) {
 //console.log("bnId: "+bnId+" set to waiting");
 
   let BN = curBNList[bnId];
-  if ((BN.faviconUri == "/icons/nofavicontmp.png") && (countFetchFav > 0))
+  let uri = BN.faviconUri;
+  if ((uri == "/icons/nofavicontmp.png") && (countFetchFav > 0))
 	countFetchFav--;
-  let uri = "/icons/waiting.gif";
+  else if ((uri == "/icons/nofavicon.png") && (countNoFavicon > 0))
+	countNoFavicon--;
+
+  uri = "/icons/waiting.gif";
   BN.faviconUri = uri;
   BN.fetchedUri = false;
   // Keep waiting image in memory only, do not save (it has the temporary one on disk anyway)
@@ -1519,16 +1530,19 @@ function setNoFavicon (bnId) {
   // Save new favicon, if different from previous record
   let BN = curBNList[bnId];
   let uri;
+  let increment = 0;
   if (BN.url.toLowerCase().endsWith(".pdf")) { // In case we got a bookmark to PDF without favicon
 	uri = "/icons/pdffavicon.png";
   }
   else {
 	uri = "/icons/nofavicon.png";
+	increment = 1;
   }
   let lastUri = BN.faviconUri;
   if (lastUri != uri) {
 	if ((lastUri == "/icons/nofavicontmp.png") && (countFetchFav > 0))
 	  countFetchFav--;
+	countNoFavicon += increment;
 	BN.faviconUri = uri;
 	BN.fetchedUri = false;
 	historyListUpdateFaviconUri(curHNList, bnId, uri);
@@ -1610,6 +1624,15 @@ function msgerrorFavicon () {
   console.log('There is a message deserialization error with faviconWorker !');
 }
 */
+
+/*
+ * Trigger re-fetch all unsucessful favicons, that is all the non protected ones which are nofavicon
+ */
+function refetchFav () {
+console.log("Trigerring re-fetch of all unsuccessful favicons");
+  scanFavBNTree(rootBN, faviconWorkerPostMessage, setFavicon);
+  countNoFavicon = 0;
+}
 
 /*
  * Migration of existing favicons to 16x16
@@ -2090,6 +2113,7 @@ function bkmkChangedHandler (id, changeInfo) {
 	  else if (cUrl.startsWith("about:")) { // about: is protected - security error ..
 		// Set uri to nofavicon.png
 		BN.faviconUri = "/icons/nofavicon.png";
+		countNoFavicon++;
 	  }
 	  else if (disableFavicons_option) {
 		BN.faviconUri = undefined;

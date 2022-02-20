@@ -24,7 +24,7 @@ const AllBookmarksV = "allbms_____v";
 /*
  * Global variables, seen by other instances (var)
  */
-var countBookmarks = 0, countFolders = 0, countSeparators = 0, countOddities = 0, countFetchFav = 0;
+var countBookmarks = 0, countFolders = 0, countSeparators = 0, countOddities = 0, countFetchFav = 0, countNoFavicon = 0;
 var mostVisitedBNId, mostVisitedBN, recentTagBNId, recentTagBN, recentBkmkBNId, recentBkmkBN;
 var bsp2TrashFldrBNId, bsp2TrashFldrBN;
 
@@ -388,8 +388,11 @@ function decrCounters (BN, type) {
 	else {
 	  if (countOddities > 0)   countOddities--;
 	}
-	if ((BN.faviconUri == "/icons/nofavicontmp.png") && (countFetchFav > 0))
-	  countFetchFav--;  
+	let uri = BN.faviconUri;
+	if ((uri == "/icons/nofavicontmp.png") && (countFetchFav > 0))
+	  countFetchFav--;
+	else if (BN.fetchedUri && (uri == "/icons/nofavicon.png") && (countNoFavicon > 0))
+	  countNoFavicon--;  
   }
 }
 
@@ -716,6 +719,8 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 	  }
 	  else {
 		fetchedUri = true;
+		if (uri == "/icons/nofavicon.png")
+		  countNoFavicon++;
 	  }
 	}
 
@@ -1172,7 +1177,7 @@ function scanBNTree (BN, faviconWorker, doStats = true) {
 	  for (let i=0 ; i<len ;i++) {
  		scanBNTree(children[i], faviconWorker, doStats);
  	  }
-    }
+	}
   }
   else if (type == "separator") {
 	if (doStats)
@@ -1250,16 +1255,61 @@ function scanBNTree (BN, faviconWorker, doStats = true) {
 		}
 	  }
 	  else if ((url.toLowerCase().endsWith(".pdf")) && (uri == "/icons/nofavicon.png")) {
+		triggerFetch = false;
 		BN.faviconUri = "/icons/pdffavicon.png";
+		if (countNoFavicon > 0)
+		  countNoFavicon--;
 	  }
 	  else {
 		triggerFetch = false;
+		if (uri == "/icons/nofavicon.png")
+		  countNoFavicon++;
 	  }
 
 	  if (triggerFetch && !pauseFavicons_option) { // Trigger favicon fetch, except if paused
 		// This is a bookmark, so here no need for cloneBN(), there is no tree below
 //		faviconWorker.postMessage(["get", BN.id, BN.url, enableCookies_option]);
-		faviconWorker({data: ["get", BN.id, BN.url, enableCookies_option]});
+		faviconWorker({data: ["get", bnId, url, enableCookies_option]});
+	  }
+	}
+  }
+}
+
+/*
+ * Scan a BN tree for unsuccessful favicons to fetch, and trigger updates as needed
+ * function of disableFavicons_option.
+ * 
+ * BN = BN tree to scan
+ * faviconWorker = function to post favicons fetching to
+ * setFavicon = function to call for directly setting favicon
+ */
+function scanFavBNTree (BN, faviconWorker, setFavicon) {
+  if (!disableFavicons_option && !pauseFavicons_option) {
+	let type = BN.type;
+	if (type == "folder") {
+	  let children = BN.children;
+ 	  if (children != undefined) {
+		let len = children.length;
+		for (let i=0 ; i<len ;i++) {
+ 		  scanFavBNTree(children[i], faviconWorker, setFavicon);
+ 		}
+	  }
+	}
+	else if (type == "bookmark") {
+	  let bnId = BN.id;
+	  let url = BN.url;
+	  if ((url != undefined) && !url.startsWith("file:") && !url.startsWith("about:") && !url.startsWith("place:")) {
+		let uri = BN.faviconUri;
+		if (uri == "/icons/nofavicon.png") {
+		  if (url.toLowerCase().endsWith(".pdf")) {
+			setFavicon(bnId, "/icons/pdffavicon.png");
+		  }
+		  else {
+			setFavicon(bnId, "/icons/nofavicontmp.png");
+			countFetchFav++;
+			faviconWorker({data: ["get", bnId, url, enableCookies_option]});
+		  }
+		}
 	  }
 	}
   }

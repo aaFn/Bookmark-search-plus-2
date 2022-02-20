@@ -21,6 +21,7 @@ const ActiveFaviconsInput = document.querySelector("#activeff");
 const PauseFaviconsInput = document.querySelector("#pauseff");
 const DisableFaviconsInput = document.querySelector("#disablefavicons");
 const EnableCookiesInput = document.querySelector("#enablecookies");
+const RefetchFavButton = document.querySelector("#refetchfav");
 const EnableFlipFlop = document.querySelector("#enableflipflop");
 const SimpleClickInput = document.querySelector("#simple");
 const AdvancedClickInput = document.querySelector("#advanced");
@@ -94,7 +95,7 @@ let command1;
 let command2;
 //Declared in libstore.js
 //let structureVersion;
-let countBookmarks, countFolders, countSeparators, countOddities, countFetchFav;
+let countBookmarks, countFolders, countSeparators, countOddities, countFetchFav, countNoFavicon;
 
 
 /*
@@ -106,12 +107,14 @@ let countBookmarks, countFolders, countSeparators, countOddities, countFetchFav;
  * Display stats in the statistics textarea
  */
 function displayStats () {
-  let percent = new Number (countFetchFav/countBookmarks * 100);
-  StatsTextarea.textContent =    "Bookmarks:            "+countBookmarks;
-  StatsTextarea.textContent += "\nFavicons to fetch:    "+countFetchFav+" ("+percent.toFixed(1)+"%)";
-  StatsTextarea.textContent += "\nFolders:              "+countFolders;
-  StatsTextarea.textContent += "\nSeparators:           "+countSeparators;
-  StatsTextarea.textContent += "\nOddities:             "+countOddities;
+  let percent1 = new Number (countFetchFav / countBookmarks * 100);
+  let percent2 = new Number (countNoFavicon / countBookmarks * 100);
+  StatsTextarea.textContent =    "Bookmarks:             "+countBookmarks;
+  StatsTextarea.textContent += "\nFavicons to fetch:     "+countFetchFav+" ("+percent1.toFixed(1)+"%)";
+  StatsTextarea.textContent += "\nUnsuccessful favicons: "+countNoFavicon+" ("+percent2.toFixed(1)+"%)";
+  StatsTextarea.textContent += "\nFolders:               "+countFolders;
+  StatsTextarea.textContent += "\nSeparators:            "+countSeparators;
+  StatsTextarea.textContent += "\nOddities:              "+countOddities;
 }
 
 /*
@@ -127,6 +130,7 @@ if (traceEnabled_option) {
 	if (msg == "getStats") {
 	  countBookmarks = message.countBookmarks;
 	  countFetchFav = message.countFetchFav;
+	  countNoFavicon = message.countNoFavicon;
 	  countFolders = message.countFolders;
 	  countSeparators = message.countSeparators;
 	  countOddities = message.countOddities;
@@ -193,6 +197,7 @@ function saveOptions (e) {
   EnableCookiesInput.disabled = DisableFaviconsInput.checked;
   ActiveFaviconsInput.disabled = DisableFaviconsInput.checked;
   PauseFaviconsInput.disabled = DisableFaviconsInput.checked;
+  RefetchFavButton.disabled =  DisableFaviconsInput.checked || PauseFaviconsInput.checked;
   OpenTreeInput.disabled = CloseSearchInput.checked;
   ReloadFFAPIButton.disabled = LoadFFAPIInput.checked;
   ResetSizesButton.disabled = !(RememberSizesInput.checked);
@@ -545,6 +550,7 @@ function themeRefreshedHandler (updateInfo) {
 function restoreOptions () {
   if (pauseFavicons_option_file) {
 	PauseFaviconsInput.checked = true;
+	RefetchFavButton.disabled = true;
   }
 
   if (disableFavicons_option_file) {
@@ -553,6 +559,7 @@ function restoreOptions () {
 	EnableCookiesInput.disabled = true;
 	ActiveFaviconsInput.disabled = true;
 	PauseFaviconsInput.disabled = true;
+	RefetchFavButton.disabled = true;
   }
 
   if (enableCookies_option_file) {
@@ -762,10 +769,22 @@ function restoreOptions () {
 }
 
 /*
+ * Re-fetch all unsuccessful favicons (= the non protected ones which are nofavicon)
+ */
+function refetchFav () {
+//console.log("Re-fetch all unsuccessful favoicons button pressed");
+  // Disable button
+  RefetchFavButton.disabled = true;
+
+  // Signal re-fetch to background
+  sendAddonMessage("refetchFav");
+}
+
+/*
  * Reload bookmark tree from FF API
  */
 function reloadFFAPI () {
-//  console.log("Reload FF API bookmark tree button pressed");
+//console.log("Reload FF API bookmark tree button pressed");
   // Disable button
   ReloadFFAPIButton.disabled = true;
 
@@ -1166,6 +1185,7 @@ function initialize2 () {
 	restoreOptions();
 	countBookmarks = backgroundPage.countBookmarks;
 	countFetchFav = backgroundPage.countFetchFav;
+	countNoFavicon = backgroundPage.countNoFavicon;
 	countFolders = backgroundPage.countFolders;
 	countSeparators = backgroundPage.countSeparators;
 	countOddities = backgroundPage.countOddities;
@@ -1177,6 +1197,7 @@ function initialize2 () {
   PauseFaviconsInput.addEventListener("click", saveOptions);
   DisableFaviconsInput.addEventListener("click", saveOptions);
   EnableCookiesInput.addEventListener("click", saveOptions);
+  RefetchFavButton.addEventListener("click", refetchFav);
   EnableFlipFlop.addEventListener("click", saveOptions);
   SimpleClickInput.addEventListener("click", saveOptions);
   AdvancedClickInput.addEventListener("click", saveOptions);
