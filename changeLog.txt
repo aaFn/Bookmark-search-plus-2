@@ -1,6 +1,16 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.102 Improvements
+    - Added a button for triggering re-fetch of unsuccessful favicons, as well as a counter of unsuccessful favicons
+      on the options page statistics.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/222
+    - Added an history list of up to 3 last search values to the search box.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/217
+    - Added the date at which a bookmark was added (created ?) in the properties window
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/220
+    - Improved properties windows behavior on Cancel when no value is changed in the bookmark = do not re-fetch favicon,
+      do not update the bookmark pointlessly. 
 - 2.0.101 Bugs & Improvements
     - Removed recent default FF style on the search text input which was showing a 2px outline on the input when typing
       text inside it, making it prominent compared to other items in the search box, and to the search box itself.
