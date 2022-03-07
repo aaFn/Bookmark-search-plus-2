@@ -30,6 +30,7 @@ const Menu_bprots = "-bps"; // Menu identifier for Bookmark pane, on a protected
 const Menu_rbkmk = "-rb"; // Menu identifier for Search pane, on a bookmark item (advanced mode)
 const Menu_rshowbkmk = "-rsb"; // Menu identifier for Search pane, on a bookmark item, with default being "Show"
 const Menu_rfldr = "-rf"; // Menu identifier for Search pane, on a folder item
+const Menu_rprotf = "-rpf"; // Menu identifier for Search pane, on a protected folder item
 const ContextMenu = {};
 // Record of keyboard shortcuts, result panel:
 //   Bookmarks hgewnagtci
@@ -41,14 +42,14 @@ const ContextMenu = {};
 ContextMenu["bsp2show"+Menu_rshowbkmk] = {
 	title: "<S&how Bookmark>"
 };
-ContextMenu["bsp2show"+Menu_rfldr] = {
+ContextMenu["bsp2show"+Menu_rfldr+Menu_rprotf] = {
 	title: "<S&how Folder>"
 };
 ContextMenu["bsp2goparent"+Menu_rshowbkmk+Menu_rfldr] = {
-	is_goparent: true,
 	title: "&Go Parent Folder"
 };
-ContextMenu["bsp2sep0"+Menu_rshowbkmk+Menu_rfldr] = {
+//------------------------------------------------------------------
+ContextMenu["bsp2sep0"+Menu_rshowbkmk+Menu_rfldr+Menu_rprotf] = {
 	type: "separator"
 };
 ContextMenu["bsp2open"+Menu_bbkmk+Menu_bresbkmk+Menu_bprot+Menu_rbkmk] = {
@@ -66,10 +67,11 @@ ContextMenu["bsp2openwin"+Menu_bbkmk+Menu_bresbkmk+Menu_bprot+Menu_rbkmk+Menu_rs
 ContextMenu["bsp2openpriv"+Menu_bbkmk+Menu_bresbkmk+Menu_bprot+Menu_rbkmk+Menu_rshowbkmk] = {
 	title: "Open in Priv&ate Window"
 };
-ContextMenu["bsp2openall"+Menu_bfldr+Menu_bresfldr+Menu_bprotf+Menu_rfldr] = {
+ContextMenu["bsp2openall"+Menu_bfldr+Menu_bresfldr+Menu_bprotf+Menu_rfldr+Menu_rprotf] = {
 	title: "&Open All in Tabs"
 };
-ContextMenu["bsp2sep1"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bprot+Menu_bprotf+Menu_rbkmk+Menu_rshowbkmk+Menu_rfldr] = {
+//------------------------------------------------------------------
+ContextMenu["bsp2sep1"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bprot+Menu_rbkmk] = {
 	type: "separator"
 };
 ContextMenu["bsp2show"+Menu_rbkmk] = {
@@ -79,10 +81,10 @@ ContextMenu["bsp2opentree"+Menu_bresbkmk+Menu_bresfldr] = {
 	title: "Open Parent Fo&lder(s)"
 };
 ContextMenu["bsp2goparent"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_bprot+Menu_rbkmk] = {
-	is_goparent: true,
 	title: "&Go Parent Folder"
 };
-ContextMenu["bsp2sep2"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_rbkmk] = {
+//------------------------------------------------------------------
+ContextMenu["bsp2sep2"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_bprotf] = {
 	type: "separator"
 };
 ContextMenu["bsp2newbtab"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_bprotf] = {
@@ -97,13 +99,16 @@ ContextMenu["bsp2newf"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bs
 ContextMenu["bsp2news"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_bprotf] = {
 	title: "New &Separator"
 };
-ContextMenu["bsp2sep3"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_bprotf] = {
+//------------------------------------------------------------------
+ContextMenu["bsp2sep3"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_bprotf+Menu_rbkmk+Menu_rshowbkmk+Menu_rfldr] = {
 	type: "separator"
 };
 ContextMenu["bsp2cut"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_rbkmk+Menu_rshowbkmk+Menu_rfldr] = {
+	is_multi: true,
 	title: "Cu&t"
 };
 ContextMenu["bsp2copy"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_rbkmk+Menu_rshowbkmk+Menu_rfldr] = {
+	is_multi: true,
 	title: "&Copy"
 };
 ContextMenu["bsp2paste"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep] = {
@@ -114,19 +119,23 @@ ContextMenu["bsp2pasteinto"+Menu_bfldr+Menu_bresfldr+Menu_bprotf] = {
 	is_paste: true,
 	title: "P&aste Into"
 };
-ContextMenu["bsp2sep4"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_rbkmk+Menu_rshowbkmk+Menu_rfldr] = {
+//------------------------------------------------------------------
+ContextMenu["bsp2sep4"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep] = {
 	type: "separator"
 };
 ContextMenu["bsp2del"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep] = {
+	is_multi: true,
 	title: "&Delete"
 };
+//------------------------------------------------------------------
 ContextMenu["bsp2sep5"+Menu_bfldr+Menu_bresfldr] = {
 	type: "separator"
 };
 ContextMenu["bsp2sort"+Menu_bfldr+Menu_bresfldr] = {
 	title: "So&rt by Name"
 };
-ContextMenu["bsp2sep6"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bprotf] = {
+//------------------------------------------------------------------
+ContextMenu["bsp2sep6"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_rshowbkmk+Menu_bprotf+Menu_rbkmk+Menu_rfldr+Menu_rprotf] = {
 	type: "separator"
 };
 const BSP2AdvancedMenu = "bsp2advanced"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bprotf;
@@ -146,7 +155,7 @@ ContextMenu["bsp2expandall"+Menu_bfldr+Menu_bresfldr+Menu_bprotf] = {
     parentId: BSP2AdvancedMenu,
 	title: "&Expand All in Branch"
 };
-ContextMenu["bsp2prop"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_rbkmk+Menu_rshowbkmk+Menu_rfldr] = {
+ContextMenu["bsp2prop"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_rbkmk+Menu_rshowbkmk+Menu_rfldr+Menu_rprotf] = {
 	title: "Propert&ies..."
 };
 
@@ -456,10 +465,10 @@ function createBSP2ContextMenu () {
  * 
  * menu = String to filter which elements are visible
  * pasteEnabled = Boolean to enable (true) or disable (false) the paste menu items
- * goparentEnabled = Boolean to enable (true) or disable (false / undefined) the go parent menu items
+ * multiSelected = Boolean to signal a multi-selection of more than 1 bookmarkt (true), or a single one (false)
  * refreshfavEnabled = Boolean to enable (true) or disable (false / undefined) the refresh favicon menu items
  */
-function updateBSP2ContextMenu (menu, pasteEnabled, goparentEnabled, refreshfavEnabled) {
+function updateBSP2ContextMenu (menu, pasteEnabled, multiSelected, refreshfavEnabled = false) {
   let menuIds = Object.keys(ContextMenu);
   let menuItem;
   let id;
@@ -470,7 +479,8 @@ function updateBSP2ContextMenu (menu, pasteEnabled, goparentEnabled, refreshfavE
 	if (id.includes(menu)) {
 	  browser.menus.update(
 		id,
-		{enabled: (!menuItem.is_paste || pasteEnabled) && (!menuItem.is_goparent || goparentEnabled)
+		{enabled: (!menuItem.is_paste || pasteEnabled)
+				  && (menuItem.is_multi || !multiSelected)
 				  && (!menuItem.is_refreshfav || refreshfavEnabled),
 		 visible: true
 		}

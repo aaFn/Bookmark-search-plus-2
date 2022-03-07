@@ -1,6 +1,5 @@
 'use strict';
 
-
 //----- Workaround for top and left position parameters being ignored for panels and bug on popups (szince panel is an alis for popup) -----
 // Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
 //     https://bugzilla.mozilla.org/show_bug.cgi?id=1271047
@@ -304,7 +303,7 @@ tmpElem2.classList.add("mfavicon");
 tmpElem2.draggable = false;
 MultiSelTempl.appendChild(tmpElem2);
 let tmpElem3 = document.createElement("div"); // Assuming it is an HTMLDivElement
-tmpElem3.classList.add("twistieac");
+tmpElem3.classList.add("twistieao");
 tmpElem3.draggable = false; // False by default for <div>
 MultiSelTempl.appendChild(tmpElem3);
 tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
@@ -659,7 +658,7 @@ function appendBookmarkHN (id, HN) {
 		seqnum = div.firstElementChild;
 		cursor = seqnum.nextElementSibling;
 		histicon = cursor.nextElementSibling;
-		img = histicon.nextElementSibling;
+		let img = histicon.nextElementSibling;
 		if (!HN.is_complete) { // Color text in red, as incomplete
 		  let span = img.nextElementSibling;
 		  span.classList.add("incompleteop");
@@ -672,7 +671,8 @@ function appendBookmarkHN (id, HN) {
 		  row.draggable = true; // Note: it is false by default for <tr>
 		  div = ItemFMultiSelTempl.cloneNode(true);
 		  seqnum = div.firstElementChild;
-		  img = seqnum.nextElementSibling.nextElementSibling;
+		  let vbar = seqnum.nextElementSibling;
+		  img = vbar.nextElementSibling;
 		}
 		else if ((uri != undefined) && (uri != "/icons/folder.png")) { // Special folder
 		  div = SFolderTempl.cloneNode(true);
@@ -706,7 +706,8 @@ function appendBookmarkHN (id, HN) {
 		  row.draggable = true; // Note: it is false by default for <tr>
 		  div = ItemSMultiSelTempl.cloneNode(true);
 		  seqnum = div.firstElementChild;
-		  img = seqnum.nextElementSibling.nextElementSibling;
+		  let vbar = seqnum.nextElementSibling;
+		  img = vbar.nextElementSibling;
 		}
 		else {
 		  div = SeparatorTempl.cloneNode(true);
@@ -724,7 +725,8 @@ function appendBookmarkHN (id, HN) {
 		  if (HN.multi_HNref) { // Item is part of a multi-selection operation
 			div = ItemNFBMultiSelTempl.cloneNode(true);
 			seqnum = div.firstElementChild;
-			img = seqnum.nextElementSibling.nextElementSibling;
+			let vbar = seqnum.nextElementSibling;
+			img = vbar.nextElementSibling;
 		  }
 		  else {
 			div = NFBookmarkTempl.cloneNode(true);
@@ -738,7 +740,8 @@ function appendBookmarkHN (id, HN) {
 		  if (HN.multi_HNref) { // Item is part of a multi-selection operation
 			div = ItemBMultiSelTempl.cloneNode(true);
 			seqnum = div.firstElementChild;
-			img = seqnum.nextElementSibling.nextElementSibling;
+			let vbar = seqnum.nextElementSibling;
+			img = vbar.nextElementSibling;
 		  }
 		  else {
 			div = BookmarkTempl.cloneNode(true);
@@ -974,42 +977,43 @@ function displayHN (hnId) {
   let HN = curHNList.hnList[hnId];
   let t = new Date (HN.timestamp);
   NDTimestamp.textContent = t.toLocaleString();
-  let actionText;
+  let actionTextStart, actionTextEnd;
   let is_multi = HN.is_multi;
   if (is_multi == true) {
-	actionText = "multi bookmarks (";
+	actionTextStart = "multi bookmarks ";
 	if (HN.is_complete) {
-	  actionText += "complete) "; 
+	  actionTextEnd = " (complete) "; 
 	  NDAction.style = "";
 	}
 	else {
-	  actionText += "incomplete) ";
+	  actionTextEnd = " (incomplete) ";
 	  NDAction.classList.add("incompleteop");
 	}
   }
   else {
-	actionText = "";
+	actionTextStart = actionTextEnd = "";
+	if (HN.multi_HNref != undefined) {
+	  actionTextEnd = " (in a multi bookmarks action)";
+	}
   }
   let action = HN.action;
   let map = MapAction[action];
   let revOp = HN.revOp;
   if (revOp == undefined) {
 	let reversion = HN.reversion;
-	if (reversion == undefined) {
-	  NDAction.textContent = map.title;
+	NDAction.textContent = actionTextStart+map.title+actionTextEnd;
+	if (reversion == HNREVERSION_UNDONE) {
+	  NDAction.textContent += " (undone by record #)"+hnId+HN.revOp_HNref;
 	}
-	else if (reversion == HNREVERSION_UNDONE) {
-	  NDAction.textContent = actionText+map.title+" (undone by record #)"+hnId+HN.revOp_HNref;
-	}
-	else if (reversion == HNREVERSION_RENDONE) {
-	  NDAction.textContent = actionText+map.title+" (redone by record #)"+hnId+HN.revOp_HNref;
+	else if (reversion == HNREVERSION_REDONE) {
+	  NDAction.textContent += " (redone by record #)"+hnId+HN.revOp_HNref;
 	}
   }
   else if (revOp == HNREVOP_ISUNDO) {
-	NDAction.textContent = "undo "+actionText+map.title+" of record #"+hnId+HN.revOp_HNref;
+	NDAction.textContent = "undo "+actionTextStart+map.title+" of record #"+hnId+HN.revOp_HNref+actionTextEnd;
   }
   else if (revOp == HNREVOP_ISREDO) {
-	NDAction.textContent = "redo "+actionText+map.title+" of record #"+hnId+HN.revOp_HNref;
+	NDAction.textContent = "redo "+actionTextStart+map.title+" of record #"+hnId+HN.revOp_HNref+actionTextEnd;
   }
   if (HN.state == HNSTATE_INACTIVEBRANCH) {
 	NDState.textContent = "Inactive branch";
@@ -1021,8 +1025,8 @@ function displayHN (hnId) {
   if (type != undefined) {				// Meta node
 	NDBNId.textContent = NBSP;
 	NDType.textContent = type;
-	NDParentId.textContent = NBSP;
 	NDIndex.textContent = NBSP;
+	NDParentId.textContent = NBSP;
 	NDPath.textContent = NBSP;
 	NDTitle.textContent = NBSP;
 	NDFavicon.style = "";
@@ -1038,11 +1042,15 @@ function displayHN (hnId) {
 	NDToChildIds.textContent = NBSP;
   }
   else {
-	NDBNId.textContent = HN.id;
-	type = NDType.textContent = HN.type;
+	let tmp = HN.id;
+	NDBNId.textContent = (tmp == undefined ? NBSP : tmp);
+	type = HN.type;
+	NDType.textContent = (type == undefined ? NBSP : type);
 	displayPath(NDPath, HN.path);
-	NDParentId.textContent = HN.parentId;
-	NDIndex.textContent = HN.index;
+	tmp = HN.index;
+	NDIndex.textContent = (tmp == undefined ? NBSP : tmp);
+	tmp = HN.parentId;
+	NDParentId.textContent = (tmp == undefined ? NBSP : tmp);
 	if (type == "folder") {				// Folder
 	  NDTitle.textContent = HN.title;
 	  let uri = HN.faviconUri;
@@ -1059,6 +1067,11 @@ function displayHN (hnId) {
 	  NDTitle.textContent = NBSP;
 	  NDFavicon.style = "";
 	  NDFavicon.className = "favicon";
+	}
+	else if (type == undefined) {		// Should occur only when is_multi is true
+	  NDTitle.textContent = NBSP;
+	  NDFavicon.style = "";
+	  NDFavicon.className = "mfavicon";
 	}
 	else {								// Presumably a Bookmark
 	  NDTitle.textContent = HN.title;
@@ -2087,7 +2100,13 @@ async function completeFavicons () {
 
 	  // Display the favicon
 	  let row = curRowList[i];
-	  let img = row.firstElementChild.firstElementChild.firstElementChild.nextElementSibling.nextElementSibling.nextElementSibling;
+	  let img;
+	  if (HN.multi_HNref != undefined) {
+		img = row.firstElementChild.firstElementChild.firstElementChild.nextElementSibling.nextElementSibling;
+	  }
+	  else {
+		img = row.firstElementChild.firstElementChild.firstElementChild.nextElementSibling.nextElementSibling.nextElementSibling;
+	  }
 	  img.src = HN.faviconUri;
 	}
   }

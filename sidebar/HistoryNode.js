@@ -56,14 +56,14 @@ const HNREVERSION_REDONE = 2;
 // timestamp
 //    A number in milliseconds since the epoch representing time of recording the action.
 //    Filled by the Constructor.
-// action
+// *action
 //    A String indicating the recorded action: "bsp2start", "reloadffapi", "create", "change", "move", "reorder", "remove".
 //    Note: nothing is recorded for favicon load / changes.
-// is_multi
+// *is_multi
 //    Boolean, if true, designate a multiple selection action to group them under history and for undo / redo
 //    (undefined if "bsp2start" or "reloadffapi".
-// id_list
-//    Array of String identifying the bookmarks subject to the multiple action (undefined if is_multi is false)
+// *id_list
+//    Array of String identifying the bookmark Ids subject to the multiple action (undefined if is_multi is false)
 // id_list_len
 //    Integer, length of the id_list array, initialized when is_multi is true, else undefined
 // hnref_list
@@ -75,45 +75,45 @@ const HNREVERSION_REDONE = 2;
 // is_complete
 //    Boolean, undefined if is_multi is false and revOp is undefined,
 //    else initialized to false, and set to true when all ids in list are received, or when reversion operation is received. 
-// id
-//    String identifying the bookmark subject to the action (undefined if "bsp2start" or "reloadffapi", or if is_multi is true).
-// type
+// *id
+//    String identifying the bookmark Id subject to the action (undefined if "bsp2start" or "reloadffapi", or if is_multi is true).
+// *type
 //    Bookmark type.
-// path
+// *path
 //    Path = Array of parent title String, from top to deepest (last one = parent of bookmark item)
-// parentId
+// *parentId
 //    Bookmark parentID.
-// index
+// *index
 //    Bookmark index.
-// title
+// *title
 //    Bookmark title.
-// faviconUri
+// *faviconUri
 //    Favicon.
-// url
+// *url
 //    Bookmark URL.
-// inBSP2Trash
+// *inBSP2Trash
 //    Record if in trash or not.
-// bnTreeJson
+// *bnTreeJson
 //    Recursive representation of node and its children if any, when "remove" (to be able to undo the remove, when no BSP2 trash).
-// toPath
+// *toPath
 //    Target path of move = Array of parent title String, from top to deepest (last one = parent of bookmark item)
-// toParentId
+// *toParentId
 //    Target parentId when "move", else undefined.
-// toIndex
+// *toIndex
 //    Target index when "move", else undefined.
-// toTitle
+// *toTitle
 //    Changed to title when "change" (undefined if no change), else undefined.
-// toUrl
+// *toUrl
 //    Changed to URL when "change" (undefined if no change), else undefined.
-// childIds
+// *childIds
 //    Array of String, initial order when "reorder", else undefined.
-// toChildIds
+// *toChildIds
 //    Array of String, target order when "reorder", else undefined.
-// state
+// *state
 //    Integer. 0 (or undefined) means "active branch", 1 means "inactive branch"
-// revOp
+// *revOp
 //    If undefined, this is a normal operation. Else, 1 is for an "undo" record, and 2 is for a "redo" record
-// revOp_HNref
+// *revOp_HNref
 //    Integer, if revOp is defined and > 0, this is a relative (negative) integer to get to undone / redone HN from this node
 //    Else, if reversion (below) is defined and > 0, this is a relative (positive) integer to get to undoer / redoer HN
 //
@@ -301,15 +301,33 @@ function HistoryList (hnList = []) {
   let activeIndex = hnList.length;
   let hn;
   let action;
-  let lastMulti;
+  let lastMulti = undefined;
   let is_multiFound = false;
+  let is_hnMultiRef = false;
+  let multiIndex;
+  let multiHN;
   while (--activeIndex >= 0) { // Find first bookmark action record
 	action = (hn = hnList[activeIndex]).action;
-	if (!is_multiFound && (hn.is_multi)) {
+	if (!is_multiFound && (hn.is_multi)) { // This is a multi node
 	  is_multiFound = true;
 	  if (!hn.is_complete) {
 		lastMulti = activeIndex;
 	  }
+	}
+	let delta;
+	if ((delta = hn.multi_HNref) != undefined) { // This is a node refering to a multi parent
+	  multiIndex = activeIndex + delta;
+	  multiHN = hnList[multiIndex];
+	  if (multiHN.is_complete) {
+		is_hnMultiRef = true;
+	  }
+	  else {
+		is_hnMultiRef = false;
+		if (!is_multiFound) {
+		  lastMulti = multiIndex;
+		}
+	  }
+	  is_multiFound = true;
 	}
 	if ((action != HNACTION_BSP2START)
 		&& (action != HNACTION_RELOADFFAPI)
@@ -323,8 +341,11 @@ function HistoryList (hnList = []) {
 	this.activeIndex = undefined;
   }
   else {
-	let revOp = hn.revOp;
-	if (revOp == HNREVOP_ISUNDO) { // Last not undone record is the one before revOp_HNref
+	let revOp;
+	if (is_hnMultiRef) { // Point at the parent multi operation, if complete
+	  activeIndex = multiIndex;
+	}
+	else if ((revOp = hn.revOp) == HNREVOP_ISUNDO) { // Last not undone record is the one before revOp_HNref
 	  activeIndex += hn.revOp_HNref - 1;
 	}
 	else if (revOp == HNREVOP_ISREDO) { // Last not undone record is the one on revOp_HNref
@@ -413,6 +434,7 @@ function historyListAdd (hl, action,
 	   ) { // Set at end of list
 	  // Any active record between current activeIndex and this new one becomes inactive
 	  // since they are now in a branch which cannot be reached anymore
+	  // (note: when referring to a multi, they take the state of their parent multi record)
 	  let curIndex = hl.activeIndex;
 	  if (curIndex == undefined) {
 		curIndex = -1;
@@ -428,7 +450,13 @@ function historyListAdd (hl, action,
 			&& (tmpAction != HNACTION_AUTORELOADFFAPI)
 			&& (tmpAction != HNACTION_CLEARHISTORY)
 		   ) {
-		  tmpHn.state = HNSTATE_INACTIVEBRANCH;
+		  let delta = tmpHn.multi_HNref;
+		  if (delta != undefined) {
+			tmpHn.state = hnList[curIndex+delta].state;
+		  }
+		  else {
+			tmpHn.state = HNSTATE_INACTIVEBRANCH;
+		  }
 		}
 	  }
 
@@ -506,7 +534,9 @@ function historyListAdd (hl, action,
 				parentHn.is_complete = true;
 				hl.lastMulti = undefined; // No more lastMulti to remember for matching
 			  }
-			  hn.multi_HNref = lastMulti - newIndex; 
+			  hn.multi_HNref = lastMulti - newIndex;
+			  // Update activeIndex to point at parent multi
+			  hl.activeIndex = lastMulti;
 			}
 		  }
 		}

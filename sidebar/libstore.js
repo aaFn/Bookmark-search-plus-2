@@ -1048,7 +1048,7 @@ function readFullOptions(res, isSidebar, waitMsg) {
 		matchTheme_option = matchTheme_option_file;
 	}
 	else {
-		matchTheme_option = true;
+		matchTheme_option_file = matchTheme_option = !beforeFF58; // False below FF58, true by default on 58+
 	}
 	waitMsg("Read SC option..");
 	if ((setColors_option_file = res.setcolors_option) != undefined) {

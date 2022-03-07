@@ -1062,18 +1062,17 @@ function searchBNRecur (BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, is
 }
 
 /*
- * Uniquely append a BN to a unique ordered list of BNs (Array) =
- * - do not include if already there or already included by a listed BN
- * - if added, add at end and remove previous listed BNs which it includes
+ * Uniquely append a BN to an ordered list of BNs (Array) =
+ * - do not include if already there or already included by a listed folder BN
+ * - if added, add at end, and if folder, remove previous listed BNs which it includes
  * Unique list property is that all its elements are different, and none includes another one in its tree.
  * 
  * bnId = Id of BN to add
  * BN = BN to add
- * a_BNId = list of unique BN Ids to add to, [] if empty, cannot be undefined
- * a_BN = list of unique BNs to add to, in same order than a_BNId, [] if empty
- * addCopy = Boolean, if true add a copy  of BN, else add BN, to a_BN (if not undefined)
+ * a_id = list of unique BN Ids to add to, [] if empty, cannot be undefined
+ * a_BN = list of unique BNs to add to, in same order than a_id, [] if empty
  */
-function uniqueListAddBN (bnId, BN, a_BNIds, a_BN, addCopy = false) {
+function uniqueListAddBN (bnId, BN, a_id, a_BN) {
   let is_included = false;
   let len = a_BN.length;
   if (len > 0) {
@@ -1092,7 +1091,7 @@ function uniqueListAddBN (bnId, BN, a_BNIds, a_BN, addCopy = false) {
 	  else if (BN_includes(BN, tmpBN)) { // Check if BN is under tmpBN tree. Note: tmpBN != BN if we are here
 		is_including = true;
 		// Remove tmpBN from list, since BN includes it and we're going to add it
-		a_BNIds.splice(i, 1);
+		a_id.splice(i, 1);
 		a_BN.splice(i, 1);
 		// Decrease length
 		len--;
@@ -1103,21 +1102,16 @@ function uniqueListAddBN (bnId, BN, a_BNIds, a_BN, addCopy = false) {
 	}
   }
   if (!is_included) { // If not there, add at end
-	a_BNIds.push(bnId);
-	if (addCopy) { // Add a copy of BN
-	  a_BN.push(BN_copy(BN));
-	}
-	else {
-	  a_BN.push(BN);
-	}
+	a_id.push(bnId);
+	a_BN.push(BN);
   }
 }
 
 /*
- * Create a copy of a unique list (containing a copy of all nodes)
+ * Create a copy of a unique list of BookmarkNodes
  * 
  * a_BN = list of unique BNs to copy, [] if empty
- * Returns an Arry copy of that list, with copied BookmarkNodes
+ * Returns an Array copy of that list, with copied BookmarkNodes
  */
 function uniqueListCopy (a_BN) {
   let a_BNcopy = [];

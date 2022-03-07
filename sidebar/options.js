@@ -86,6 +86,7 @@ const ResetMigr16x16Button = document.querySelector("#resetmigr16x16");
 let backgroundPage;
 let platformOs;
 let beforeFF57;
+let beforeFF58;
 let beforeFF60;
 let beforeFF63;
 let ffversion;
@@ -645,16 +646,14 @@ function restoreOptions () {
   }
 
   let matchtheme = false;
-  if (matchTheme_option_file) {
-	if (beforeFF57) { // The API is not active before FF57
-	  MatchThemeInput.checked = false;
-	}
-	else {
-	  matchtheme = MatchThemeInput.checked = true;
-	  fetchTheme(); // Get current colors and set other fields appropriately
-	}
+  if (matchTheme_option_file && !beforeFF58) { // The API is not fully active before FF58
+	matchtheme = MatchThemeInput.checked = true;
+	fetchTheme(); // Get current colors and set other fields appropriately
   }
-  if (beforeFF57) {
+  else {
+	MatchThemeInput.checked = false;
+  }
+  if (beforeFF58) {
 	MatchThemeInput.disabled = true;
   }
 
@@ -1261,6 +1260,7 @@ function initialize () {
 	  let info = a_values[2];
 	  ffversion = info.version;
 	  beforeFF57 = (ffversion < "57.0");
+	  beforeFF58 = (ffversion < "58.0");
 	  beforeFF60 = (ffversion < "60.0");
 	  beforeFF63 = (ffversion < "63.0");
 

@@ -16,6 +16,7 @@
 //const BeforeFF57 = ((BuildID != "20100101") && (BuildID < "20171112125346"));
 //const BeforeFF63 = ((BuildID != "20100101") && (BuildID < "20181018182531"));
 let beforeFF57;
+let beforeFF58;
 let beforeFF60;
 let beforeFF62;
 let beforeFF63;
@@ -24,6 +25,7 @@ browser.runtime.getBrowserInfo()
 .then(function (info) {
   let ffversion = info.version;
   beforeFF57 = (ffversion < "57.0");
+  beforeFF58 = (ffversion < "58.0");
   beforeFF60 = (ffversion < "60.0");
   beforeFF62 = (ffversion < "62.0");
   beforeFF63 = (ffversion < "63.0");
@@ -67,10 +69,14 @@ const CvtCtx2 = CvtCanvas2.getContext("2d");
  */
 var ready = false; // Set to true when background initialization is done
 var platformOs;
+let isLinux = false; // To indicate we are under Linux, used for workaround on commands "suggested_key"
 //Retrieve Platform
 browser.runtime.getPlatformInfo()
 .then(function (info) {
   platformOs = info.os;
+  if (platformOs == "linux") {
+	isLinux = true;
+  }
 });
 
 //Declared in libstore.js
@@ -820,6 +826,24 @@ async function sortFolder (bnId) {
 }
 
 /*
+ * Record a multiple operation in History
+ * 
+ * op = String, nature of the operation ("create", "move", "remove" or "remove_tt")
+ *   note: "create" is unused today, because we cannot create a folder with all its children (recursive) in one go
+ *         Also, we do not know in advance the id of a bookmark to create, and cannot pass the id of the copied one
+ *         in a created bookmark, for relating to the is_multi record.
+ * id_list = Array of String identifying the bookmark Ids subject to the multiple action
+ */
+function recordHistoryMulti (op, id_list) {
+  let action;
+  if (op == "move")  action = HNACTION_BKMKMOVE;
+  else if (op == "remove")  action = HNACTION_BKMKREMOVE;
+  else if (op == "remove_tt")  action = HNACTION_BKMKREMOVETOTRASH;
+//  else if (op == "create")  action = HNACTION_BKMKCREATE;
+  historyListAdd(curHNList, action, true, id_list);
+}
+
+/*
  * Reload bookmarks from FF API for re-synchro (triggered by user, or auto-detected)
  * 
  * is_autoDetected = Boolean, true if this is provoked by BSP2 code, false if demanded by user 
@@ -889,7 +913,7 @@ function createBSP2TrashFolder () {
 }
 
 /*
- * Create BSP2 trash folder 
+ * Remove BSP2 trash folder 
  */
 function removeBSP2TrashFolder () {
   if (bsp2TrashFldrBNId != undefined) { // Only remove if present !
@@ -1202,6 +1226,9 @@ if (traceEnabled_option) {
 	  BN_folderClean(bsp2TrashFldrBN);
 	  // Save new current info
 	  saveBNList();
+	}
+	else if (msg.startsWith("recordHistoryMulti")) { // Record a multipple operation in hitory
+	  recordHistoryMulti(request.operation, request.id_list);
 	}
  
 	// Answer
@@ -2349,95 +2376,131 @@ function tabModified (tabId, changeInfo, tabInfo) {
 */
   if (tabInfo.status == "complete") {
 	let tabUrl = tabInfo.url;
-
 //console.log("A tab was updated 1 - tabUrl: "+tabUrl);
+	// Verify this is a searchable url - If not, we get exception:
+	//   Type error for parameter query (Value must either: be a string value, or .url must match the format "url")
 	if ((tabUrl != undefined)
-		&& (!tabUrl.startsWith("moz-extension://"))
-		&& (!tabUrl.startsWith("about:"))
-		&& (!tabUrl.startsWith("data:"))
-		&& (!tabUrl.startsWith("file:"))
 		&& (!tabUrl.startsWith("view-source:"))
-		&& (!tabUrl.startsWith("blob:"))
 	   ) {
-	  // Look for a bookmark matching the url
-	  if (tabUrl.startsWith("wyciwyg://")) { // Cached URL wyciwyg://x/....    Cf. https://en.wikipedia.org/wiki/WYCIWYG
-		// Find start of real URL, which is after the first "/" after "wyciwyg://x"
-		let pos = tabUrl.indexOf("/", 10) + 1;
-		tabUrl = tabUrl.substring(pos);
-	  }
-	  browser.bookmarks.search({url: tabUrl})
-	  .then(
-		function (a_BTN) { // An array of BookmarkTreeNode
-		  let len = a_BTN.length;
+	  try {
+		// Handle specific wyciwyg:// case
+		if (tabUrl.startsWith("wyciwyg://")) { // Cached URL wyciwyg://x/....    Cf. https://en.wikipedia.org/wiki/WYCIWYG
+		  // Find start of real URL, which is after the first "/" after "wyciwyg://x"
+		  let pos = tabUrl.indexOf("/", 10) + 1;
+		  tabUrl = tabUrl.substring(pos);
+		}
+		// Look for a bookmark matching the url
+//		browser.bookmarks.search({url: tabUrl})
+		browser.bookmarks.search(tabUrl) // Search workaround to avoid exceptions on about:, file: ... URLs, cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1352835
+		.then(
+		  function (a_BTN) { // An array of BookmarkTreeNode
+			let len = a_BTN.length;
 //console.log("A tab was updated 2 - tabUrl: "+tabUrl);
 //console.log("Results: "+len);
-		  if (len > 0) { // This is a bookmarked tab
-			// If there is a favicon and we are collecting them, refresh all BookmarkNodes with it
-			let tabFaviconUrl = tabInfo.favIconUrl;
-			let chgFaviconUrl = changeInfo.favIconUrl;
-			let chgStatus = changeInfo.status;
-			let is_refreshFav = !disableFavicons_option			// Ignore if disableFavicons_option is set
-/*								&& !pauseFavicons_option		// Ignore if pauseFavicons_option is set */
-								&& (tabFaviconUrl != undefined) // Need a favicon URI
-																// There was no favicon change, justa tab switch OR this is a tab reload with a new URL / favicon
-								&& (((chgFaviconUrl == undefined) && ((chgStatus == undefined) || (chgStatus == "complete")) && (changeInfo.title == undefined) && (changeInfo.url == undefined))		
-									|| (chgFaviconUrl == tabFaviconUrl) 
-								   )
-								;
-			let is_nofavicon = is_refreshFav
-							   && (tabFaviconUrl.startsWith("chrome://global/skin/icons/")); // Internal icon, we can't fetch it, security error
-			let bnId, foundBN_Id;
-			let BN;
-			for (let i=0 ; i<len ; i++) {
-			  bnId = a_BTN[i].id;
-			  BN = curBNList[bnId];
-			  if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
-				reloadFFAPI(true);
-				break;
-			  }
-			  if (!BN.inBSP2Trash && (foundBN_Id == undefined)) { // Keep only the first one not in trash
-				foundBN_Id = bnId;
-			  }
+			if (len > 0) { // This could be a bookmarked tab
+			  // If there is a favicon and we are collecting them, refresh all coorresponding BookmarkNodes with it
+			  let tabFaviconUrl = tabInfo.favIconUrl;
+			  let chgFaviconUrl = changeInfo.favIconUrl;
+			  let chgStatus = changeInfo.status;
+			  let is_refreshFav = !disableFavicons_option		  // Ignore if disableFavicons_option is set
+/*								  && !pauseFavicons_option		  // Ignore if pauseFavicons_option is set */
+								  && (tabFaviconUrl != undefined) // Need a favicon URI
+								  && (tabUrl != "about:blank")    // For something else than about:blank, which appears intermitently when relaoding a tab
+																  // There was no favicon change, just a tab switch OR this is a tab reload with a new URL / favicon
+								  && (((chgFaviconUrl == undefined) && ((chgStatus == undefined) || (chgStatus == "complete")) && (changeInfo.title == undefined) && (changeInfo.url == undefined))		
+									  || (chgFaviconUrl == tabFaviconUrl) 
+									 )
+								  ;
+			  let bnId, foundBN_Id;
+			  let BN;
+			  let is_nofavicon = undefined;
+			  for (let i=0 ; i<len ; i++) {
+				bnId = a_BTN[i].id;
+				BN = curBNList[bnId];
+				if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
+				  reloadFFAPI(true);
+				  break;
+				}
+				if (!BN.inBSP2Trash && (BN.url == tabUrl)) { // Only the ones not in trash
+															 // + protection against too wide result because of Search workaround above
+				  if (foundBN_Id == undefined) { // Keep only the first one
+					foundBN_Id = bnId;
+				  }
 //console.log("Matching BTN.id: "+bnId+" "+a_BTN[i].url+" foundBN_Id: "+foundBN_Id);
-			  // Load the favicon as a data: URI
-			  if (is_refreshFav) {
-				if (is_nofavicon) {
-				  setNoFavicon(bnId);
-//console.log("Set no favicon: "+tabFaviconUrl);
-				}
-				else if (tabFaviconUrl.startsWith("data:")) { // Cool, already in good format for us !
-				  setFavicon(bnId, tabFaviconUrl);
+				  // Load the favicon as a data: URI
+				  if (is_refreshFav) {
+					if (tabFaviconUrl.startsWith("data:")) { // Cool, already in good format for us !
+					  setFavicon(bnId, tabFaviconUrl);
 //console.log("Directly set favicon: "+tabFaviconUrl);
-				}
-				else { // Fetch favicon
-				  // Presumably a bookmark, so no need for cloneBTN(), there is no tree below
-//				  faviconWorker.postMessage(["iconurl", bnId, tabFaviconUrl, enableCookies_option]);
-				  faviconWorkerPostMessage({data: ["iconurl", bnId, tabFaviconUrl, enableCookies_option]});
+					}
+					else {
+					  // Verify this is a collectable favicon
+					  if (is_nofavicon == undefined) {
+						is_nofavicon = (tabFaviconUrl.startsWith("chrome://global/skin/icons/")) // Internal icon, we can't fetch it, security error
+									   || (tabUrl.startsWith("moz-extension://"))
+									   || (tabUrl.startsWith("about:"))
+									   || (tabUrl.startsWith("data:"))
+									   || (tabUrl.startsWith("file:"))
+									   || (tabUrl.startsWith("blob:"))
+									   ;
+					  }
+					  if (is_nofavicon) {
+						setNoFavicon(bnId);
+//console.log("Set no favicon: "+tabFaviconUrl);
+					  }
+					  else { // Fetch favicon
+						// Presumably a bookmark, so no need for cloneBTN(), there is no tree below
+//						faviconWorker.postMessage(["iconurl", bnId, tabFaviconUrl, enableCookies_option]);
+						faviconWorkerPostMessage({data: ["iconurl", bnId, tabFaviconUrl, enableCookies_option]});
 //console.log("Retrieval demand sent for favicon: "+tabFaviconUrl);
+					  }
+					}
+				  }
 				}
 			  }
+			  // Show a bookmarked BSP2 star for this tab, if there is a corresponding bookmark not in BSP2 trash
+			  if (foundBN_Id != undefined) {
+				browser.browserAction.setIcon(
+				  {path: "icons/star2bkmked.png",
+				   tabId: tabId
+				  }
+				);
+			  }
+			  else { // Reset to unbookmarked BSP2 icon
+				browser.browserAction.setIcon(
+				  {tabId: tabId
+				  }
+				);
+			  }
 			}
-			// Show a bookmarked BSP2 star for this tab, if there is a corresponding bookmark not in BSP2 trash
-			if (foundBN_Id != undefined) {
-			  browser.browserAction.setIcon(
-				{path: "icons/star2bkmked.png",
-				 tabId: tabId
-				}
-			  );
-			}
-			else { // Reset to global BSP2 icon
+			else { // Reset to unbookmarked BSP2 icon
 			  browser.browserAction.setIcon(
 				{tabId: tabId
 				}
 			  );
 			}
 		  }
-		  else { // Reset to global BSP2 icon
-			browser.browserAction.setIcon(
-			  {tabId: tabId
-			  }
-			);
+		);
+	  } catch (err) {
+		// Reset to unbookmarked BSP2 icon
+		browser.browserAction.setIcon(
+		  {tabId: tabId
 		  }
+		);
+
+		let msg = "Error in searching url "+tabUrl+" on tabModified : "+err;
+		console.log(msg);
+		if (err != undefined) {
+		  let fn = err.fileName;
+		  if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+		  console.log("fileName:   "+fn);
+		  console.log("lineNumber: "+err.lineNumber);
+		}
+	  }
+	}
+	else { // Reset to unbookmarked BSP2 icon
+	  browser.browserAction.setIcon(
+		{tabId: tabId
 		}
 	  );
 	}
@@ -2966,12 +3029,26 @@ readFullLStore(false, trace)
   function () {
 	// Set shortcut if different from default
 	trace("sidebarCommand_option: "+sidebarCommand_option, true);
-	if ((sidebarCommand_option != undefined) && !beforeFF60) {
-	  browser.commands.update(
-		{name: "_execute_sidebar_action",
-		 shortcut: sidebarCommand_option
-		}
-	  );
+	if (sidebarCommand_option == undefined) {
+	  // Workaround the fact that manifest.json "suggested_key" in "commands" cannot contain "Alt" before FF63
+	  // Indeed, default key for Linux is "Ctrl+Alt+B", but this fails the add-on load for FF < 63, so default
+	  // in manifest is set to "Ctrl+Shift+B" in Linux, which conflicts with FF reserved combinations later on.
+	  if (!beforeFF63 && isLinux) {
+		browser.commands.update(
+		  {name: "_execute_sidebar_action",
+		   shortcut: "Ctrl+Alt+B"
+		  }
+	    );
+	  }
+	}
+	else {
+	  if (!beforeFF60) {
+		browser.commands.update(
+		  {name: "_execute_sidebar_action",
+		   shortcut: sidebarCommand_option
+		  }
+		);
+	  }
 	}
 
 	// If we got savedBNList, rebuild it

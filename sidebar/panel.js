@@ -98,7 +98,6 @@ const Migr16x16Timeout = 60000; // Time to wait before triggering 16x16 favicon 
 let beforeFF57;
 let beforeFF58;
 let beforeFF64;
-let beforeFF71;
 let ffversion;
 let p_ffversion = browser.runtime.getBrowserInfo();
 
@@ -112,6 +111,7 @@ const MGlassImg = document.querySelector("#mglass"); // Assuming it is an HTMLIm
 const MGlassImgStyle = MGlassImg.style;
 const SearchTextInput = document.querySelector("#searchtext"); // Assuming it is an HTMLInputElement
 const SearchDatalist = document.querySelector("#searchlist"); // Assuming it is an HTMLDataListElement
+const SearchListMax = 5; // Must be >= 3
 const CancelSearchInput = document.querySelector("#cancelsearch"); // Assuming it is an HTMLInputElement
 const SearchResult = document.querySelector("#searchresult"); // Assuming it is an HTMLDivElement
 const Bookmarks = document.querySelector("#bookmarks"); // Assuming it is an HTMLDivElement
@@ -129,6 +129,10 @@ const MyRShowBkmkMenuStyle = MyRShowBkmkMenu.style;
 const MyRFldrMenu = document.querySelector("#myrfldrmenu");
 const MyRFldrMenuStyle = MyRFldrMenu.style;
 const MyRFldrMenuGoParent = document.querySelector("#myrfldrmenugoparent");
+const MyRFldrMenuCut = document.querySelector("#myrfldrmenucut");
+const MyRFldrMenuCopy = document.querySelector("#myrfldrmenucopy");
+const MyRMultMenu = document.querySelector("#myrmultmenu");
+const MyRMultMenuStyle = MyRMultMenu.style;
 const MyBBkmkMenu = document.querySelector("#mybbkmkmenu");
 const MyBBkmkMenuStyle = MyBBkmkMenu.style;
 const MyBBkmkMenuPaste = document.querySelector("#mybbkmkmenupaste");
@@ -148,6 +152,8 @@ const MyBResFldrMenuPasteInto = document.querySelector("#mybresfldrmenupasteinto
 const MyBSepMenu = document.querySelector("#mybsepmenu");
 const MyBSepMenuStyle = MyBSepMenu.style;
 const MyBSepMenuPaste = document.querySelector("#mybsepmenupaste");
+const MyBMultMenu = document.querySelector("#mybmultmenu");
+const MyBMultMenuStyle = MyBMultMenu.style;
 const MyBProtMenu = document.querySelector("#mybprotmenu");
 const MyBProtMenuStyle = MyBProtMenu.style;
 const MyBProtFMenu = document.querySelector("#mybprotfmenu");
@@ -181,7 +187,9 @@ const DfltMenuSize = 150;
 const DfltMenuSizeLinux = 170;
 const OpenFolderTimeout = 1000; // Wait time in ms for opening a closed folder, when dragging over it
 
-const SelectHighlight = "selbrow"; // select highlight class name in CSS
+const SelectHighlight = "selbrow"; // Bookmark select highlight class name in CSS
+const RSelectHighlight = "rselbrow"; // Result bookmark select highlight class name in CSS
+const CursorHighlight = "curbrow"; // cursor highlight class name in CSS
 const HighlightTextColor = "#222426"; // Text color used when hovering or focusing a cell (or dragging over a folder)
 const Reshidden = "reshidden"; // reshidden class name in CSS, to remember a shown row was hidden before show
 const BScrollOk = "bscrollok"; // scrollok class name in CSS, to enable Bookmarks scrolling
@@ -413,27 +421,43 @@ let isResultMenu = false; // Indicate if current open context menu is in result 
 let myRBkmkMenu_open = false;
 let myRShowBkmkMenu_open = false;
 let myRFldrMenu_open = false;
+let myRMultMenu_open = false;
 let myBBkmkMenu_open = false;
 let myBResBkmkMenu_open = false;
 let myBFldrMenu_open = false;
 let myBResFldrMenu_open = false;
 let myBSepMenu_open = false;
+let myBMultMenu_open = false;
 let myBProtMenu_open = false;
 let myBProtFMenu_open = false;
 let myMGlassMenu_open = false;
-let cursor = {
-	  cell: null, // Current cursor on a row in bookmarks panel = cell, null if none selected
-	  bnId: undefined // BN Id of bookmark under cursor in bookmarks panel
-	};
-let rcursor = {
-	  cell: null, // Current cursor on a row in bookmarks panel = cell, null if none selected
-	  bnId: undefined // BN Id of bookmark under cursor in bookmarks panel
-	};
-let bkmkSelectIds = []; // List (ordered) of selected Bookmark Id(s), [] if empty
-let rbkmkSelectIds = []; // List (ordered) of selected result Bookmark Id(s), [] if empty
+let cursor = { // Cursor Object
+  cell: null, // Current cursor on a row in bookmarks panel = cell, null if none selected
+  bnId: undefined // BN Id of bookmark under cursor in bookmarks panel
+};
+let selection = { // Selection Object
+  selectHighlight: SelectHighlight, // Class used for marking selection
+  lastCell: null, // Last bookmark cell on which a "click" (select or clear) operation was applied
+  is_select: true, // true if last action is a select operation, false if it is an unselect/clear
+  selectCells: [], // List (ordered) of selected cell(s), [] if empty
+  selectIds: [] // List (ordered) of selected Bookmark Id(s), [] if empty
+};
+let rcursor = { // Results cursor Object
+  cell: null, // Current cursor on a row in bookmarks panel = cell, null if none selected
+  bnId: undefined // BN Id of bookmark under cursor in bookmarks panel
+};
+let rselection = { // Results selection Object
+  selectHighlight: RSelectHighlight, // Class used for marking selection
+  lastCell: null, // Last bookmark cell on which a "click" (select or clear) operation was applied
+  is_select: true, // true if last action is a select operation, false if it is an unselect/clear
+  selectCells: [], // List (ordered) of selected result cell(s), [] if empty
+  selectIds: [] // List (ordered) of selected result Bookmark Id(s), [] if empty
+};
+let selHighlightRule = "."+SelectHighlight; // Corresponding CSS rule name
+let rselHighlightRule = "."+RSelectHighlight; // Corresponding CSS rule name
 let bkmkClipboardIds = []; // Unique list of copied or cut Bookmark Id(s), [] if empty
 let bkmkClipboard = []; // Unique list of copied or cut BookmarkNode(s), [] if empty
-let isClipboardOpCut = undefined; // Boolean, false if copy operation, true if cut, undefined if empty clipboard
+let isClipboardOpCut = undefined; // Boolean, false if copy operation ongoing, true if cut, undefined if empty clipboard
 let bkmkDragIds = []; // Unique list of dragged Bookmark Id(s), [] if empty
 let bkmkDrag = []; // Unique list of dragged BookmarkNode(s), [] if empty
 
@@ -615,64 +639,144 @@ function appendResult (BN) {
 }
 
 /*
- * Remove highlight from cursor cell, reomve from selection, if there is one.
- * Clear cursor
+ * Remove cursor and selection, if there are.
  *
  * cursor = Object describing cursor to manipulate
- * selectedIds = list (Array) of ids of selected bookmark items
- * is_remove = Boolean, if true, only remove cursor from selection, if false clear all selection
+ * selection = Object describing the selection to manipulate
  */
-function clearCellHighlight (cursor, selectedIds, is_remove = false) {
+function cancelCursorSelection (cursor, selection) {
+  // Clear cursor
   let cellCursor = cursor.cell;
   if (cellCursor != null) {
-	// Clear highlight and selection
-	cellCursor.classList.replace(SelectHighlight, "brow");
 	if (cellCursor.classList.contains(Reshidden)) {
 	  cellCursor.classList.remove(Reshidden);
 	}
-	if (is_remove) {
-	  let i = selectedIds.indexOf(cursor.bnId);
-	  if (i >= 0) {
-		selectedIds.splice(i, 1);
-	  }
-	}
-	else {
-	  selectedIds.length = 0;
-	}
-	// Clear cursor
-	cursor.cell = null;
-	cursor.bnId = undefined;
+	cellCursor.classList.remove(CursorHighlight);
   }
-  else {
-	selectedIds.length = 0;
+  // Clear selection
+  let cells = selection.selectCells;
+  let len = cells.length;
+  if (len > 0) {
+	let selectHighlight = selection.selectHighlight;
+	for (let i=0 ; i<len ; i++) {
+	  cells[i].classList.replace(selectHighlight, "brow");
+	}
+	cells.length = 0;
+	selection.selectIds.length = 0;
+
+	// Clear last select operation
+	selection.lastCell = null;
+	selection.is_select = true;
   }
 }
 
 /*
- * Move cursor to new cell, remember current cursor bnId for next FF or sidebar reopen.
- * Set cell highlight on new cell and add to bookmark selection
- * 
- * cursor = Object describing cursor to manipulate
+ * Manage selection and cursor on a cell action/move, as well as selection list of bookmark items
+ * In details, move cursor to new cell, remember current cursor bnId for next FF or sidebar reopen,
+ * set cell highlighting, manage selection lists.
+ *
  * cell = .brow cell to set. Preserve the Reshidden flag if cellCursor is not changing.
- * selectedIds = list (Array) of ids of selected bookmark items
- * is_add = Boolean, if true, add to selection, if false replace selection
+ * cursor = Object describing cursor to manipulate
+ * selection = Object describing the selection to manipulate
+ * is_click = Boolean, if true, tells that a "click" (typically blank or mouse click) action was made
+ * is_keep = Boolean, if true, tells that this is keeping last selection and adding to it (typically Ctrl key)
+ * is_range = Boolean, if true, tells that this is not just a point click, but a range click from last "click" operation (typically Shift key)
  */
-function setCellHighlight (cursor, cell, selectedIds, is_add = false) {
-  if (cell != cursor.cell) {
-	clearCellHighlight(cursor, selectedIds, is_add);
+function addCellCursorSelection (cell, cursor, selection, is_click = true, is_keep = false, is_range = false) {
+  // If range, impose no click, except when lastCell is null (this allows to modify current range extent with mouse, like on keyboard)
+  // If no range and no keep, impose click (can happen on keyboard, but means nothing)
+  let lastCell = selection.lastCell;
+  if (is_range) {
+	is_click = (lastCell == null);
+  }
+  else {
+	is_click = is_click || !is_keep; // "||=" operator is not supported in all FF versions
+  }
+
+  // Move cursor if not already on cell
+  let row = cell.parentElement;
+  let bnId = row.dataset.id;
+  let cellCursor = cursor.cell;
+  if (cell != cellCursor) {
+	if (cellCursor != null) {
+	  cellCursor.classList.remove(CursorHighlight);
+	}
 	// Set cursor
 	cursor.cell = cell;
-	let bnIdCursor = cursor.bnId = cell.parentElement.dataset.id;
+	cell.classList.add(CursorHighlight);
+	cursor.bnId = bnId;
 	// Save cursor position
 	if (backgroundPage == undefined) {
-	  sendAddonMsgCurBnId(bnIdCursor);
+	  sendAddonMsgCurBnId(bnId);
 	}
 	else {
-	  backgroundPage.saveCurBnId(myWindowId, bnIdCursor);
+	  backgroundPage.saveCurBnId(myWindowId, bnId);
 	}
-	// Set highlight and bookmark selection
-	cell.classList.replace("brow", SelectHighlight);
-	selectedIds.push(bnIdCursor); // If is_add is false, selectedIds was already emptied by clearCellHighlight()
+  }
+
+  // Manage current selection state if any
+  let cells = selection.selectCells;
+  let selectHighlight = selection.selectHighlight;
+  let len = cells.length;
+  if (!is_keep && (len > 0)) { // Do not keep => clear current selection
+	for (let i=0 ; i<len ; i++) {
+	  cells[i].classList.replace(selectHighlight, "brow");
+	}
+	len = cells.length = 0;
+	selection.selectIds.length = 0;
+  }
+
+  // Manage selection operation, and last position
+  let is_select;
+  if (is_click) {
+	lastCell = selection.lastCell = cell;
+	if (is_keep) {
+	  // Refresh is_select function of cell state
+	  is_select = !cell.classList.contains(selectHighlight);
+	}
+	else {
+	  is_select = true;
+	}
+	selection.is_select = is_select;
+  }
+  else {
+	is_select = selection.is_select;
+  }
+
+  // Manage selection with regards to cell, with selection operation (select or unselect)
+  if (is_click || is_range) {
+	// Select or unselect all visible rows between lastCell and cell
+	let end = lastCell.parentElement;
+	if (row.rowIndex > end.rowIndex) {
+	  let tmp = row;
+	  row = end;
+	  end = tmp;
+	}
+	let ids = selection.selectIds;
+	while (true) { // Dirty trick to avoid testing twice (= inside the loop and at end) as we can't use > or <
+	  if (!row.hidden) {
+		cell = row.firstElementChild;
+		let i = cells.indexOf(cell);
+		if (is_select) {
+		  cell.classList.add(selectHighlight);
+		  if (i < 0) {
+			cells.push(cell);
+			ids.push(row.dataset.id);
+		  }
+		}
+		else {
+		  cell.classList.remove(selectHighlight);
+		  if (i >= 0) {
+			cells.splice(i, 1);
+			ids.splice(i, 1);
+		  }
+		}
+	  }
+	  if (row == end) {
+		break;
+	  }
+	  row = row.nextElementSibling;
+	}
   }
 }
 
@@ -809,7 +913,8 @@ function displayResults (a_BTN) {
 //	resultsFragment = null;
 
 	// If a row cell was highlighted, do not highlight it anymore
-	clearCellHighlight(rcursor, rbkmkSelectIds);
+//	clearCellHighlight(rcursor, rlastSelOp, rselection.selectIds);
+	cancelCursorSelection(rcursor, rselection);
   }
 
   // Create search results table
@@ -858,24 +963,31 @@ function updateSearchList (text) {
   let len = options.length;
   // Find if text is already in history
   let i;
+  let option;
+  let value;
   for (i=0 ; i<len ; i++) {
-	if (options[i].value == text)
+	if (text.includes(value = (option = options[i]).value)
+		|| value.includes(text))
 	  break;
   }
   if (i >= len) { // Not found, add it
-	let option;
-	if (len < 3) { // Simply append at front
+	if (len < SearchListMax) { // Simply append at front
 	  option = document.createElement("option");
 	  option.value = text;
 	  SearchDatalist.prepend(option);
 	}
 	else { // Shift values down to make room at top
-	  option = options[2];
+	  option = options[SearchListMax-1];
 	  let prev;
-	  for (i=1 ; i>=0 ; i--) {
+	  for (i=SearchListMax-2 ; i>=0 ; i--) {
 		option.value = (prev = options[i]).value;
 		option = prev;
 	  }
+	  option.value = text;
+	}
+  }
+  else { // Found, keep the most specific one
+	if (text.length > value.length) {
 	  option.value = text;
 	}
   }
@@ -910,7 +1022,8 @@ function updateSearch () {
 //	  resultsFragment = null;
 
 	  // If a row cell was highlighted, do not highlight it anymore
-	  clearCellHighlight(rcursor, rbkmkSelectIds);
+//	  clearCellHighlight(rcursor, rlastSelOp, rselection.selectIds);
+	  cancelCursorSelection(rcursor, rselection);
 	}
 
 	// Display waiting for results icon
@@ -1085,7 +1198,8 @@ function manageSearchTextHandler () {
 	}
 
 	// If a row was highlighted, do not highlight it anymore
-	clearCellHighlight(rcursor, rbkmkSelectIds);
+//	clearCellHighlight(rcursor, rlastSelOp, rselection.selectIds);
+	cancelCursorSelection(rcursor, rselection);
 
 	// Restore bookmarks tree to its initial visibility state
 	resetTreeVisiblity();
@@ -1727,7 +1841,8 @@ function removeBkmks (row, cleanup) {
   if (cursor.cell == row.firstElementChild) {
 	// Clear cursor if that is the deleted row to avoid
 	// problems later when moving cursor
-	clearCellHighlight(cursor, bkmkSelectIds);
+//	clearCellHighlight(cursor, lastSelOp, selection.selectIds);
+	cancelCursorSelection(cursor, selection);
   }
   if (row.dataset.type == "folder") {
 	isOtherThanSeparatorRemoved = true;
@@ -2221,7 +2336,8 @@ function showRow (srcBnId, srcRow) {
   }
 
   // Set/move cursor on the source cell + highlight it
-  setCellHighlight(cursor, srcRow.firstElementChild, bkmkSelectIds);
+//  setCellHighlight(cursor, lastSelOp, srcRow.firstElementChild, selection.selectIds);
+  addCellCursorSelection(srcRow.firstElementChild, cursor, selection);
   // Get row into view
   // BUG: "smooth" has a bug when the viewport content is modified, it points at the origin position before modification
   // See https://bugzilla.mozilla.org/show_bug.cgi?id=1139745
@@ -2572,6 +2688,7 @@ function handleFolderClick (twistie) {
 
 /*
  * Receive mouse down event on results table
+ * Note that buttons 1 (middle click) and 2 (right click) also go here
  *
  * e is of type MouseEvent (click)
  */
@@ -2595,8 +2712,20 @@ function resultsMouseDownHandler (e) {
 	}
 
 	// Select result item if recognized
+	// , and if not already selected=> keep bigger multi-items selection area if right click inside it 
 	if (cell != undefined) {
-	  setCellHighlight(rcursor, cell, rbkmkSelectIds);
+	  let button = e.button;
+	  // Do nothing on selection if this is a right click inside a selection range
+	  if ((button != 2) || !cell.classList.contains(rselection.selectHighlight)) {
+//		setCellHighlight(rcursor, rlastSelOp, cell, rselection.selectIds);
+		if (button == 1) { // If middle click, simple select, no multi-select
+		  addCellCursorSelection(cell, rcursor, rselection);
+		}
+		else {
+		  let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
+		  addCellCursorSelection(cell, rcursor, rselection, true, is_ctrlKey, e.shiftKey);
+		}
+	  }
 	}
   }
 }
@@ -2698,7 +2827,8 @@ function resultsMouseHandler (e) {
 }
 
 /*
- * Receive mouse down event on bookmarks table
+ * Receive mouse down event on bookmarks table.
+ * Note that buttons 1 (middle click) and 2 (right click) also go here
  *
  * e is of type MouseEvent (click)
  */
@@ -2721,7 +2851,23 @@ function bkmkMouseDownHandler (e) {
 
 	// Select bookmark item if recognized
 	if (cell != undefined) {
-	  setCellHighlight(cursor, cell, bkmkSelectIds);
+	  let is_shiftKey = e.shiftKey;
+	  let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
+	  let button = e.button;
+	  // Do not modify selection if click is inside, and if this is a right click
+	  //  or if this is a left click with no modifier (to allow for dragging the selection)
+	  if ((button == 1)
+		  || !cell.classList.contains(selection.selectHighlight)
+		  || ((button != 2) && (is_ctrlKey || is_shiftKey))
+		 ) {
+//		setCellHighlight(rcursor, lastSelOp, cell, selection.selectIds);
+		if (button == 1) { // If middle click, simple select, no multi-select
+		  addCellCursorSelection(cell, cursor, selection);
+		}
+		else {
+		  addCellCursorSelection(cell, cursor, selection, true, is_ctrlKey, is_shiftKey);
+		}
+	  }
 	}
   }
 }
@@ -2739,25 +2885,42 @@ function bkmkMouseHandler (e) {
   // The click target is one of .brow/.selbrow cell, .bkmkitem_x div,
   // .twistiexx img (if folder), .favseparator/.favseparatorend div, .favicon or .favttext
   // Act only if the user clicked on .bkmkitem_x, .twistieax, .favicon or .favtext
-  // If twistie, favicon or favtext, get parent instead to handle click
+  // If twistie, favicon or favtext, get parent instead (which is a .bkmkitem_x div)
+  // to handle click
   // Cannot be scrollbars when left mouse click
+  let cell;
   if (className.includes("fav") || className.startsWith("twistie")) {
 	target = target.parentElement;
+	cell = target.parentElement;
 	className = target.className;
   }
-  else if (e.altKey) { // If Alt is pressed on bookmark, open in current tab wherever we click
-	if ((className.includes("brow"))
-		&& (target.parentElement.dataset.type == "bookmark")) {
+  else if (className.startsWith("bkmkitem_")) {
+	cell = target.parentElement;
+  }
+  else if (className.includes("brow")) {
+	cell = target;
+	// If Alt is pressed on bookmark, open in current tab wherever we click, so retarget to the .bkmkitem_x div 
+	if (e.altKey && (target.parentElement.dataset.type == "bookmark")) {
 	  target = target.firstElementChild;
 	  className = target.className;
 	}
   }
+
+  // Adjust selection to a simple select if we are inside one and there is no modifier
+  let is_shiftKey = e.shiftKey;
+  let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
+  if (cell.classList.contains(selection.selectHighlight)
+	  && !is_ctrlKey && !is_shiftKey
+	 ) {
+	addCellCursorSelection(cell, cursor, selection);
+  }
+
+  // Do action corresponding to click and modifiers
   if (className == "bkmkitem_b") { // An HTMLDivElement
 	e.preventDefault(); // We do not want the left click to open in a new tab ..
 						// but in the active tab
 	let href = target.href;
 	if ((href != undefined) && (href.length > 0)) {
-	  let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
 	  // Respect the about:config browser.tabs.loadBookmarksInTabs setting
 	  if (openBookmarksInNewTabs_option) { // If option set, open in new tab at end
 		browser.tabs.create({url: href});
@@ -2788,7 +2951,7 @@ function bkmkMouseHandler (e) {
   // If folder bkmkitem with active twistie, handle folder click
   else if (className == "bkmkitem_f") {
 	if (traceEnabled_option && e.altKey) {
-	  let bnId = target.parentElement.parentElement.dataset.id;
+	  let bnId = cell.parentElement.dataset.id;
 	  if ((bnId == mostVisitedBNId) || (bnId == recentTagBNId) || (bnId == recentBkmkBNId)) {
 		// Special trick .. if traces are enabled, authorize this .. with href = "" or SelfURL, it will
 		// load the add-on itself in the window tab.
@@ -2955,9 +3118,10 @@ function drawMenu (menu, posY, posX) {
 	}
 
   // Display the context menu at calculated position
-  menu.style.top = posY + "px";
-  menu.style.left = posX + "px";
-  menu.style.visibility = "visible";
+  let mstyle = menu.style;
+  mstyle.top = posY + "px";
+  mstyle.left = posX + "px";
+  mstyle.visibility = "visible";
 }
 
 /*
@@ -2970,68 +3134,68 @@ function clearMenu () {
 
   if (myRBkmkMenu_open) {
 	menuClosed = true;
-    MyRBkmkMenuStyle.visibility = "hidden";
-    myRBkmkMenu_open = false;
+	MyRBkmkMenuStyle.visibility = "hidden";
+	myRBkmkMenu_open = false;
   }
-
-  if (myRShowBkmkMenu_open) {
+  else if (myRShowBkmkMenu_open) {
 	menuClosed = true;
 	MyRShowBkmkMenuStyle.visibility = "hidden";
 	myRShowBkmkMenu_open = false;
   }
-
-  if (myRFldrMenu_open) {
+  else if (myRFldrMenu_open) {
 	menuClosed = true;
-    MyRFldrMenuStyle.visibility = "hidden";
-    myRFldrMenu_open = false;
+	MyRFldrMenuStyle.visibility = "hidden";
+	myRFldrMenu_open = false;
   }
-
-  if (myBBkmkMenu_open) {
+  else if (myRMultMenu_open) {
 	menuClosed = true;
-    MyBBkmkMenuStyle.visibility = "hidden";
-    myBBkmkMenu_open = false;
+	MyRMultMenuStyle.visibility = "hidden";
+	myRMultMenu_open = false;
   }
-
-  if (myBResBkmkMenu_open) {
+  else if (myBBkmkMenu_open) {
 	menuClosed = true;
-    MyBResBkmkMenuStyle.visibility = "hidden";
-    myBResBkmkMenu_open = false;
+	MyBBkmkMenuStyle.visibility = "hidden";
+	myBBkmkMenu_open = false;
   }
-
-  if (myBFldrMenu_open) {
+  else if (myBResBkmkMenu_open) {
 	menuClosed = true;
-    MyBFldrMenuStyle.visibility = "hidden";
-    myBFldrMenu_open = false;
+	MyBResBkmkMenuStyle.visibility = "hidden";
+	myBResBkmkMenu_open = false;
   }
-
-  if (myBResFldrMenu_open) {
+  else if (myBFldrMenu_open) {
 	menuClosed = true;
-    MyBResFldrMenuStyle.visibility = "hidden";
-    myBResFldrMenu_open = false;
+	MyBFldrMenuStyle.visibility = "hidden";
+	myBFldrMenu_open = false;
   }
-
-  if (myBSepMenu_open) {
+  else if (myBResFldrMenu_open) {
 	menuClosed = true;
-    MyBSepMenuStyle.visibility = "hidden";
-    myBSepMenu_open = false;
+	MyBResFldrMenuStyle.visibility = "hidden";
+	myBResFldrMenu_open = false;
   }
-
-  if (myBProtMenu_open) {
+  else if (myBSepMenu_open) {
 	menuClosed = true;
-    MyBProtMenuStyle.visibility = "hidden";
-    myBProtMenu_open = false;
+	MyBSepMenuStyle.visibility = "hidden";
+	myBSepMenu_open = false;
   }
-
-  if (myBProtFMenu_open) {
+  else if (myBMultMenu_open) {
 	menuClosed = true;
-    MyBProtFMenuStyle.visibility = "hidden";
-    myBProtFMenu_open = false;
+	MyBMultMenuStyle.visibility = "hidden";
+	myBMultMenu_open = false;
   }
-
-  if (myMGlassMenu_open) {
+  else if (myBProtMenu_open) {
+	menuClosed = true;
+	MyBProtMenuStyle.visibility = "hidden";
+	myBProtMenu_open = false;
+  }
+  else if (myBProtFMenu_open) {
+	menuClosed = true;
+	MyBProtFMenuStyle.visibility = "hidden";
+	myBProtFMenu_open = false;
+  }
+  else if (myMGlassMenu_open) {
 	menuClosed = true;
 	MyMGlassMenuStyle.visibility = "hidden";
-    myMGlassMenu_open = false;
+	myMGlassMenu_open = false;
   }
 
   myMenu_open = isResultMenu = false;
@@ -3043,6 +3207,39 @@ function clearMenu () {
  * 
  * e is of type MouseEvent (contextmenu)
  */
+/*
+const MyRShowBkmkMenu = document.querySelector("#myrshowbkmkmenu");
+const MyRShowBkmkMenuStyle = MyRShowBkmkMenu.style;
+const MyRFldrMenu = document.querySelector("#myrfldrmenu");
+const MyRFldrMenuStyle = MyRFldrMenu.style;
+const MyRFldrMenuGoParent = document.querySelector("#myrfldrmenugoparent");
+const MyRFldrMenuCut = document.querySelector("#myrfldrmenugoparent");
+const MyRFldrMenuCopy = document.querySelector("#myrfldrmenucut");
+const MyBBkmkMenu = document.querySelector("#myrfldrmenucopy");
+const MyBBkmkMenuStyle = MyBBkmkMenu.style;
+const MyBBkmkMenuPaste = document.querySelector("#mybbkmkmenupaste");
+const MyBBkmkMenuFavicon = document.querySelector("#mybbkmkmenufavicon");
+const MyBResBkmkMenu = document.querySelector("#mybresbkmkmenu");
+const MyBResBkmkMenuStyle = MyBResBkmkMenu.style;
+const MyBResBkmkMenuPaste = document.querySelector("#mybresbkmkmenupaste");
+const MyBResBkmkMenuFavicon = document.querySelector("#mybresbkmkmenufavicon");
+const MyBFldrMenu = document.querySelector("#mybfldrmenu");
+const MyBFldrMenuStyle = MyBFldrMenu.style;
+const MyBFldrMenuPaste = document.querySelector("#mybfldrmenupaste");
+const MyBFldrMenuPasteInto = document.querySelector("#mybfldrmenupasteinto");
+const MyBResFldrMenu = document.querySelector("#mybresfldrmenu");
+const MyBResFldrMenuStyle = MyBResFldrMenu.style;
+const MyBResFldrMenuPaste = document.querySelector("#mybresfldrmenupaste");
+const MyBResFldrMenuPasteInto = document.querySelector("#mybresfldrmenupasteinto");
+const MyBSepMenu = document.querySelector("#mybsepmenu");
+const MyBSepMenuStyle = MyBSepMenu.style;
+const MyBSepMenuPaste = document.querySelector("#mybsepmenupaste");
+const MyBProtMenu = document.querySelector("#mybprotmenu");
+const MyBProtMenuStyle = MyBProtMenu.style;
+const MyBProtFMenu = document.querySelector("#mybprotfmenu");
+const MyBProtFMenuStyle = MyBProtFMenu.style;
+const MyBProtFMenuPasteInto = document.querySelector("#mybprotfmenupasteinto");
+*/
 function resultsContextHandler (e) {
   let target = e.target; // Type depends ..
 //console.log("Result context event: "+e.type+" target: "+target+" class: "+target.classList);
@@ -3085,7 +3282,11 @@ function resultsContextHandler (e) {
 	let menu;
 //trace("Row: "+row+" rowIndex: "+rowIndex+" type: "+type);
 	if (beforeFF64) { // Use our built-in menus
-	  if (type == "bookmark") {
+	  if (rselection.selectIds.length > 1) { // Menu for multiple selection
+		myMenu_open = isResultMenu = myRMultMenu_open = true;
+		menu = MyRMultMenu;
+	  }
+	  else if (type == "bookmark") { // Menu for single bookmark
 		if (isShowBkmkMenu) {
 		  myMenu_open = isResultMenu = myRShowBkmkMenu_open = true;
 		  menu = MyRShowBkmkMenu;
@@ -3095,7 +3296,7 @@ function resultsContextHandler (e) {
 		  menu = MyRBkmkMenu;
 		}
 	  }
-	  else { // Menu for "folder"
+	  else { // Menu for single folder
 		myMenu_open = isResultMenu = myRFldrMenu_open = true;
 		menu = MyRFldrMenu;
 
@@ -3104,10 +3305,18 @@ function resultsContextHandler (e) {
 		if ((BN_id == PersonalToobar) || (BN_id == BookmarksMenu) || (BN_id == OtherBookmarks) || (BN_id == MobileBookmarks)) {
 		  if (MyRFldrMenuGoParent.className == "menugoparent")
 			MyRFldrMenuGoParent.className = "menudisabled";
+		  if (MyRFldrMenuCut.className == "menucut")
+			MyRFldrMenuCut.className = "menudisabled";
+		  if (MyRFldrMenuCopy.className == "menucopy")
+			MyRFldrMenuCopy.className = "menudisabled";
 		}
 		else {
 		  if (MyRFldrMenuGoParent.className == "menudisabled")
 			MyRFldrMenuGoParent.className = "menugoparent";
+		  if (MyRFldrMenuCut.className == "menudisabled")
+			MyRFldrMenuCut.className = "menucut";
+		  if (MyRFldrMenuCopy.className == "menudisabled")
+			MyRFldrMenuCopy.className = "menucopy";
 		}
 	  }
 
@@ -3118,8 +3327,7 @@ function resultsContextHandler (e) {
 	  drawMenu(menu, e.clientY, e.clientX);
 	}
 	else { // Use integrated FF context menu function -> the background task will build its contents
-	  let goparentEnabled = true;
-	  let BN_id = row.dataset.id;
+	  let bn_id = row.dataset.id;
 	  if (type == "bookmark") {
 		if (isShowBkmkMenu) {
 		  menu = Menu_rshowbkmk;
@@ -3129,19 +3337,20 @@ function resultsContextHandler (e) {
 		}
 	  }
 	  else { // Menu for "folder"
-		menu = Menu_rfldr;
-
 		// Disable "Go parent folder" if this is one of the top level folders (i.e. parent is root, not visible)
-		if ((BN_id == PersonalToobar) || (BN_id == BookmarksMenu) || (BN_id == OtherBookmarks) || (BN_id == MobileBookmarks)) {
-		  goparentEnabled = false;
+		if ((bn_id == PersonalToobar) || (bn_id == BookmarksMenu) || (bn_id == OtherBookmarks) || (bn_id == MobileBookmarks)) {
+		  menu = Menu_rprotf;
+		}
+		else {
+		  menu = Menu_rfldr;
 		}
 	  }
 
-	  updateBSP2ContextMenu(menu, false, goparentEnabled);
+	  updateBSP2ContextMenu(menu, false, (rselection.selectIds.length > 1));
 	  myMenu_open = isResultMenu = true; // Remember that this instance opened the menu when processing the onClicked event
 	  browser.menus.overrideContext({
 		context: "bookmark",
-		bookmarkId: BN_id
+		bookmarkId: bn_id
 	  });
 	}
   }
@@ -3208,7 +3417,11 @@ function bkmkContextHandler (e) {
   let menu;
 //trace("Row: "+row+" rowIndex: "+rowIndex+" type: "+type);
   if (beforeFF64) { // Use our built-in menus
-	if (type == "bookmark") {
+	if (selection.selectIds.length > 1) { // Menu for multiple selection
+	  myMenu_open = myBMultMenu_open = true;
+	  menu = MyBMultMenu;
+	}
+	else if (type == "bookmark") { // Menu for single bookmark
 	  if (row.dataset.protect == "true") { // Protected row
 		menu = MyBProtMenu;
 		myMenu_open = myBProtMenu_open = true;
@@ -3217,13 +3430,13 @@ function bkmkContextHandler (e) {
 		// Check if we are on an highlighted result row which is hidden
 		if (!openTree_option && row.firstElementChild.classList.contains(Reshidden)) {
 		  menu = MyBResBkmkMenu;
-		  if ((bkmkClipboard.length > 0) && noPasteZone.isInZone(rowIndex)) {
-			if (MyBResBkmkMenuPaste.className == "menupaste")
-			  MyBResBkmkMenuPaste.className = "menudisabled";
-		  }
-		  else {
+		  if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)) {
 			if (MyBResBkmkMenuPaste.className == "menudisabled")
 			  MyBResBkmkMenuPaste.className = "menupaste";
+		  }
+		  else {
+			if (MyBResBkmkMenuPaste.className == "menupaste")
+			  MyBResBkmkMenuPaste.className = "menudisabled";
 		  }
 		  if (disableFavicons_option) {
 			MyBResBkmkMenuFavicon.className = "menudisabled";
@@ -3235,13 +3448,13 @@ function bkmkContextHandler (e) {
 		}
 		else {
 		  menu = MyBBkmkMenu;
-		  if ((bkmkClipboard.length > 0) && noPasteZone.isInZone(rowIndex)) {
-			if (MyBBkmkMenuPaste.className == "menupaste")
-			  MyBBkmkMenuPaste.className = "menudisabled";
-		  }
-		  else {
+		  if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)) {
 			if (MyBBkmkMenuPaste.className == "menudisabled")
 			  MyBBkmkMenuPaste.className = "menupaste";
+		  }
+		  else {
+			if (MyBBkmkMenuPaste.className == "menupaste")
+			  MyBBkmkMenuPaste.className = "menudisabled";
 		  }
 		  if (disableFavicons_option) {
 			MyBBkmkMenuFavicon.className = "menudisabled";
@@ -3253,16 +3466,20 @@ function bkmkContextHandler (e) {
 		}
 	  }
 	}
-	else if (type == "folder") {
+	else if (type == "folder") { // Menu for single folder
 	  if (row.dataset.protect == "true") { // Protected row
 		menu = MyBProtFMenu;
-		if ((bkmkClipboard.length > 0) && noPasteZone.isInZone(rowIndex)) {
-		  if (MyBProtFMenuPasteInto.className == "menupasteinto")
-			MyBProtFMenuPasteInto.className = "menudisabled";
-		}
-		else {
+		// Disable paste into if this is the "Most visited .." or one of the "Recent .." folders
+		let bn_id = row.dataset.id;
+		if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)
+			&& (bn_id != mostVisitedBNId) && (bn_id != recentTagBNId) && (bn_id != recentBkmkBNId)
+		   ) {
 		  if (MyBProtFMenuPasteInto.className == "menudisabled")
 			MyBProtFMenuPasteInto.className = "menupasteinto";
+		}
+		else {
+		  if (MyBProtFMenuPasteInto.className == "menupasteinto")
+			MyBProtFMenuPasteInto.className = "menudisabled";
 		}
 		myMenu_open = myBProtFMenu_open = true;
 	  }
@@ -3270,48 +3487,48 @@ function bkmkContextHandler (e) {
 		// Check if we are on an highlighted result row which is hidden
 		if (!openTree_option && row.firstElementChild.classList.contains(Reshidden)) {
 		  menu = MyBResFldrMenu;
-		  if ((bkmkClipboard.length > 0) && noPasteZone.isInZone(rowIndex)) {
-			if (MyBResFldrMenuPaste.className == "menupaste")
-			  MyBResFldrMenuPaste.className = "menudisabled";
-			if (MyBResFldrMenuPasteInto.className == "menupasteinto")
-			  MyBResFldrMenuPasteInto.className = "menudisabled";
-		  }
-		  else {
+		  if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)) {
 			if (MyBResFldrMenuPaste.className == "menudisabled")
 			  MyBResFldrMenuPaste.className = "menupaste";
 			if (MyBResFldrMenuPasteInto.className == "menudisabled")
 			  MyBResFldrMenuPasteInto.className = "menupasteinto";
 		  }
+		  else {
+			if (MyBResFldrMenuPaste.className == "menupaste")
+			  MyBResFldrMenuPaste.className = "menudisabled";
+			if (MyBResFldrMenuPasteInto.className == "menupasteinto")
+			  MyBResFldrMenuPasteInto.className = "menudisabled";
+		  }
 		  myMenu_open = myBResFldrMenu_open = true;
 		}
 		else {
 		  menu = MyBFldrMenu;
-		  if ((bkmkClipboard.length > 0) && noPasteZone.isInZone(rowIndex)) {
-			if (MyBFldrMenuPaste.className == "menupaste")
-			  MyBFldrMenuPaste.className = "menudisabled";
-			if (MyBFldrMenuPasteInto.className == "menupasteinto")
-			  MyBFldrMenuPasteInto.className = "menudisabled";
-		  }
-		  else {
+		  if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)) {
 			if (MyBFldrMenuPaste.className == "menudisabled")
 			  MyBFldrMenuPaste.className = "menupaste";
 			if (MyBFldrMenuPasteInto.className == "menudisabled")
 			  MyBFldrMenuPasteInto.className = "menupasteinto";
 		  }
+		  else {
+			if (MyBFldrMenuPaste.className == "menupaste")
+			  MyBFldrMenuPaste.className = "menudisabled";
+			if (MyBFldrMenuPasteInto.className == "menupasteinto")
+			  MyBFldrMenuPasteInto.className = "menudisabled";
+		  }
 		  myMenu_open = myBFldrMenu_open = true;
 		}
 	  }
 	}
-	else { // Separator
+	else { // Menu for single separator
 	  if (row.dataset.protect != "true") { // Non protected row
 		menu = MyBSepMenu;
-		if ((bkmkClipboard.length > 0) && noPasteZone.isInZone(rowIndex)) {
-		  if (MyBSepMenuPaste.className == "menupaste")
-			MyBSepMenuPaste.className = "menudisabled";
-		}
-		else {
+		if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)) {
 		  if (MyBSepMenuPaste.className == "menudisabled")
 			MyBSepMenuPaste.className = "menupaste";
+		}
+		else {
+		  if (MyBSepMenuPaste.className == "menupaste")
+			MyBSepMenuPaste.className = "menudisabled";
 		}
 		myMenu_open = myBSepMenu_open = true;
 	  }
@@ -3346,6 +3563,11 @@ function bkmkContextHandler (e) {
 	  pasteEnabled = ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex));
 	  if (row.dataset.protect == "true") { // Protected row
 		menu = Menu_bprotf;
+		// Disable paste into if this is the "Most visited .." or one of the "Recent .." folders
+		let bn_id = row.dataset.id;
+		if ((bn_id == mostVisitedBNId) || (bn_id == recentTagBNId) || (bn_id == recentBkmkBNId)) {
+		  pasteEnabled = false;
+		}
 	  }
 	  else { // Non protected row
 		// Check if we are on an highlighted result row which is hidden
@@ -3369,7 +3591,7 @@ function bkmkContextHandler (e) {
 	}
 
 	if (menu != undefined) {
-	  updateBSP2ContextMenu(menu, pasteEnabled, !disableFavicons_option);
+	  updateBSP2ContextMenu(menu, pasteEnabled, (selection.selectIds.length > 1), !disableFavicons_option);
 	  myMenu_open = true; // Remember that this instance opened the menu when processing the onClicked event
 	  // Open menu
 	  browser.menus.overrideContext({
@@ -3685,7 +3907,7 @@ function handleRsltDragScroll (eventId, e) {
 /*
  * Setup drag operation and contents
  *
- * selectedIds = list (Array) of ids of selected bookmark items
+ * selection = selection Object
  * dt = event DataTransfer object to set
  *
  * Sets global variable dtSignature
@@ -3693,15 +3915,16 @@ function handleRsltDragScroll (eventId, e) {
 let noDropZone; // ZoneDexc to identify where we cannot drop a BSP2 or native bookmark drag
 let dtSignature; // Used to verify if a drag operation is always the same, to calculate no drop zone only once
 				 // (both isBkmkItemDragged and isRsltItemDragged are false when not an internal drag)
-function setDragTransfer (selectedIds, dt) {
-  // Set dragged BNs
+function setDragTransfer (selection, dt) {
+  // Get unique list of dragged BNs (none including another)
   let BN, BNDragged;
   let bnId, bnIdDragged;
   bkmkDragIds = [];
   bkmkDrag = [];
-  let len = selectedIds.length;
+  let selectIds = selection.selectIds;
+  let len = selectIds.length;
   for (let i=0 ; i<len ; i++) {
-	bnId = selectedIds[i];
+	bnId = selectIds[i];
 	BN = curBNList[bnId];
 	if (BNDragged == undefined) { // text/x-moz-place<-xxx> can (for now) only hold one bookmark = first one  
 	  BNDragged = BN;
@@ -3709,14 +3932,14 @@ function setDragTransfer (selectedIds, dt) {
 	}
 	uniqueListAddBN(bnId, BN, bkmkDragIds, bkmkDrag);
   }
-  // Set no drop zone
+  // Set no drop zone on those BNs
   noDropZone = new ZoneDesc ();
   len = bkmkDragIds.length;
   for (let i=0 ; i<len ; i++) {
 	zoneAddBN(noDropZone, bkmkDragIds[i], bkmkDrag[i]);
   }
 
-  // Set the event dataTransfer
+  // Build dataTransfer in the event
   // For a bookmark:	application/x-bookmark and text/x-moz-place,text/x-moz-url,text/plain,text/html
   // For a folder:		application/x-bookmark and text/x-moz-place-container,text/x-moz-url,text/plain,text/html
   // For a separator:	application/x-bookmark and text/x-moz-place-separator,text/plain,text/html
@@ -3724,7 +3947,7 @@ function setDragTransfer (selectedIds, dt) {
   // Data for BSP2 bookmark object = unique list (Array) of bookmark ids
   let json = JSON.stringify(bkmkDragIds);
   dt.setData("application/x-bookmark", dtSignature = json);
-//console.log("selectedIds: "+selectedIds);
+//console.log("selectIds: "+selectIds);
 //console.log("bkmkDragIds: "+bkmkDragIds);
 //console.log("dtSignature: "+dtSignature);
   // application/x-bookmark is for BSP2 internal drag & drops.
@@ -3832,7 +4055,7 @@ function bkmkDragStartHandler (e) {
 //console.log("BN_id: "+rowDragged.dataset.id);
   if (rowDragged.dataset.protect != "true") {
 	isBkmkItemDragged = true; // Signal we are dragging an internal item to prevent scrolling
-	setDragTransfer(bkmkSelectIds, e.dataTransfer); // This sets dtSignature
+	setDragTransfer(selection, e.dataTransfer); // This sets dtSignature
   }
 }
 
@@ -3871,7 +4094,7 @@ function resultsDragStartHandler (e) {
 //console.log("BN_id: "+rowDragged.dataset.id);
   if (rowDragged.dataset.protect != "true") {
 	isRsltItemDragged = true; // Signal we are dragging an internal item
-	setDragTransfer(rbkmkSelectIds, e.dataTransfer); // This sets dtSignature
+	setDragTransfer(rselection, e.dataTransfer); // This sets dtSignature
   }
 }
 
@@ -4813,26 +5036,6 @@ async function createBkmkItem_async (parentId, insertIndex, title, url, type) {
 }
 
 /*
- * Handle FF API call for bookmark removal (with handling of BSP2 trash, if enabled)
- * 
- * bnId = Id of BookmarkNode to delete
- */
-function removeBkmkItem (bnId) {
-  // If BSP2 trash enabled, move the bookmark item to trash instead (except if already in trash)
-  let BN = curBNList[bnId];
-  if (trashEnabled_option && !BN.inBSP2Trash) { // Move at end of trash
-	browser.bookmarks.move(
-	  bnId,
-	  {parentId: bsp2TrashFldrBNId
-	  }
-	);
-  }
-  else { // Really delete the bookmark item
-	browser.bookmarks.removeTree(bnId);
-  }
-}
-
-/*
  * Drag drop event handler
  * 
  * e = DragEvent
@@ -4904,10 +5107,10 @@ console.log("dt.types        : "+dt.types);
 		  || types.includes(type = "text/x-moz-place")		// Dragging a native Bookmark to us
 		 ) {
 		if (is_ctrlKey) { // Copy
-		  copyBkmk(bkmkDrag, (is_infolder ? BN_id : BN.parentId), bnIndex);
+		  copyBkmk(bkmkDragIds, bkmkDrag, (is_infolder ? BN_id : BN.parentId), bnIndex);
 		}
 		else { // Move
-		  moveBkmk(bkmkDrag, (is_infolder ? BN_id : BN.parentId), bnIndex);
+		  moveBkmk(bkmkDragIds, bkmkDrag, (is_infolder ? BN_id : BN.parentId), bnIndex);
 		}
 	  }
 	  else if (types.includes(type = "text/x-moz-text-internal")) { // Dragging one or multiple tabs to us
@@ -5147,21 +5350,23 @@ async function pasteBkmk (a_BN, parentId, index = undefined) {
   let BN;
   for (let i=0 ; i<len ; i++) { // Go through list of BookmarkNodes
 	BN = a_BN[i];
-	let newBTN;
-	// If index is undefined, we are pasting into a folder => at end
-	if (index == undefined) {
-	  // Create BTN at end of parent folder
-	  newBTN = await createBkmkItem_async(parentId, undefined, BN.title, BN.url, BN.type);
-	}
-	else {
-	  newBTN = await createBkmkItem_async(parentId, index++, BN.title, BN.url, BN.type);
-    }
+	if (!BN.protect) {
+	  let newBTN;
+	  // If index is undefined, we are pasting into a folder => at end
+	  if (index == undefined) {
+		// Create BTN at end of parent folder
+		newBTN = await createBkmkItem_async(parentId, undefined, BN.title, BN.url, BN.type);
+	  }
+	  else {
+		newBTN = await createBkmkItem_async(parentId, index++, BN.title, BN.url, BN.type);
+	  }
 //let t2 = (new Date ()).getTime();
 //trace(t2+" Paste node creation delay: "+(t2.getTime() - t1.getTime()));
-	let children = BN.children;
-	if ((children != undefined) && (children.length > 0)) { // There are children to copy ...
-	  // Recursively call pasteBkmk on children
-	  await pasteBkmk(children, newBTN.id);
+	  let children = BN.children;
+	  if ((children != undefined) && (children.length > 0)) { // There are children to copy ...
+		// Recursively call pasteBkmk on children
+		await pasteBkmk(children, newBTN.id);
+	  }
 	}
   }
 }
@@ -5169,42 +5374,61 @@ async function pasteBkmk (a_BN, parentId, index = undefined) {
 /*
  * Copy bookmark contents at the designated place.
  * 
+ * a_id = array of Strings (bookmark ids)
  * a_BN = array of BookmarkNodes to paste (copy)
  * parentId = String, Id of new parent to paste into
  * index = integer position in parent (undefined if at end)
  */
-async function copyBkmk (a_BN, parentId, index = undefined) {
-  // Create a copy of the source as list to paste, in case we are copiying inside source, to avoid
-  // an infinite loop because of source being itslef modified by the paste 
-  await pasteBkmk(uniqueListCopy(a_BN), parentId, index);
+async function copyBkmk (a_id, a_BN, parentId, index = undefined) {
+  // Create a copy of the source list of BookmarNodes to paste, in case we are copying inside source,
+  // to avoid an infinite loop because of the source list being itself modified by the paste 
+  // Fecord a multiple operation if more than one item in the array
+  //   note: "create" is unused today, because we cannot create a folder with all its children (recursive) in one go
+  //         and so a_id does not list all ids of bookmarks to create as copies
+  //         Also, we do not know in advance the id of a bookmark to create, and cannot pass the id of the copied one
+  //         in a created bookmark, for relating to the is_multi record.
+/*
+  let len = a_id.length;
+  if (len > 1) {
+	await recordHistoryMulti("create", a_id);
+  }
+*/
+  await pasteBkmk(uniqueListCopy(a_BN), parentId, index); // Recursive call on folders
 }
 
 /*
  * Move bookmark(s) at the designated place.
  * 
+ * a_id = array of Strings (bookmark ids)
  * a_BN = Array of BookmarkNodes to move (=> need to remain synchronous to keep order)
  * newParentId = String, Id of new parent to move into
  * newIndex = integer position in parent (undefined if at end)
  * 
  * Return true if moved, else false. 
  */
-async function moveBkmk (a_BN, newParentId, newIndex = undefined) {
+async function moveBkmk (a_id, a_BN, newParentId, newIndex = undefined) {
+  let len = a_BN.length;
+  // Fecord a multiple operation if more than one item in the array
+  if (len > 1) {
+	await recordHistoryMulti("move", a_id);
+  }
+
   if (newIndex == undefined) { // Cut and pasting into a folder, at end
-	let len = a_BN.length;
 	let BN;
 	for (let i=0 ; i<len ; i++) {
 	  BN = a_BN[i];
 //trace("Move BN id: "+BN.id+" to Parent id: "+newParentId+" at index: "+newIndex);
 	  // Move BTN at end of folder. Do that synchronously to avoid mess when processing multiple BNs
-	  await browser.bookmarks.move(
-		BN.id,
-		{parentId: newParentId
-		}
-	  );
+	  if (!BN.protect) {
+		await browser.bookmarks.move(
+		  BN.id,
+		  {parentId: newParentId
+		  }
+		);
+	  }
 	}
   }
   else {
-	let len = a_BN.length;
 	let BN;
 	for (let i=0 ; i<len ; i++) {
 	  BN = a_BN[i];
@@ -5219,12 +5443,46 @@ async function moveBkmk (a_BN, newParentId, newIndex = undefined) {
 		}
 	  }
 	  // Move BTN at designated place. Do that synchronously to avoid mess when processing multiple BNs
+	  if (!BN.protect) {
+		await browser.bookmarks.move(
+		  BN.id,
+		  {parentId: newParentId,
+		   index: newIndex++
+		  }
+		);
+	  }
+	}
+  }
+}
+
+/*
+ * Remove bookmarks (with handling of BSP2 trash, if enabled)
+ * 
+ * a_id = array of Strings (bookmark ids)
+ * a_BN = Array of BookmarkNodes to delete
+ */
+async function delBkmk (a_id, a_BN) {
+  let len = a_BN.length;
+  // Fecord a multiple operation if more than one item in the array
+  if (len > 1) {
+	await recordHistoryMulti((trashEnabled_option ? "remove_tt" : "remove"), a_id);
+  }
+
+  let BN;
+  for (let i=0 ; i<len ; i++) {
+	BN = a_BN[i];
+//trace("Remove BN id: "+BN.id);
+	// If BSP2 trash enabled, move the bookmark item to trash instead (except when already in trash, where we really delete it)
+	let bnId = BN.id;
+	if (trashEnabled_option && !BN.inBSP2Trash) { // Move at end of trash
 	  await browser.bookmarks.move(
-		BN.id,
-		{parentId: newParentId,
-		 index: newIndex++
+		bnId,
+		{parentId: bsp2TrashFldrBNId
 		}
 	  );
+	}
+	else { // Really delete the bookmark item
+	  await browser.bookmarks.removeTree(bnId);
 	}
   }
 }
@@ -5321,13 +5579,14 @@ function keyHandler (e) {
 		  let firstRow = resultsTable.rows[0];
 		  let cell = firstRow.firstElementChild;
 		  cell.focus();
-		  setCellHighlight(rcursor, cell, rbkmkSelectIds);
+//		  setCellHighlight(rcursor, rlastSelOp, cell, rselection.selectIds);
+		  addCellCursorSelection(cell, rcursor, rselection);
 		}
 	  }
 	  e.preventDefault(); // Don't pass the key event for further processing
 	}
   }
-  else if (classList.contains(SelectHighlight)) { // Keyboard actions on an highlighted (=> focused) cell
+  else if (classList.contains(CursorHighlight)) { // Keyboard actions on cursor (=> focused) cell
 	let keyProcessed = false;
 	if (key == "ArrowDown") {
 	  if (!myMenu_open) {
@@ -5337,10 +5596,12 @@ function keyHandler (e) {
 		if (nextRow != null) { // We got one
 		  let cell = nextRow.firstElementChild;
 		  if (isResultRow) { // Set result cursor and selection if in search panel
-			setCellHighlight(rcursor, cell, rbkmkSelectIds);
+//			setCellHighlight(rcursor, rlastSelOp, cell, rselection.selectIds);
+			addCellCursorSelection(cell, rcursor, rselection, false, is_ctrlKey, e.shiftKey);
 		  }
 		  else { // Set cursor and selection in main panel
-			setCellHighlight(cursor, cell, bkmkSelectIds);
+//			setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
+			addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, e.shiftKey);
 		  }
 		  cell.focus();
 		}
@@ -5355,10 +5616,12 @@ function keyHandler (e) {
 		if (previousRow != null) { // We got one
 		  let cell = previousRow.firstElementChild;
 		  if (isResultRow) { // Set result cursor and selection if in search panel
-			setCellHighlight(rcursor, cell, rbkmkSelectIds);
+//			setCellHighlight(rcursor, rlastSelOp, cell, rselection.selectIds);
+			addCellCursorSelection(cell, rcursor, rselection, false, is_ctrlKey, e.shiftKey);
 		  }
 		  else { // Set cursor and selection in main panel
-			setCellHighlight(cursor, cell, bkmkSelectIds);
+//			setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
+			addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, e.shiftKey);
 		  }
 		  cell.focus();
 		}
@@ -5408,10 +5671,12 @@ function keyHandler (e) {
 		if (nextRow != row) { // We got one
 		  let cell = nextRow.firstElementChild;
 		  if (isResultRow) { // Set result cursor and selection if in search panel
-			setCellHighlight(rcursor, cell, rbkmkSelectIds);
+//			setCellHighlight(rcursor, rlastSelOp, cell, rselection.selectIds);
+			addCellCursorSelection(cell, rcursor, rselection, false, is_ctrlKey, e.shiftKey);
 		  }
 		  else { // Set cursor and selection in main panel
-			setCellHighlight(cursor, cell, bkmkSelectIds);
+//			setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
+			addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, e.shiftKey);
 		  }
 		  cell.focus();
 		}
@@ -5461,10 +5726,12 @@ function keyHandler (e) {
 		if (previousRow != row) { // We got one
 		  let cell = previousRow.firstElementChild;
 		  if (isResultRow) { // Set result cursor and selection if in search panel
-			setCellHighlight(rcursor, cell, rbkmkSelectIds);
+//			setCellHighlight(rcursor, rlastSelOp, cell, rselection.selectIds);
+			addCellCursorSelection(cell, rcursor, rselection, false, is_ctrlKey, e.shiftKey);
 		  }
 		  else { // Set cursor and selection in main panel
-			setCellHighlight(cursor, cell, bkmkSelectIds);
+//			setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
+			addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, e.shiftKey);
 		  }
 		  cell.focus();
 		}
@@ -5482,7 +5749,8 @@ function keyHandler (e) {
 		  lastRow = resultsTable.rows[len-1];
 		  cell = lastRow.firstElementChild;
 		  // Set result cursor and selection
-		  setCellHighlight(rcursor, cell, rbkmkSelectIds);
+//		  setCellHighlight(rcursor, rlastSelOp, cell, rselection.selectIds);
+		  addCellCursorSelection(cell, rcursor, rselection, false, is_ctrlKey, e.shiftKey);
 		}
 		else {
 		  len = bookmarksTable.rows.length; // Start from end of table
@@ -5492,7 +5760,8 @@ function keyHandler (e) {
 		  }
 		  cell = lastRow.firstElementChild;
 		  // Set cursor and selection in main panel
-		  setCellHighlight(cursor, cell, bkmkSelectIds);
+//		  setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
+		  addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, e.shiftKey);
 		}
 		cell.focus();
 		keyProcessed = true;
@@ -5507,13 +5776,15 @@ function keyHandler (e) {
 		  firstRow = resultsTable.rows[0]; // Always visible
 		  cell = firstRow.firstElementChild;
 		  // Set result cursor and selection
-		  setCellHighlight(rcursor, cell, rbkmkSelectIds);
+//		  setCellHighlight(rcursor, rlastSelOp, cell, rselection.selectIds);
+		  addCellCursorSelection(cell, rcursor, rselection, false, is_ctrlKey, e.shiftKey);
 		}
 		else {
 		  firstRow = bookmarksTable.rows[0]; // Always visible
 		  cell = firstRow.firstElementChild;
 		  // Set cursor and selection in main panel
-		  setCellHighlight(cursor, cell, bkmkSelectIds);
+//		  setCellHighlight(cursor, rlastSelOp, cell, selection.selectIds);
+		  addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, e.shiftKey);
 		}
 		cell.focus();
 		keyProcessed = true;
@@ -5538,7 +5809,8 @@ function keyHandler (e) {
 		  if (bnId != Root) {
 			row = curRowList[bnId];
 			let cell = row.firstElementChild;
-			setCellHighlight(cursor, cell, bkmkSelectIds);
+//			setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
+			addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, e.shiftKey);
 			cell.focus();
 		  }
 		}
@@ -5567,7 +5839,8 @@ function keyHandler (e) {
 			  bnId = children[0].id;
 			  row = curRowList[bnId];
 			  let cell = row.firstElementChild;
-			  setCellHighlight(cursor, cell, bkmkSelectIds);
+//			  setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
+			  addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, e.shiftKey);
 			  cell.focus();
 			}
 		  }
@@ -5575,40 +5848,44 @@ function keyHandler (e) {
 		keyProcessed = true;
 	  }
 	}
-	else if (!isResultRow && (key == "Delete")) {
+	else if (key == " ") { // Toggle selection if is_ctrlKey or is_range
 	  if (!myMenu_open) {
-		// Find next visible row and highlight it
+		let cell = row.firstElementChild;
+		if (isResultRow) { // Set result cursor and selection if in search panel
+//		  setCellHighlight(rcursor, rlastSelOp, cell, rselection.selectIds);
+		  addCellCursorSelection(cell, rcursor, rselection, true, is_ctrlKey, e.shiftKey);
+		}
+		else { // Set cursor and selection in main panel
+//		  setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
+		  addCellCursorSelection(cell, cursor, selection, true, is_ctrlKey, e.shiftKey);
+		}
+		keyProcessed = true;
+	  }
+	}
+	else if (!isResultRow && (key == "Delete")) {
+	  if (!myMenu_open
+		  && (row.dataset.protect != "true") // Non protected row
+		 ) {
+		// Find next visible row to highlight it
 		let nextRow = row;
-		while (((nextRow = nextRow.nextElementSibling) != null) && (nextRow.hidden));
+		while (((nextRow = nextRow.nextElementSibling) != null) && (nextRow.hidden))
+		  ;
+		if (nextRow == null) { // Try row before instead
+		  // Find previous visible row to highlight it
+		  let nextRow = row;
+		  while (((nextRow = nextRow.previousElementSibling) != null) && (nextRow.hidden))
+			;
+		}
+
+		// Delete bookmark item(s) in selection, and highlight / select new row
+		menuDelBkmkItem(selection);
+		// Set cursor and selection in main panel
 		if (nextRow != null) { // We got one
 		  let cell = nextRow.firstElementChild;
-		  if (isResultRow) { // Set result cursor and selection if in search panel
-			setCellHighlight(rcursor, cell, rbkmkSelectIds);
-		  }
-		  else { // Set cursor and selection in main panel
-			setCellHighlight(cursor, cell, bkmkSelectIds);
-		  }
+		  // Set cursor and selection in main panel
+//		  setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
+		  addCellCursorSelection(cell, cursor, selection);
 		  cell.focus();
-		}
-		else { // try row before instead
-		// Find previous visible row and highlight it
-		  let previousRow = row;
-		  while (((previousRow = previousRow.previousElementSibling) != null) && (previousRow.hidden));
-		  if (previousRow != null) { // We got one
-			let cell = previousRow.firstElementChild;
-			if (isResultRow) { // Set result cursor and selection if in search panel
-			  setCellHighlight(rcursor, cell, rbkmkSelectIds);
-			}
-			else { // Set cursor and selection in main panel
-			  setCellHighlight(cursor, cell, bkmkSelectIds);
-			}
-			cell.focus();
-		  }
-		}
-		if (row.dataset.protect != "true") { // Non protected row
-		  // Delete bookmark item in that row
-		  let BN_id = row.dataset.id;
-		  removeBkmkItem(BN_id);
 		}
 		keyProcessed = true;
 	  }
@@ -5664,10 +5941,10 @@ function keyHandler (e) {
 	else if ((key.toLowerCase() == "c") && is_ctrlKey) { // Copy
 	  if (!myMenu_open) {
 		if (isResultRow) { // A results table menu
-		  menuCopyBkmkItem(rbkmkSelectIds);
+		  menuCopyBkmkItem(rselection);
 		}
 		else {
-		  menuCopyBkmkItem(bkmkSelectIds);
+		  menuCopyBkmkItem(selection);
 		}
 		keyProcessed = true;
 	  }
@@ -5675,10 +5952,10 @@ function keyHandler (e) {
 	else if ((key.toLowerCase() == "x") && is_ctrlKey) { // Cut
 	  if (!myMenu_open) {
 		if (isResultRow) { // A results table menu
-		  menuCutBkmkItem(rbkmkSelectIds);
+		  menuCutBkmkItem(rselection);
 		}
 		else {
-		  menuCutBkmkItem(bkmkSelectIds);
+		  menuCutBkmkItem(selection);
 		}
 		keyProcessed = true;
 	  }
@@ -5745,10 +6022,12 @@ function keyHandler (e) {
 	  while (!found);
 	  if (found) {
 		if (isResultRow) { // Set result cursor and selection if in search panel
-		  setCellHighlight(rcursor, cell, rbkmkSelectIds);
+//		  setCellHighlight(rcursor, rlastSelOp, cell, rselection.selectIds);
+		  addCellCursorSelection(cell, rcursor, rselection);
 		}
 		else { // Set cursor and selection in main panel
-		  setCellHighlight(cursor, cell, bkmkSelectIds);
+//		  setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
+		  addCellCursorSelection(cell, cursor, selection);
 		}
 		cell.focus();
 	  }
@@ -5949,10 +6228,12 @@ function menuNewBkmkItem (tgtBN_id, bkmkType, is_openProp = true) {
 /*
  * Handle cut bookmark item action to clipboard on context menu or shortcut key
  * 
- * selectedIds = list (Array) of ids of selected bookmark items to cut
+ * selection = selection Object
+ *
+ * Sets global variables bkmkClipboardIds, bkmkClipboard, noPasteZone, isClipboardOpCut
  */
-function menuCutBkmkItem (selectedIds) {
-  // Cancel previous cut if any
+function menuCutBkmkItem (selection) {
+  // Cancel previous cut and clipboard if any
   if (isClipboardOpCut == true) {
 	refreshCutPanel(bkmkClipboardIds, false);
 	refreshCutSearch(bkmkClipboardIds, false);
@@ -5960,20 +6241,26 @@ function menuCutBkmkItem (selectedIds) {
   }
   bkmkClipboardIds.length = bkmkClipboard.length = 0;
 
-  let len = selectedIds.length;
+  // Filter to keep only unique bookmark items (none including another)
+  let selectIds = selection.selectIds;
+  let len = selectIds.length;
   let bnId;
   for (let i=0 ; i<len ; i++) {
-	bnId = selectedIds[i];
-	// We are going to move, so clip the real ones
-	uniqueListAddBN(bnId, curBNList[bnId], bkmkClipboardIds, bkmkClipboard);
+	bnId = selectIds[i];
+	let BN = curBNList[bnId];
+	if (!BN.protect) { 
+	  // We are going to move, so clip the real ones
+	  uniqueListAddBN(bnId, BN, bkmkClipboardIds, bkmkClipboard);
+	}
   }
+
   // Set the no paste zone
   len = bkmkClipboardIds.length;
   for (let i=0 ; i<len ; i++) {
 	zoneAddBN(noPasteZone, bkmkClipboardIds[i], bkmkClipboard[i]);
   }
   isClipboardOpCut = true;
-  // Just dim the row(s) being cut, do not remove it/them now
+  // Dim the row(s) being cut, do not remove it/them now
   refreshCutPanel(bkmkClipboardIds, true);
   refreshCutSearch(bkmkClipboardIds, true);
 }
@@ -5981,10 +6268,12 @@ function menuCutBkmkItem (selectedIds) {
 /*
  * Handle copy bookmark item action to clipboard on context menu or shortcut key
  * 
- * selectedIds = list (Array) of ids of selected bookmark items to copy
+ * selection = selection Object
+ *
+ * Sets global variables bkmkClipboardIds, bkmkClipboard, noPasteZone, isClipboardOpCut
  */
-function menuCopyBkmkItem (selectedIds) {
-  // Cancel previous cut if any
+function menuCopyBkmkItem (selection) {
+  // Cancel previous cut and clipboard if any
   if (isClipboardOpCut == true) {
 	refreshCutPanel(bkmkClipboardIds, false);
 	refreshCutSearch(bkmkClipboardIds, false);
@@ -5993,12 +6282,16 @@ function menuCopyBkmkItem (selectedIds) {
   bkmkClipboardIds.length = bkmkClipboard.length = 0;
   isClipboardOpCut = false; // Not a cut
 
-  let len = selectedIds.length;
+  // Filter to keep only unique bookmark items (none including another)
+  let selectIds = selection.selectIds;
+  let len = selectIds.length;
   let bnId;
   for (let i=0 ; i<len ; i++) {
-	bnId = selectedIds[i];
-	// Get a copy of nodes ! Let's not reinject the nodes themselves
-	uniqueListAddBN(bnId, curBNList[bnId], bkmkClipboardIds, bkmkClipboard, true);
+	bnId = selectIds[i];
+	let BN = curBNList[bnId];
+	if (!BN.protect) { 
+	  uniqueListAddBN(bnId, BN, bkmkClipboardIds, bkmkClipboard);
+	}
   }
 }
 
@@ -6007,6 +6300,8 @@ function menuCopyBkmkItem (selectedIds) {
  * 
  * BN_id = String identifying the bookmark item to paste bkmkClipboard to
  * is_pasteInto = Boolean, false if paste before, and true if paste into (only on folders)
+ *
+ * Uses / modifies global variables bkmkClipboardIds, bkmkClipboard, noPasteZone, isClipboardOpCut
  */
 function menuPasteBkmkItem (BN_id, is_pasteInto) {
   let BN = curBNList[BN_id];
@@ -6020,16 +6315,53 @@ function menuPasteBkmkItem (BN_id, is_pasteInto) {
 	refreshCutPanel(bkmkClipboardIds, false);
 	refreshCutSearch(bkmkClipboardIds, false);
 	noPasteZone.clear();
-	moveBkmk(bkmkClipboard, (is_pasteInto ? BN_id : BN.parentId), bnIndex);
+	moveBkmk(bkmkClipboardIds, bkmkClipboard, (is_pasteInto ? BN_id : BN.parentId), bnIndex);
   }
   else { // This is a copy operation
-	copyBkmk(bkmkClipboard, (is_pasteInto ? BN_id : BN.parentId), bnIndex);
+	copyBkmk(bkmkClipboardIds, bkmkClipboard, (is_pasteInto ? BN_id : BN.parentId), bnIndex);
 	// Refresh search is handled thought bkmkCreatedHandler(), do not call it
   }
 
-  // Empty the clipboard variable (array still in nmemory, until fully processed by one of the called async functions)
+  // Empty the clipboard variables by pointing at a new empty array
+  // (previous array object still in memory, until fully processed by one of the called async functions)
+  bkmkClipboardIds = [];
   bkmkClipboard = [];
   isClipboardOpCut = undefined;
+}
+
+/*
+ * Handle delete bookmark item action on context menu or shortcut key
+ * 
+ * selection = selection Object
+ * 
+ * Modifies global variables bkmkClipboardIds, bkmkClipboard, noPasteZone, isClipboardOpCut
+ */
+function menuDelBkmkItem (selection) {
+  // Cancel previous cut and clipboard if any
+  if (isClipboardOpCut == true) {
+	refreshCutPanel(bkmkClipboardIds, false);
+	refreshCutSearch(bkmkClipboardIds, false);
+	noPasteZone.clear();
+  }
+  bkmkClipboardIds.length = bkmkClipboard.length = 0;
+  isClipboardOpCut = undefined;
+
+  // Filter to keep only unique bookmark items (none including another)
+  let selectIds = selection.selectIds;
+  let len = selectIds.length;
+  let bnId;
+  let a_id = [];
+  let a_BN = [];
+  for (let i=0 ; i<len ; i++) {
+	bnId = selectIds[i];
+	let BN = curBNList[bnId];
+	if (!BN.protect) { 
+	  // We are going to delete, so clip the real ones
+	  uniqueListAddBN(bnId, BN, a_id, a_BN);
+	}
+  }
+
+  delBkmk(a_id, a_BN);
 }
 
 /*
@@ -6175,20 +6507,20 @@ function clickHandler (e) {
 	  // Retrieve parent context menu, the rowIndex and row on which it is
 	  menuAction = true;
 	  if (isResultMenu) { // A results table menu
-		menuCutBkmkItem(rbkmkSelectIds);
+		menuCutBkmkItem(rselection);
 	  }
 	  else {
-		menuCutBkmkItem(bkmkSelectIds);
+		menuCutBkmkItem(selection);
 	  }
 	}
 	else if (classList.contains("menucopy")) { // Copy a bookmark item into bkmkClipboard
 	  // Retrieve parent context menu, and the rowIndex on which it is
 	  menuAction = true;
 	  if (isResultMenu) { // A results table menu
-		menuCopyBkmkItem(rbkmkSelectIds);
+		menuCopyBkmkItem(rselection);
 	  }
 	  else {
-		menuCopyBkmkItem(bkmkSelectIds);
+		menuCopyBkmkItem(selection);
 	  }
 	}
 	else if (classList.contains("menupaste")) { // Paste bkmkClipboard contents before the row
@@ -6212,9 +6544,8 @@ function clickHandler (e) {
 	else if (classList.contains("menudel")) { // Delete a bookmark item
 	  // Can only happen on bookmarks table row, retrieve the rowIndex from the menu
 	  menuAction = true;
-	  let row = bookmarksTable.rows[getMenuRowIndex(target)];
-	  // Delete bookmark item in that row
-	  removeBkmkItem(row.dataset.id);
+	  // Delete selected bookmark item(s)
+	  menuDelBkmkItem(selection);
 	}
 	else if (classList.contains("menusort")) { // Sort folder contents by name
 	  // Can only be on a folder and a bookmarks table row
@@ -6388,19 +6719,19 @@ function onClickedContextMenuHandler (info, tab) {
 	  case "bsp2cut":
 		// Cut selection to clipboard
 		if (isResultMenu) { // A results table menu
-		  menuCutBkmkItem(rbkmkSelectIds);
+		  menuCutBkmkItem(rselection);
 		}
 		else {
-		  menuCutBkmkItem(bkmkSelectIds);
+		  menuCutBkmkItem(selection);
 		}
 		break;
 	  case "bsp2copy":
 		// Copy selection to clipboard
 		if (isResultMenu) { // A results table menu
-		  menuCopyBkmkItem(rbkmkSelectIds);
+		  menuCopyBkmkItem(rselection);
 		}
 		else {
-		  menuCopyBkmkItem(bkmkSelectIds);
+		  menuCopyBkmkItem(selection);
 		}
 		break;
 	  case "bsp2paste":
@@ -6412,8 +6743,8 @@ function onClickedContextMenuHandler (info, tab) {
 		menuPasteBkmkItem(bnId, true);
 		break;
 	  case "bsp2del":
-		// Delete bookmark
-		removeBkmkItem(bnId);
+		// Delete selected bookmark item(s)
+		menuDelBkmkItem(selection);
 		break;
 	  case "bsp2sort":
 		// Sort folder content
@@ -6609,6 +6940,36 @@ function sendAddonMsgGetFavicon (a_msg) {
 	 postMsg: a_msg
 	}
   ).then(handleMsgResponse, handleMsgError);
+}
+
+/*
+ * Send a multi operation record in history to Background (when we are a private window)
+ * 
+ * op = String, nature of the operation ("create", "move", "remove" or "remove_tt")
+ *   note: "create" is unused today, because we cannot create a folder with all its children (recursive) in one go
+ *         Also, we do not know in advance the id of a bookmark to create, and cannot pass the id of the copied one
+ *         in a created bookmark, for relating to the is_multi record.
+ * id_list = Array of String identifying the bookmark Ids subject to the multiple action
+ */
+async function recordHistoryMulti (op, id_list) {
+  if (backgroundPage == undefined) {
+	try {
+	  let message = await browser.runtime.sendMessage(
+			{source: "sidebar:"+myWindowId,
+			 content: "recordHistoryMulti",
+			 operation: op,
+			 id_list: id_list
+			}
+		  );
+	  handleMsgResponse(message);
+	}
+	catch (error) {
+	  handleMsgError(error);
+	}
+  }
+  else {
+	backgroundPage.recordHistoryMulti(op, id_list);
+  }
 }
 
 /*
@@ -6954,10 +7315,58 @@ function closeHandler (e) {
 
 /*
  * Fire when we lose keyboard focus
- * Used to close any context menu when open
+ * Used to close any context menu when open, and to change the SelectHighlight background color to inactive
  */
 function onBlur (aEvent) {
   clearMenu();
+}
+
+/*
+ * Fire when the results panel loses focus
+ * Used to change the SelectHighlight background color to inactive
+ */
+function resultsFocusout (aEvent) {
+  // Retrieve the CSS rules to modify
+  let a_ss = document.styleSheets;
+  let ss = a_ss[0];
+  let cssRules = ss.cssRules;
+  setSelectHighlight(cssRules, rselHighlightRule, false);
+}
+
+/*
+ * Fire when we gain focus somewhere in the results panel
+ * Used to change the SelectHighlight background color to active
+ */
+function resultsFocusin (aEvent) {
+  // Retrieve the CSS rules to modify
+  let a_ss = document.styleSheets;
+  let ss = a_ss[0];
+  let cssRules = ss.cssRules;
+  setSelectHighlight(cssRules, rselHighlightRule, true);
+}
+
+/*
+ * Fire when the bookmarks panel loses focus
+ * Used to change the SelectHighlight background color to inactive
+ */
+function bookmarksFocusout (aEvent) {
+  // Retrieve the CSS rules to modify
+  let a_ss = document.styleSheets;
+  let ss = a_ss[0];
+  let cssRules = ss.cssRules;
+  setSelectHighlight(cssRules, selHighlightRule, false);
+}
+
+/*
+ * Fire when we gain focus somewhere in the bookmarks panel
+ * Used to change the SelectHighlight background color to active
+ */
+function bookmarksFocusin (aEvent) {
+  // Retrieve the CSS rules to modify
+  let a_ss = document.styleSheets;
+  let ss = a_ss[0];
+  let cssRules = ss.cssRules;
+  setSelectHighlight(cssRules, selHighlightRule, true);
 }
 
 /*
@@ -7119,6 +7528,10 @@ function completeDisplay () {
   addEventListener("contextmenu", noDefaultAction);
   addEventListener("auxclick", noDefaultAction);
   addEventListener("blur", onBlur);
+  Bookmarks.addEventListener("focusout", bookmarksFocusout);
+  SearchResult.addEventListener("focusout", resultsFocusout);
+  Bookmarks.addEventListener("focusin", bookmarksFocusin);
+  SearchResult.addEventListener("focusin", resultsFocusin);
   addEventListener('wheel', onWheel, {capture: true, passive: false}); // To disable zooming
   addEventListener('resize', windowSizeHandler);
 
@@ -7356,6 +7769,27 @@ function setRBkmkItemBCursor (is_advanced) {
 }
 
 /*
+ * Change a SelectHighlight rule to active or inactive
+ */
+function setSelectHighlight (cssRules, rule, is_active) {
+  let cssStyleRule;
+  let style;
+
+  let prop;
+  if (is_active) {
+	prop = "#CDE8FF";
+  }
+  else {
+	prop = "#D9D9D9";
+  }
+
+  cssStyleRule = getStyleRule(cssRules, rule);
+  style = cssStyleRule.style; // A CSSStyleDeclaration object
+  style.setProperty("background-color", prop);
+  style.setProperty("border-color", prop);
+}
+
+/*
  * Set cssRules background colors to a given value
  * 
  * prop = a String holding color value to apply. If null or undefined, goes back to default
@@ -7407,11 +7841,11 @@ function setTextColors (cssRules, prop) {
 	style = cssStyleRule.style; // A CSSStyleDeclaration object
 	style.setProperty("color", HighlightTextColor);
 
-	cssStyleRule = getStyleRule(cssRules, ".brow:hover, .selbrow:hover");
+	cssStyleRule = getStyleRule(cssRules, ".brow:hover, .selbrow:hover, .rselbrow:hover");
 	style = cssStyleRule.style; // A CSSStyleDeclaration object
 	style.setProperty("color", HighlightTextColor);
 
-	cssStyleRule = getStyleRule(cssRules, ".brow:focus, .selbrow:focus");
+	cssStyleRule = getStyleRule(cssRules, ".brow:focus, .selbrow:focus, .rselbrow:focus");
 	style = cssStyleRule.style; // A CSSStyleDeclaration object
 	style.setProperty("color", HighlightTextColor);
   }
@@ -7431,11 +7865,11 @@ function setTextColors (cssRules, prop) {
 	style = cssStyleRule.style; // A CSSStyleDeclaration object
 	style.removeProperty("color");
 
-	cssStyleRule = getStyleRule(cssRules, ".brow:hover, .selbrow:hover");
+	cssStyleRule = getStyleRule(cssRules, ".brow:hover, .selbrow:hover, .rselbrow:hover");
 	style = cssStyleRule.style; // A CSSStyleDeclaration object
 	style.removeProperty("color");
 
-	cssStyleRule = getStyleRule(cssRules, ".brow:focus, .selbrow:focus");
+	cssStyleRule = getStyleRule(cssRules, ".brow:focus, .selbrow:focus, .rselbrow:focus");
 	style = cssStyleRule.style; // A CSSStyleDeclaration object
 	style.removeProperty("color");
   }
@@ -7934,7 +8368,6 @@ Promise.all([p_platform, p_background, p_ffversion, p_getTab])
 	beforeFF57 = ((ffversion = info.version) < "57.0");
 	beforeFF58 = (ffversion < "58.0");
 	beforeFF64 = (ffversion < "64.0");
-	beforeFF71 = (ffversion < "71.0");
 
 	// In a private browsing window (incognito), this will be null
 	if (page != null) { // Not in a private browsing window
