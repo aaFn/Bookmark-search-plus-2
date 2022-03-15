@@ -3945,13 +3945,13 @@ function setDragTransfer (selection, dt) {
   // For a separator:	application/x-bookmark and text/x-moz-place-separator,text/plain,text/html
 
   // Data for BSP2 bookmark object = unique list (Array) of bookmark ids
+  // application/x-bookmark is for BSP2 internal drag & drops.
   let json = JSON.stringify(bkmkDragIds);
   dt.setData("application/x-bookmark", dtSignature = json);
 //console.log("selectIds: "+selectIds);
 //console.log("bkmkDragIds: "+bkmkDragIds);
 //console.log("dtSignature: "+dtSignature);
-  // application/x-bookmark is for BSP2 internal drag & drops.
-  //
+
   // Rest is:
   // text/x-moz-place<-xxx> (native Bookmark sidebar):
   // Native Bookmark data like  {"title":"Nouveau dossier","id":2238,"itemGuid":"VQ8ulNGyfXk0","instanceId":"jvwImUhXA2rV","parent":2099,"parentGuid":"CLSASmpIpBmQ",
@@ -3974,7 +3974,7 @@ function setDragTransfer (selection, dt) {
   // text/x-moz-url: documented in https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XPCOM/Reference/Interface/nsITransferable
   //	a text string containing the URL, a newline (\n), then the title of the page
   //		about:blank\nNew bookmark44
-  //	No support for folders nor separator, no support for multiple bookmarks
+  //	NOTE: no support for folders nor separator, no support for multiple bookmarks
 
   // Data for native bookmark object = first bookmark only for now
   let type = BNDragged.type;
@@ -8365,9 +8365,9 @@ Promise.all([p_platform, p_background, p_ffversion, p_getTab])
 	let page = a_values[1];
 	let info = a_values[2];
 	let tabInfo = a_values[3];
-	beforeFF57 = ((ffversion = info.version) < "57.0");
-	beforeFF58 = (ffversion < "58.0");
-	beforeFF64 = (ffversion < "64.0");
+	beforeFF57 = ((ffversion = parseFloat(info.version)) < 57.0);
+	beforeFF58 = (ffversion < 58.0);
+	beforeFF64 = (ffversion < 64.0);
 
 	// In a private browsing window (incognito), this will be null
 	if (page != null) { // Not in a private browsing window

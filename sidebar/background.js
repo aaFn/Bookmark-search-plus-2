@@ -23,13 +23,13 @@ let beforeFF63;
 let beforeFF64;
 browser.runtime.getBrowserInfo()
 .then(function (info) {
-  let ffversion = info.version;
-  beforeFF57 = (ffversion < "57.0");
-  beforeFF58 = (ffversion < "58.0");
-  beforeFF60 = (ffversion < "60.0");
-  beforeFF62 = (ffversion < "62.0");
-  beforeFF63 = (ffversion < "63.0");
-  beforeFF64 = (ffversion < "64.0");
+  let ffversion = parseFloat(info.version);
+  beforeFF57 = (ffversion < 57.0);
+  beforeFF58 = (ffversion < 58.0);
+  beforeFF60 = (ffversion < 60.0);
+  beforeFF62 = (ffversion < 62.0);
+  beforeFF63 = (ffversion < 63.0);
+  beforeFF64 = (ffversion < 64.0);
 });
 
 const SaveMinHysteresis = 2000; // Space saves to lower memory consumption

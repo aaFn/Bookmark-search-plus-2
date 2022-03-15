@@ -1258,11 +1258,11 @@ function initialize () {
 
 	  // Check FF version
 	  let info = a_values[2];
-	  ffversion = info.version;
-	  beforeFF57 = (ffversion < "57.0");
-	  beforeFF58 = (ffversion < "58.0");
-	  beforeFF60 = (ffversion < "60.0");
-	  beforeFF63 = (ffversion < "63.0");
+	  ffversion = parseFloat(info.version);
+	  beforeFF57 = (ffversion < 57.0);
+	  beforeFF58 = (ffversion < 58.0);
+	  beforeFF60 = (ffversion < 60.0);
+	  beforeFF63 = (ffversion < 63.0);
 
 	  // Handle myWindowId
 	  let windowInfo = a_values[3];
