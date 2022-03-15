@@ -1,6 +1,9 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.104 Bugs
+    - Corrected a bug where FF versions superior to 99 where not properly recognized.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/229
 - 2.0.103 Bugs & Improvements
     - Corrected a bug where the cursor top & bottom borders were not having a darker color as intended,
       when no focus on the sidebar.
