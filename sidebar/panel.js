@@ -97,6 +97,7 @@ const Migr16x16Timeout = 60000; // Time to wait before triggering 16x16 favicon 
 //const BeforeFF58 = ((BuildID != "20100101") && (BuildID < "20180118215408"));
 let beforeFF57;
 let beforeFF58;
+let beforeFF63;
 let beforeFF64;
 let ffversion;
 let p_ffversion = browser.runtime.getBrowserInfo();
@@ -6226,6 +6227,37 @@ function menuNewBkmkItem (tgtBN_id, bkmkType, is_openProp = true) {
 }
 
 /*
+ * Fill system clpboard with copied data
+ * 
+ * a_BN = array of BookmarkNodes to place in system clipboard
+ *
+ */
+function writeSystemClipboard (a_BN) {
+  if (!beforeFF63) {
+	// Plain text only today
+	let len = a_BN.length;
+	let plain = "";
+	let plain_sep = "";
+	let BN; 
+	for (let i=0 ; i<len ; i++) {
+	  BN = a_BN[i];
+	  plain += plain_sep + BN_toPlain(BN); 
+	  if (i == 0) { // Separator for next objects
+		plain_sep = "\n"; 
+	  }
+	}
+	navigator.clipboard.writeText(plain)
+	.then(function() {
+	  /* clipboard successfully set */
+//console.log("clipboard successfully set");
+	}, function() {
+	  /* clipboard write failed */
+console.log("clipboard write failed");
+	});
+  }
+}
+
+/*
  * Handle cut bookmark item action to clipboard on context menu or shortcut key
  * 
  * selection = selection Object
@@ -6263,6 +6295,9 @@ function menuCutBkmkItem (selection) {
   // Dim the row(s) being cut, do not remove it/them now
   refreshCutPanel(bkmkClipboardIds, true);
   refreshCutSearch(bkmkClipboardIds, true);
+
+  // Fill system clipboard with copied data
+  writeSystemClipboard(bkmkClipboard);
 }
 
 /*
@@ -6293,6 +6328,9 @@ function menuCopyBkmkItem (selection) {
 	  uniqueListAddBN(bnId, BN, bkmkClipboardIds, bkmkClipboard);
 	}
   }
+
+  // Fill system clipboard with copied data
+  writeSystemClipboard(bkmkClipboard);
 }
 
 /*
@@ -8367,6 +8405,7 @@ Promise.all([p_platform, p_background, p_ffversion, p_getTab])
 	let tabInfo = a_values[3];
 	beforeFF57 = ((ffversion = parseFloat(info.version)) < 57.0);
 	beforeFF58 = (ffversion < 58.0);
+	beforeFF63 = (ffversion < 63.0);
 	beforeFF64 = (ffversion < 64.0);
 
 	// In a private browsing window (incognito), this will be null
