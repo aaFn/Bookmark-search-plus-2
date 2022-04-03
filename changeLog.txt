@@ -1,6 +1,10 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.105 Improvements
+    - Added an indented text copy of selected bookmarks containing URLs/folder names/separators into system clipboard
+      for FF >= 63, when doing copy / cut actions, both on keyboard and context menu actions.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/232
 - 2.0.104 Bugs
     - Corrected a bug where FF versions superior to 99 where not properly recognized.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/229
