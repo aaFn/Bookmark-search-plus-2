@@ -1,6 +1,13 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.106 Bugs & Improvements
+    - Removed white flash on the side bar for dark themes (and shortened the one for the Bookmark history window).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/230
+    - Adapted the BSP2 options page to follow also the theme main dark/light colors. 
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/230
+    - Corrected a bug where the context action menu on the BSP2 star icon was not making the "Show Bookmark in Sidebar"
+      menu action available, on special bookmarked URLs like "about:...".
 - 2.0.105 Improvements
     - Added an indented text copy of selected bookmarks containing URLs/folder names/separators into system clipboard
       for FF >= 63, when doing copy / cut actions, both on keyboard and context menu actions.
