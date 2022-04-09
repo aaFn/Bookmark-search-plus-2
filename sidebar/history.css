@@ -1,15 +1,20 @@
-.fontdflt {
-  font: caption;
+:root{
+  --bg-color: white; 
+  --txt-color: #222426;
 }
 
-.fontwin {
-  font: 12px "Segoe UI";
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg-color: #38383d;
+    --txt-color: #f9f9fa;
+  }
 }
 
 html {
   height: 100%;
   width: 100%;
   box-sizing: border-box;
+  background-color: var(--bg-color);
 }
 
 body {
@@ -19,6 +24,15 @@ body {
   display: grid;
   grid-template-columns: min-content minmax(400px, auto);
   grid-template-rows: 420px minmax(200px, auto);
+  background-color: var(--bg-color);
+}
+
+.fontdflt {
+  font: caption;
+}
+
+.fontwin {
+  font: 12px "Segoe UI";
 }
 
 #pane {
@@ -32,8 +46,8 @@ body {
   min-width: 200px;
   max-width: 400px;
   border: 1px solid #F0F0F0;
-  background-color: white;
-  color: #222426;
+  background-color: var(--bg-color);
+  color: var(--txt-color);
   display: flex;
   flex-direction: column;
 }
@@ -49,7 +63,7 @@ body {
 
 #bookmarks {
   margin: 0 0 0 0;
-  border-top: 1px solid white;
+  border-top: 1px solid var(--bg-color);
   flex: auto;
 }
 
@@ -72,8 +86,8 @@ tbody {
 
 .brow {
   min-width: 100%;
-  background-color: white;
-  border: 1px solid white;
+  background-color: var(--bg-color);
+  border: 1px solid var(--bg-color);
   padding: 0;
   min-height: 16px;
   display: flex;

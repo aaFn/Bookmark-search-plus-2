@@ -1,3 +1,15 @@
+:root{
+  --bg-color: white; 
+  --txt-color: #222426;
+}
+
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg-color: #38383d;
+    --txt-color: #f9f9fa;
+  }
+}
+
 html, body {
   height: 100%;
   width: 100%;
@@ -5,8 +17,8 @@ html, body {
   box-sizing: border-box;
   white-space: nowrap;
   overflow-x: hidden;
-  background-color: white;
-  color: #222426;
+  background-color: var(--bg-color);
+  color: var(--txt-color);
 }
 
 body {
@@ -199,7 +211,7 @@ p {
 
 #bookmarks {
   margin: 0 0 0 0;
-  border-top: 1px solid white;
+  border-top: 1px solid var(--bg-color);
   flex: auto;
 }
 
@@ -226,8 +238,8 @@ tbody {
 
 .brow {
   min-width: 100%;
-  background-color: white;
-  border: 1px solid white;
+  background-color: var(--bg-color);
+  border: 1px solid var(--bg-color);
   padding: 0;
   min-height: 16px;
   display: flex;

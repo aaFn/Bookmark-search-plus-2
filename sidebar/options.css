@@ -1,3 +1,20 @@
+:root{
+  --bg-color: white; 
+  --txt-color: #222426;
+}
+
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg-color: #38383d;
+    --txt-color: #f9f9fa;
+  }
+}
+
+html, body {
+  background-color: var(--bg-color);
+  color: var(--txt-color);
+}
+
 .fontdflt {
   font: caption;
 }
