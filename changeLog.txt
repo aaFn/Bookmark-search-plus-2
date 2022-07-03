@@ -1,21 +1,30 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
-- 2.0.106 Bugs & Improvements
+- 2.0.107 03/07/2022 Bugs & Improvements
+    - Do not accept drag & drops from FF History sidebar (or from History section in FF Bookmark Library), they are
+      empty and provoke a BP2 reload.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/240
+    - Now properly support multi-windows display of BSP2 toolbar icon, reflecting the active tab of each window,
+      instead of one state for all. 
+    - Added dedicated support for tab switch event to refresh the BSP2 icon in the toolbar when changing tabs, to
+      exactly correspond to the tab URL (as tab switching does not seem to generate an updated tab even anymore).
+    - Added realtime update of BSP2 toolbar icon in all FF windows when a bookmark is created, modified or deleted.
+- 2.0.106 09/04/2022 Bugs & Improvements
     - Removed white flash on the side bar for dark themes (and shortened the one for the Bookmark history window).
         https://github.com/aaFn/Bookmark-search-plus-2/issues/230
     - Adapted the BSP2 options page to follow also the theme main dark/light colors. 
         https://github.com/aaFn/Bookmark-search-plus-2/issues/230
     - Corrected a bug where the context action menu on the BSP2 star icon was not making the "Show Bookmark in Sidebar"
       menu action available, on special bookmarked URLs like "about:...".
-- 2.0.105 Improvements
+- 2.0.105 03/04/2022: Improvements
     - Added an indented text copy of selected bookmarks containing URLs/folder names/separators into system clipboard
       for FF >= 63, when doing copy / cut actions, both on keyboard and context menu actions.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/232
-- 2.0.104 Bugs
+- 2.0.104 15/03/2022: Bugs
     - Corrected a bug where FF versions superior to 99 where not properly recognized.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/229
-- 2.0.103 Bugs & Improvements
+- 2.0.103 07/03/2022: Bugs & Improvements
     - Corrected a bug where the cursor top & bottom borders were not having a darker color as intended,
       when no focus on the sidebar.
     - Made hover color a bit lighter, to better distinguish from selection color.
@@ -33,7 +42,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Corrected context menu on "Most visited.." and "Recent.." folders to not enable Paste into them.
     - Reintroduced support for FF below 58, which was broken by calls and options to match current browser theme.
     - Corrected bugs on the pre-FF64 (non-native) menus.
-- 2.0.102 Improvements
+- 2.0.102 20/02/2022: Improvements
     - Added a button for triggering re-fetch of unsuccessful favicons, as well as a counter of unsuccessful favicons
       on the options page statistics.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/222
@@ -43,7 +52,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
         https://github.com/aaFn/Bookmark-search-plus-2/issues/220
     - Improved properties windows behavior on Cancel when no value is changed in the bookmark = do not re-fetch favicon,
       do not update the bookmark pointlessly. 
-- 2.0.101 Bugs & Improvements
+- 2.0.101 15/02/2022: Bugs & Improvements
     - Removed recent default FF style on the search text input which was showing a 2px outline on the input when typing
       text inside it, making it prominent compared to other items in the search box, and to the search box itself.
     - Added behavior of selecting all available text in the search text input when gaining focus, for easy replace
@@ -66,7 +75,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       subsequent background fetch.
     - Corrected a bug where diacritic input keys for "type-to-find" were ignored.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/224
-- 2.0.100 Bugs
+- 2.0.100 28/12/2021: Bugs
     - Corrected a regression on key-typing search, introduced when adding the wrap at start function of issue #181.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/199
     - Corrected a bug where an exception was occurring in the BSP2 sidebar when the show path option was enabled,
@@ -76,9 +85,9 @@ Please find here the release notes, TODO's, and some limitations I know of today
         https://github.com/aaFn/Bookmark-search-plus-2/issues/210
     - Added support to History window for current FF theme in the bookmark history list.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/210
-- 2.0.99 Bugs
+- 2.0.99 26/10/2021: Bugs
     - Corrected a regression on favicon refresh after a tab switch, introduced in 2.0.98.
-- 2.0.98 Improvements
+- 2.0.98 26/10/2021: Improvements
     - Implemented cleaner processing of keys, so as to pass back to FF non processed key events for further processing
       by it.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/194
@@ -99,7 +108,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       Press Ctrl at same time than click on menu action to open the Property window after creation, to edit the newly
       created bookmark.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/200
-- 2.0.97 Bugs & Improvements
+- 2.0.97 05/10/2021: Bugs & Improvements
     - Allow wrapping to start of list, when searching for next bookmark item matching with typed sequence of
       alphanumeric characters.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/181
@@ -116,11 +125,11 @@ Please find here the release notes, TODO's, and some limitations I know of today
         https://github.com/aaFn/Bookmark-search-plus-2/issues/199
     - Corrected a bug where image was replaced twice on favicon refresh happening on a nofavicon bookmark, resulting
       in an error message on the browser console.
-- 2.0.96 Bugs
+- 2.0.96 07/08/2021: Bugs
     - Corrected a bug introduced in 2.0.95 when deleting a node while BSP2 trash folder is invisible, which resulted in a
       code exception while refreshing display, preventing from visually removing node from display.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/75
-- 2.0.95 Improvements
+- 2.0.95 07/08/2021: Improvements
     - Better highlight options in BSP2 options page which do not start with a checkbox or with another HTML input object,
       by starting them with a bullet and aligning them better with other options.
     - Introduced new function of BSP2 trash folder. This is to work around the fact that there is no "undo" on 
@@ -128,10 +137,10 @@ Please find here the release notes, TODO's, and some limitations I know of today
       This is enabled by default, but can be disabled in the BSP2 options page if user does not like it.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/75
     - Made some code cleanup.
-- 2.0.94 Improvements
+- 2.0.94 24/07/2021: Improvements
     - Made round bullets darker in the search result pane, for better visibility of folders.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/84
-- 2.0.93 Bugs & Improvements
+- 2.0.93 23/07/2021: Bugs & Improvements
     - Adjusted behavior to handle the MacOS Cmd key like Windows/Linux Ctrl key (and conversely handle MacOS
       Control/Ctrl key like the Windows/Linux Meta key).
         https://github.com/aaFn/Bookmark-search-plus-2/issues/191
@@ -149,10 +158,10 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - In search result panel, highlight folders by a simple round bullet instead of a twistie, which is misleading
       for some people who interpret it as being an "openable" item, and click on it in hope to see it open/close.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/84
-- 2.0.92 Bugs
+- 2.0.92 19/05/2021: Bugs
     - Corrected a regression introduced in 2.0.91 when slightly accelerating display of folders.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/187
- - 2.0.91 Bugs & Improvements
+- 2.0.91 05/05/2021: Bugs & Improvements
     - Corrected a regression appearing at start of BSP2 in private windows, causing BSP2 not to load properly.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/186
     - Added option to not use the FF Search Bookmark API, but to use only the internal BSP2 search algorithm,
@@ -160,7 +169,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       Note that this can change the order of results in the search result pane, but the list of results should
       be the same.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/185  
-- 2.0.90 Bugs & Improvements
+- 2.0.90 02/05/2021: Bugs & Improvements
     - Accepted pull request from Gitoffthelawn aligning caps in menus with those of FF.
         https://github.com/aaFn/Bookmark-search-plus-2/pull/176
     - Aligned some more caps in other menus for consistency.
@@ -200,7 +209,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Added a timeout on getting response.text on fetch favicon, for a few cases like http://radio10.pro-fhi.net/flux-qlvuthph/192stream
       where it never returns a value.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/184
-- 2.0.89 Improvements
+- 2.0.89 07/02/2021: Improvements
     - When showing a row from a search result, unhide also all chidren of already open sub-folders on the path to that row : their
       content is meant to be seen, for consistency with their twistie open state. So far, content of sibbling folders which were open
       was not unhidden by the show action, forcing to click twice on twistie to close and open again to really see content.
@@ -208,11 +217,11 @@ Please find here the release notes, TODO's, and some limitations I know of today
       menu if the target was hidden, like with normal show bookmark action.
     - Changed max font size in BSP2 options to 20 pixels instead of 16.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/175
-- 2.0.88 Bugs
+- 2.0.88 26/01/2021: Bugs
     - Corrected a bug where search result is including the Mobile bookmarks special folder, but it is not present in an
       API load / reload from Firefox, breaking the search display with an exception, and so showing a never ending spinning wait
       icon. Look like this is happening with fresh profiles, or more recent than my previous profile ...
-- 2.0.87 Bugs & Improvements
+- 2.0.87 26/01/2021: Bugs & Improvements
     - Corrected an exception on undefined variable in code on drag & drop event handling (no visible effect, but cleaner code).
     - Do not execute action of opening bookmarks in current tab when BSP2 is in tab mode, to avoid inadvertently losing focus
       on BSP2 (except if explicitely demanded through the context menu, or by key modifiers like Alt).
@@ -227,9 +236,9 @@ Please find here the release notes, TODO's, and some limitations I know of today
       to overcome bad drag & drop support in such hacks. Quite convoluted .. but some users are ready to go through that as we
       can see:
         https://github.com/aaFn/Bookmark-search-plus-2/issues/174
-- 2.0.86 Bugs
+- 2.0.86 21/12/2020: Bugs
     - Corrected a 2.0.84 regression where opening BSP2 in a tab was failing.
-- 2.0.85 Bugs and Improvements
+- 2.0.85 20/12/2020: Bugs and Improvements
     - Added robustness and improved behavior to fully support a complete bookmark restore initiated from FF Bookmark Library
       ("Import and Backup" menu, then "Restore"). Workaround since FF does not support bookmarks.onImportBegan and
       onImportEnded (but Chrome does).
@@ -239,7 +248,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
         https://github.com/aaFn/Bookmark-search-plus-2/issues/167
     - Corrected a regression of insertion line not being removed when stopping a drag on a no-drop protection zone
       (e.g. on the dragged bookmark itself to cancel the drag).
-- 2.0.84 Bugs and Improvements
+- 2.0.84 14/12/2020: Bugs and Improvements
     - Introduced internal code support for multi-bookmarks selection and drag & drop, first phase before delivering
       the function in UI in a next release.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/29
@@ -288,7 +297,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       rapid access to BSP2 properties window.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/160
     - Code cleaning and optimizations.
-- 2.0.83 Bugs and Improvements
+- 2.0.83 14/09/2020: Bugs and Improvements
     - Corrected a bug where hitting the "Enter" key inside the search box when no result table was displayed
       was generating an exception.
     - Added an option to only wait for "Enter" key (or "Enter" icon click) inside the search box to launch
@@ -300,7 +309,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       effect as pressing "Enter" key).
          https://github.com/aaFn/Bookmark-search-plus-2/issues/157
     - Reduced delay for updating search results on events like search filters change, or bookmark item changes. 
-- 2.0.82 Improvements
+- 2.0.82 22/08/2020: Improvements
     - Added display of a default PDF favicon when a bookmarked URL returns no favicon, and the URL ends in ".pdf"
       in lowercase.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/126
@@ -308,7 +317,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       keep only one folder open at a time for clarity.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/128 
         and https://addons.mozilla.org/en-US/firefox/addon/bookmark-search-plus-2/reviews/1474439/
-- 2.0.81 Bugs and Improvements
+- 2.0.81 16/08/2020: Bugs and Improvements
     - Added partial protection against adverse bookmark property window positioning effects induced by
       privacy.resistFingerprinting = true. This FF mode, activated by a minority of users, does not allow the
       add-on to get the real screen size, and does not say it is active :-(. The improvement is limited to some
@@ -320,7 +329,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Corrected a bug where the FF dynamic behavior on scrollbar colors, introduced with FF 72, was not applying.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/153
         https://www.ghacks.net/2019/11/11/firefox-72-dynamic-scrollbars-based-on-page-color/
-- 2.0.80 Bugs & Improvements
+- 2.0.80 02/08/2020: Bugs & Improvements
     - Some more code clean up.
     - Worked around an inconsistency in FF API related to system DPI settings / zoom factor, impacting
       window.devicePixelRatio, but not window.screenX and screenY, so leading to bookmark property window
@@ -336,7 +345,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
         https://github.com/aaFn/Bookmark-search-plus-2/issues/151
     - Corrected a regression where context menu actions were not executed when BSP2 was open in a tab.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/151
-- 2.0.79 Bugs & Improvements
+- 2.0.79 20/07/2020: Bugs & Improvements
     - Shortened the BSP2 menu label which shows path of a bookmark in native FF interfaces (and other compatible
       add-ons).
         https://github.com/aaFn/Bookmark-search-plus-2/issues/148
@@ -346,10 +355,10 @@ Please find here the release notes, TODO's, and some limitations I know of today
       instead of clearing the search.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/151
     - Some code cleanup
-- 2.0.78 Bugs
+- 2.0.78 10/06/2020: Bugs
     - Corrected a bug where all previous active records in bookmark history become inactive, on first bookmark
       action appended after a trim in history where 1 or more past records were removed.
-- 2.0.77 Improvements
+- 2.0.77 17/05/2020: Improvements
     - Added support for right-click on the search button (= magnifying glass at left of the search box), in
       addition to left click, to show the search configuration menu. This should to make it more accessible,
       depending on user habits.
@@ -364,7 +373,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       Cf. also https://www.incredible-web.com/blog/performance-of-for-loops-with-javascript/ as an illustration.
     - Corrected a bug on monitoring BSP2 sidebar open/close state in private windows. No visible effect, but
       cleaner code.
-- 2.0.76 Bugs & Improvements
+- 2.0.76 28/04/2020: Bugs & Improvements
     - Added a Bookmark history window to examine the history of all recorded bookmark actions, as well as
       some meta actions (like BSP2 start, or reload). The window is refreshed real time when there are updates
       and it is open. It also shows the undo/redo cursor position in the history stack, as well as undo/redo
@@ -405,14 +414,14 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Removed protection from "about:" bookmarks which was set at very early versions of BSP2, this is of
       no use now, and was annoying because cannot mdrag & drop / move such bookmarks.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/140
-- 2.0.75 Bugs & Improvements
+- 2.0.75 23/03/2020: Bugs & Improvements
     - Complemented drag & drop operations with full plain text (with indentation) and HTML representations,
       including folder title and recursive content, and separators.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/131
     - Corrected a bug where dragging a result to an external window could leave the non droppable zone
       active on the object being dragged (or on the zone covered by it when a folder), preventing to drop
       something on it later, until another drag & drop operation from the result or bookmark pane is started.
-- 2.0.74 Improvements
+- 2.0.74 18/03/2020: Improvements
     - Added extension short_name = "BSP2" in manifest file, to appear in FF places where normal name is too
       long and would be truncated.
     - Changed the hover on search result bookmark items and folders, so that it always shows the default cursor
@@ -429,7 +438,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
         https://github.com/aaFn/Bookmark-search-plus-2/issues/112
       A library of alternate icons is here https://github.com/aaFn/Bookmark-search-plus-2/tree/master/altFldrIcons
       (use a Pull request to add more to it)
-- 2.0.73 Bugs & Improvements
+- 2.0.73 07/03/2020: Bugs & Improvements
     - Added option to show path instead of (title + url) in the tooltip bubble which appears when hovering above
       a search result. When the option changes while a search result is active, the search result will be
       refreshed accordingly. Same when a bookmark is moved while a search result is open and the option is set.
@@ -445,7 +454,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Added context menu item on BSP2 Browser Action button in the toolbar, to open BSP2 in a tab besides the
       current active one, as demanded by blankon
         https://addons.mozilla.org/en-US/firefox/addon/bookmark-search-plus-2/reviews/1491980/
-- 2.0.72 Improvements
+- 2.0.72 01/03/2020: Improvements
     - Now handle multiple favicon links in HTML pages for more robustness, picking the closest to 16x16, and
       then increasingly trying the other bigger ones if fetch error, until getting a good one.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/124
@@ -454,7 +463,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Detect HTML responses on favicon fetching which answer a 200 return code with HTML to say no object
       or page at this URL, to then try the next favicon link in the candidate list.
     - Also catch rel=icon links, without " or '.
-- 2.0.71 Improvements
+- 2.0.71 16/02/2020: Improvements
     - Detect a number cases of de-synchronization between BSP2 and FF (by receiving a notification from FF,
       or by getting a search result, on a bookmark which cannot be retrieved in BSP2 cache), and if so provoke
       an automatic reload of bookmarks through FF API to re-synchronize.
@@ -478,7 +487,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Added "Collapse all in branch" and "Expand all in branch" actions for Folders into the Advanced submenu, also
       activable by shift-left and shift-right shortcuts on keyboard, for FF64 and higher.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/31
-- 2.0.70 Improvements
+- 2.0.70 12/01/2020: Improvements
     - Added key shortcuts in integrated context menus (FF >= 64), mimicking as much as possible native
       FF bookmark sidebar context menus key shortcuts, but resolving an ambiguity error on P which means both
       "Paste" and "Open in a new private window" actions in the native context menu.
@@ -496,7 +505,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       accident. Now, only browser global settings or external wanted means (e.g. another add-on for that purpose)
       can act on the property window aspect.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/123
-- 2.0.69 Bugs & Improvements
+- 2.0.69 01/01/2020: Bugs & Improvements
     - Improved compability with browsers before FF62.
     - Cleaner event handling on mouse button actions.
     - Aligned order of possible actions in context menus between different objects, to follow a consitent
@@ -512,7 +521,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
         https://github.com/aaFn/Bookmark-search-plus-2/issues/70
     - Corrected a regression where BSP2 version bubble was not showing while hovering mouse over the magnifying
       glass button, when running on FF version 66 and below.
-- 2.0.68 Improvements
+- 2.0.68 02/12/2019: Improvements
     - Added suppport for FF themes on text and background colors of BSP2. Activate by a special option
       to read and follow current FF theme.
     - Added option to override text and background colors in the BSP2 sidebar (disabled by the match
@@ -521,15 +530,15 @@ Please find here the release notes, TODO's, and some limitations I know of today
       any value, then set the "Match active theme" option, and unset it .. the text and background input
       color pickers will contain the theme values and keep them for modification.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/100
-- 2.0.67 Bugs
+- 2.0.67 08/09/2019: Bugs
     - Corrected a bug where folder state was not saved immediately after a result search, when the option
       `After "Show Bookmark", leave bookmark tree open by default when closing search pane` is set.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/82 
-- 2.0.66 Improvements
+- 2.0.66 01/09/2019: Improvements
     - Remember last highlighted bookmark across sidebar sessions, and across FF sessions, if it still exists.
       Else go at top of the tree.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/82
-- 2.0.65 Improvements
+- 2.0.65 16/08/2019: Improvements
     - Removed the version number from the Sidebar title, this is superfluous now, as it is shown by hovering
       on the magnifying glass, and on the Star icon in the toolbar, and anyway not really the place for it.
     - Added new option "Reverse folder hierarchy in paths", effective in BSP2 Property popups, and in the
@@ -544,7 +553,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
         - https://github.com/aaFn/Bookmark-search-plus-2/issues/90
         - https://github.com/aaFn/Bookmark-search-plus-2/issues/28
     - The "Open BSP2 in a tab" hidden menu becomes now directly accessible through that button.
-- 2.0.64 Improvements
+- 2.0.64 07/07/2019: Improvements
     - In case of slow save (see 2.0.63), set a maximum duration of 5 minutes on delayed saves.
       This is to make sure that we are not losing too many changes in case Firefox is closed while having
       a continued flow of bookmark changes delaying save.
@@ -552,7 +561,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       to make sure we're not endlessly forgetting favicons, when fetching all of them is longer than the
       FF browser session and user exits it before full favicon fetching completion ..
       Again can only occur for very large numbers of bookmarks, so this is a very specific case.
-- 2.0.63 Improvements
+- 2.0.63 30/06/2019: Improvements
     - Introduced for users with large numbers of bookmarks (> 10000 ?) a workaround delay on save to local
       storage when there is a slow save (> 2s), to maintain UI responsiveness.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/103
@@ -577,7 +586,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       - Drawback of the workaround is a slight chance to have de-synchronization on BSP2 side for users with
         large numbers of bookmarks, if FF is closed before BSP2 had time to do its delayed save (10s) = to be
         resolved by pressing the "Reload all bookmarks from FF now" button in the Options page. 
-- 2.0.62 Bugs & Improvements
+- 2.0.62 08/06/2019: Bugs & Improvements
     - Corrected a bug which caused an exception when dragging a bookmark to the last folder of the
       tree, if that one was empty.
     - Added popup display of a folder name when hovering over it in search result, like in main tree.
@@ -586,7 +595,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       Added a twistie at front of it to keep it visually distinguishable from normal bookmarks in
       big result lists.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/84
-- 2.0.61 Bugs & Improvements
+- 2.0.61 02/06/2019: Bugs & Improvements
     - Increased the number of retries for the Linux FF startup robustness feature from 3 to 10,
       to get some margin, as 3 seems to be the minimum number I observe when the problem occurs.
     - Fixed bad URL in bookmark when dragging and dropping the address from the address bar to the
@@ -600,7 +609,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
         https://github.com/aaFn/Bookmark-search-plus-2/issues/104
     - Accept dragging and dropping Reader type of tabs / addresses into the bookmarks tree.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/104
-- 2.0.60 Bugs & Improvements
+- 2.0.60 1/05/2019: Bugs & Improvements
     - Changed the name of the Reload bookmarks button in options page to something more meaningful
       to all users.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/93
@@ -614,13 +623,13 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Added some robustness on a few events when adding new bookmarks, to resist to some de-synchro
       I am seeing appeared with FF 65/66 .. :-(
         https://github.com/aaFn/Bookmark-search-plus-2/issues/99
-- 2.0.59 Bugs & Improvements
+- 2.0.59 01/04/2019: Bugs & Improvements
     - Improved handling of FF66 bug workaround on Linux for target element which is set to body.
     - Improved handling of events to clear open context menus when right clicking inside search box
       or inside the trace box.
     - Corrected a bug on error logging when the error given by FF is undefined (!!), which was making
       the background task to stop in exception.
-- 2.0.58 Improvements
+- 2.0.58 30/03/2019: Improvements
     - Improved visibility of folder twisties by adjusting to Windows 10 Explorer colors.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/89
     - Workaround for an FF66 bug in Linux on contextmenu events, where the target element of the
@@ -630,7 +639,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
         https://github.com/aaFn/Bookmark-search-plus-2/issues/9
     - Changed behavior of default menu, which is now only a context menu on the magnifier glass, in
       preparation for https://github.com/aaFn/Bookmark-search-plus-2/issues/90
-- 2.0.57 Bugs & Improvements
+- 2.0.57 06/03/2019: Bugs & Improvements
     - Improved insertion as first item of an open non empty folder, which demanded precise movements to
       distinguish between 'folder next sibling' and 'folder first item'. Now only first item is possible,
       so as to avoid hassle to the user of distinguishing between the two.
@@ -639,14 +648,14 @@ Please find here the release notes, TODO's, and some limitations I know of today
         https://github.com/aaFn/Bookmark-search-plus-2/issues/89
     - Forcing text color to black in the searchbox, in case an internal theme is overriding the sidebar page
       default and setting it to white on white background ...
-- 2.0.56 Bugs & Improvements
+- 2.0.56 01/03/2019: Bugs & Improvements
     - Corrected a regression introduced in 2.0.55 when dragging onto a folder.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/89
     - Palliated for missing "leave" and "exit" events on drag and drop, which FF appears to forget
       to send sometimes, and which was resulting in unwanted remaining insert highlight marks. Especially
       under Linux.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/89
-- 2.0.55 Bugs & Improvements
+- 2.0.55 28/02/2019: Bugs & Improvements
     - Corrected the mouse pointer behavior on context menus when BSP2 is open in a tab, as it was sometimes
       a text cursor.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/89
@@ -661,7 +670,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       copied instead of being moved.
       Reverse direction is working fine.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/89
-- 2.0.54 Bugs & Improvements
+- 2.0.54 24/02/2019: Bugs & Improvements
     - Improved on displaying multiple spaces in bookmark titles, by instructing HTML to preserve space
       formatting and not collapse them into one space.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/88
@@ -679,9 +688,9 @@ Please find here the release notes, TODO's, and some limitations I know of today
       with an action to allow opening BSP2 in a full tab for very wide visibility, since FF limits the size of
       sidebars.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/71
-- 2.0.53 Bugs & Improvements
+- 2.0.53 16/02/2019: Bugs & Improvements
     - Added support for drag and drop of the URL address text selected in the Location bar.
-- 2.0.52 Bugs & Improvements
+- 2.0.52 29/01/2019: Bugs & Improvements
     - Corrected a rare bug where auto-scrolling was disabled when dragging around end of panel, in the case
       of dragging from outside but not triggering an initial scroll at entry (because the bookmark pane
       was already at its end scroll position).
@@ -697,7 +706,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       Indeed, starting with FF65, img HTML elements with no src= attribute start to show 2 box-shadow: inset
       effects above the background image.
         Cf. https://github.com/aaFn/Bookmark-search-plus-2/issues/83
-- 2.0.51 Bugs & Improvements
+- 2.0.51 14/01/2019: Bugs & Improvements
     - Shortened the submenu name added by BSP2 to FF native context menus to "BSP2 Path to bookmark item"
       (removed "Show").
     - Fixed the size of both the font and place size input fields in the BSP2 Options page, and increased
@@ -713,7 +722,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       https://developer.mozilla.org/en-US/docs/Web/Events), so this is creating an odd effect some times,
       and I might end up disabling that improvement on Linux if I do not find a work around ... :-(
     - Also prevent Search result pane scrolling when dragging an element out of it. 
-- 2.0.50 Bugs & Improvements
+- 2.0.50 06/01/2019: Bugs & Improvements
     - Added a native FF context menu extension for FF bookmarks, to show their path. This is adding a
       "BSP2 Show path to bookmark item" specific submenu, to display the path to the bookmark item.
       For now, this works only on bookmarks toolbar or menu. This doesn't currently work for bookmark sidebar and
@@ -732,7 +741,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       durations before sending back the Promise result, and there were things changing in between in the
       input box, or there were several searches queued and dispatched after last key stroke.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/72
-- 2.0.49 Bugs & Improvements
+- 2.0.49 25/12/2018: Bugs & Improvements
     - Corrected a rare bug where dragging an element from outside the sidebar, to the sidebar, after having
       dragged a bookmark item inside it, was forbidding to drop the new element before or after the place of
       the old dragged bookmark item.
@@ -740,7 +749,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       I gave a max of 10px. Increments are by 2px because each increment is adding 1px on each side (top and
       bottom) of items.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/78
-- 2.0.48 Bugs & Improvements
+- 2.0.48 20/12/2018: Bugs & Improvements
     - Corrected height of separator bookmark items, which were 1 pixel more than other bookmark items.
     - Removed the annoying effect of tree wobbling below the blue insert line, when dragging and dropping
       bookmark items.
@@ -750,11 +759,11 @@ Please find here the release notes, TODO's, and some limitations I know of today
         https://github.com/aaFn/Bookmark-search-plus-2/issues/77
     - Removed the default annoying focus-ring which would now become visible under Linux as a side effect
       of above modifications.
-- 2.0.47 Bugs
+- 2.0.47 17/12/2018: Bugs
     - Corrected a bug where it was possible to drag & drop a bookmark item onto a special "place:" folder.
     - Corrected a bug where resetting to default sidebar shortcut in the options page was not effective
       immediately in case of 2 modifiers in the default combination (e.g. under Linux). 
-- 2.0.46 Improvements
+- 2.0.46 16/12/2018: Improvements
     - Improved the mouse hovering pointer behavior on folders, to indicate which part of the line is going
       to have an open/close action on the folder, and which part will only do a select.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/73
@@ -769,7 +778,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Added the path to bookmark item in the Properties dialog.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/74
     - Added support for multiple tabs drag and drop for creating bookmarks, which comes with FF64.
-- 2.0.45 Improvements
+- 2.0.45 08/12/2018: Improvements
     - Added handling of left and right keyboard arrows on folders and bookmarks, as per native Bookmark
       sidebar.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/73
@@ -779,16 +788,16 @@ Please find here the release notes, TODO's, and some limitations I know of today
         https://github.com/aaFn/Bookmark-search-plus-2/issues/46
     - Added support for "Enter" key inside the search box = it now sets the keyboard focus on the first
       search result (if any), to allow for further keyboard based navigation in the search result list.
-- 2.0.44 Improvements
+- 2.0.44 07/12/2018: Improvements
     - As it looks like this FF bug https://bugzilla.mozilla.org/show_bug.cgi?id=1396364 is getting worse
       than before, add a trace just before calling the FF API to see in the console that we are waiting for
       the FF API to return to us, in case things seem stuck.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/72
-- 2.0.43 Bugs & Improvements
+- 2.0.43 02/12/2018: Bugs & Improvements
     - Simplification of the code to save the bookmark tree in local storage, in order to reduce the number
       of objects to garbage collect and to ease the GC work.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/64
-- 2.0.42 Bugs & Improvements
+- 2.0.42 24/11/2018: Bugs & Improvements
     - Improved bug catching when a trap is happening in nested promises and an outer try{} or .then()
       statement has a catch() part.
       It appears that errors in the inner promise .then() statement are not (anymore ??) caught
@@ -816,7 +825,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Allow drag and drop from search result pane into the bookmark pane, for move of the real bookmark at
       dropped place. Note: this results in a copy when Ctrl is pressed at the same time than drop.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/66
-- 2.0.41 Bugs & Improvements
+- 2.0.41 18/11/2018: Bugs & Improvements
     - Improved to catch the mouse middle button click at "mousedown" event and to prevent the default FF
       autoscroll feature to activate itself when middle clicking on a bookmark inside the sidebar. This will
       now only open the bookmark in a separate tab, without doing "fancy" things in the sidebar itself.
@@ -836,7 +845,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Corrected a bug of not catching an error on favicon fetching for an undocumented case where
       Response.blob() ends in error, in some cases of favicon getUri() retrieval. This was interrupting
       the favicon fetching process with no hope of getting the next favicons. 
-- 2.0.40 Bugs & Improvements
+- 2.0.40 28/10/2018: Bugs & Improvements
     - Corrected a regression where modified tab events with favicon already coded as data: URL were not
       properly handled.
     - Better handling of visited URL history cleaning when opening bookmark property popups, and better
@@ -850,18 +859,18 @@ Please find here the release notes, TODO's, and some limitations I know of today
         https://github.com/aaFn/Bookmark-search-plus-2/issues/46
     - Corrected a bug when refreshing contents of the most visited special folder, not showing the latest
       list.
-- 2.0.39 Bugs
+- 2.0.39 19/10/2018: Bugs
     - Corrected a bug where opening properties on a bookmark item whose title contained "&" was improperly
       showing in the property window, and was changing (trunking) the title of the bookmark.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/58
-- 2.0.38 Bugs
+- 2.0.38 15/10/2018: Bugs
     - Corrected a bug where dragging & dropping a tab with a URL containing "#" could end up with wrong open
       tab being bookmarked (bug in a workaround for an FF bug on browser.tabs.query() which returns an empty
       array of tabs when the searched url contains # :-( ).
-- 2.0.37 Bugs
+- 2.0.37 23/09/2018: Bugs
     - Corrected a bug where after some error conditions, background favicon fetching would stop until next
       FF restart.
-- 2.0.36 Bugs & Improvements
+- 2.0.36 08/09/2018: Bugs & Improvements
     - Added folder sort function, respecting separators like in Native bookmark sidebar and library:
       - Sorting is case insensitive
       - Separators are sorting "frontiers" = sorting is executed only inside portions delimited by
@@ -874,7 +883,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
         https://github.com/aaFn/Bookmark-search-plus-2/issues/52
     - Support for modified tabs notification when there is a cached page reload (internal URL in
       "wyciwyg://"). Cf. https://en.wikipedia.org/wiki/WYCIWYG
-- 2.0.35 Bugs & improvements
+- 2.0.35 02/09/2018: Bugs & improvements
     - Catch some background task errors resulting in "Wait background load..." hang and report them
       in the console log.
       Please report those errors on GitHub by copying the console contents on:
@@ -896,12 +905,12 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Added an option to change the font size of the bookmarks to suit your taste, between 10 px and 16 px.
       Default is 12 px when the option is not set.
          https://github.com/aaFn/Bookmark-search-plus-2/issues/56
-- 2.0.34 Improvements
+- 2.0.34 11/08/2018: Improvements
     - Added a "Go parent folder" action on the context menu, both for result and for bookmark pane rows.
       Quite useful for folders with 100 or more rows, to avoid to scroll up looking or the first less
       indented item (which is also eye tiring, in particular when earlier siblings are open folders).
        https://github.com/aaFn/Bookmark-search-plus-2/issues/55
-- 2.0.33 Bugs
+- 2.0.33 08/08/2018: Bugs
     - Corrected a regression when sorting bookmarks inside a folder from the bookmark library, where
       things were not displayed in right order in the folder being sorted (had to switch the sidebar
       off and on to get things displayed right).
@@ -912,16 +921,16 @@ Please find here the release notes, TODO's, and some limitations I know of today
       bookmarks panel was making the inserted object visible while the folder was closed.
     - Corrected a bug when bookmarks were deleted while retrieving their favicon, which was generating
       an exception. This was having no effect, but it is cleaner to not get any exception :-)
-- 2.0.32 Bugs
+- 2.0.32 06/08/2018: Bugs
     - Corrected a bug where the saved state may not deserialize properly and would return a null
       object, thus leaving BSP2 hanging in "Wait background load..." state.
       Now checking the returned value, and if null, forcing an FF API reload, which is longer
       but should always work.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/52
-- 2.0.31 Bugs
+- 2.0.31 28/07/2018: Bugs
     - Corrected a bug where OS Platform was not always identified from start in the sidebar (to set
       OS specifics for display), because of the sidebar running faster than the background page.
-- 2.0.30 Bugs & improvements
+- 2.0.30 21/07/2018: Bugs & improvements
     - Corrected a bug where pause favicons fetching was not respected when loading bookmarks
       from FF API.
     - Improved to maintain counters all the time and not only during initial load. Added a counter
@@ -935,7 +944,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       It is recommended to hit the "Reload from FF API now" button once in the add-on options panel
       to fully resync, although this shouldn't really create any problem, so I am not going to force
       it on update.
-- 2.0.29 Bugs & improvements
+- 2.0.29 14/07/2018: Bugs & improvements
     - Corrected a bug on migrating from old save structure before 2.0.18 when in the new background
       task of 2.0.27+.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/50
@@ -950,7 +959,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Added an option to "Pause favicon fetching option" which stops the fetch but keeps things already
       fetched in the cache. The fetch process can be restarted at anytime by coming back to "Active".
         https://github.com/aaFn/Bookmark-search-plus-2/issues/49
-- 2.0.28 Bugs & improvements
+- 2.0.28 08/07/2018: Bugs & improvements
     - Bug introduced in 2.0.27 with BSP2 waiting indefinitely on "Load FF API..". This was due
       to a misunderstanding from me on how to use browser.runtime.onInstalled.addListener() = no
       event is sent on it when FF regularly restarts, but the code was waiting on it to systematically
@@ -962,7 +971,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       nor install.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/5
     - Removed browser console traces on exchanged message with background task. They are not needed now.
-- 2.0.27 Bugs & improvements
+- 2.0.27 07/07/2018: Bugs & improvements
     - Implemented optimization of loading the bookmark tree from local store where the add-on keeps
       it up to date, instead of from FF API each time. 
       This should be the second major improvement for users with many bookmarks, after the
@@ -987,7 +996,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Added feature of displaying a suggested title calculated from the URL when a bookmark title
       is empty - coming from pull request from jun1x
         https://github.com/aaFn/Bookmark-search-plus-2/pull/45 
-- 2.0.26 Improvements
+- 2.0.26 17/06/2018: Improvements
     - Accelerated display phase by a factor between 2 and 4 depending on cases, by using cloneNode()
       techniques, background images for folders and for disabled favicon mode, and most of all by
       deferring favicon display (which is the longest piece) out of the main cycles, in background
@@ -997,22 +1006,22 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Added an option to revert to old favicon display behavior during main display phase, and to
       not defer them, in case the new behavior would create problems for some users. It is not
       disabling the usage of cloneNode() though, which is supposed to always have a gain.
-- 2.0.25 Improvements
+- 2.0.25 12/06/2018: Improvements
     - Support working with the websites.resistFingerprinting setting as manipulated in the
       Privacy Settings add-on, which alter the Navigator.buildID returned value.
         https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/privacy/websites
-- 2.0.24 Improvements
+- 2.0.24 10/06/2018: Improvements
     - Reproduced the native bookmarks behavior on Shift and Ctrl Keys:
         https://github.com/aaFn/Bookmark-search-plus-2/issues/44
     - And therefore, changed Shift to Alt to force opening the clicked bookmark in non-advanced
       mode:
         https://github.com/aaFn/Bookmark-search-plus-2/issues/3
-- 2.0.23 Bug
+- 2.0.23 06/06/2018: Bug
     - Removed the annoying "force trace" textarea left by error from a temporary version made for
       investigating issue https://github.com/aaFn/Bookmark-search-plus-2/issues/40.
       - See https://github.com/aaFn/Bookmark-search-plus-2/issues/42
       - Sorry for the inconvenience.
-- 2.0.22 Bugs & improvements
+- 2.0.22 02/06/2018: Bugs & improvements
     - Corrected a bug when the add-on was stopped while the favicon of a bookmark was being
       fetched, where the favicon was not reset to be fetched when restarting.
     - Introduced a priority process for manual "Refresh favicon" and for existing modified
@@ -1037,11 +1046,11 @@ Please find here the release notes, TODO's, and some limitations I know of today
       save, preserving a fallback in case the last save was corrupted.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/40
     - Some cleanup on options format in local storage.
-- 2.0.21 Improvements
+- 2.0.21 30/05/2018: Improvements
     - Added intermediate messages on the status when initially loading the sidebar, to better
       visually track each step. And if one is blocking load, identify which one it is. 
         https://github.com/aaFn/Bookmark-search-plus-2/issues/40
-- 2.0.20 Bugs & improvements
+- 2.0.20 28/05/2018: Bugs & improvements
     - Accelerated setting zones of no-drop or no-paste when dragging or cutting a folder
       with many bookmarks inside.
     - Also show bookmark in the bookmark pane when right clicking on a result in the search pane.
@@ -1058,7 +1067,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       effect, in case the memory saw phenomenon due to favicon fetching is really annoying
       and creating problems.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/40
-- 2.0.19 Bugs & improvements
+- 2.0.19 09/05/2018: Bugs & improvements
     - Corrected an internal error happening during some drag operations. Apparently without
       consequence, but cleaner without.
         See https://github.com/aaFn/Bookmark-search-plus-2/issues/35
@@ -1071,7 +1080,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Corrected a blocking bug introduced in 2.0.18 with new internal acceleration tree structure,
       of failure at start when a bookmark was created while the add-on was not active.
       Emergency fix ..
-- 2.0.18 Bugs & improvements
+- 2.0.18 06/05/2018: Bugs & improvements
     - Corrected a bug when moving a folder holding separators in FF 56, where separators were not
       shown again.
     - Corrected a bug when creating or inserting a bookmark in FF 56 as last child of its parent
@@ -1100,14 +1109,14 @@ Please find here the release notes, TODO's, and some limitations I know of today
         https://github.com/aaFn/Bookmark-search-plus-2/issues/36
     - Update search result to show the "waiting favicon refresh" when we refresh a favicon, if
       there is a search result open.
-- 2.0.17 Bugs
+- 2.0.17 14/04/2018: Bugs
     - Added support for Mobile bookmarks when not empty (no way to know that Mobile bookmarks / sync
       is activated or not).
         https://github.com/aaFn/Bookmark-search-plus-2/issues/33
     - Added a better status of migration to 16x16 favicons, some more robustness to it, and
       a way to retrigger it in case it is believed it didn't complete properly.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/35
-- 2.0.16 Improvements
+- 2.0.16 08/04/2018: Improvements
     - Decreased memory usage on massive favicon loads by spacing the saves to local storage.
       Apparently, browser.storage.local.set() is leaving significant chunks of memory to garbage
       collect, and having saves too close to each other (initially at each new favicon load)
@@ -1124,7 +1133,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       and until all stored valid favicons are converted, so that this improvement applies also to
       existing favicons.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/2
-- 2.0.15 Bugs and improvements
+- 2.0.15 01/04/2018: Bugs and improvements
     - Fix menu sizes not being consistent on Linux variation.
     - Added an option to disable favicon retrieval, as some users really do not use favicons.
       Note that this allows to trigger massive refresh of all favicons, apart from the initial
@@ -1136,14 +1145,14 @@ Please find here the release notes, TODO's, and some limitations I know of today
       popup.
       Along with a "Reset to defaults" button to come back to defaults if needed.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/26
-- 2.0.14 Bugs
+- 2.0.14 25/03/2018: Bugs
     - Corrected regression on drop into folder brought by 2.0.13.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/27
     - Scroll to center for "Show bookmark" is only supported with FF > 58.0, so only
       apply that improvement for versions >= 58.0, and revert to old behavior in older
       version.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/25
-- 2.0.13 Bugs and improvements
+- 2.0.13 24/03/2018: Bugs and improvements
     - Fix folder twistie color change when hovering the mouse on a selected folder row
       (it was not highlighting).
     - Added context menu on top (system) folders to allow creating bookmarks, folders and
@@ -1154,7 +1163,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       bookmark at center of bookmark pane, so as to make previous context visible (previous
       siblings, parents if not too far).
         https://github.com/aaFn/Bookmark-search-plus-2/issues/25
-- 2.0.12 Bugs and improvements
+- 2.0.12 20/03/2018: Bugs and improvements
     - Small adjustment to highlight colors to make things more consistent between search pane
       and bookmark pane.
     - Made the insertion line a little more color intense when dragging bookmarks for better
@@ -1175,7 +1184,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
         https://github.com/aaFn/Bookmark-search-plus-2/issues/23
     - Changing minimum version of the add-on to be on FF 56, instead of FF 54. FF 56 appears to
       be the real minimum I can support ..
-- 2.0.11 Bugs and improvements
+- 2.0.11 20/03/2018: Bugs and improvements
     - Some more robustness against odd bookmarks
         https://github.com/aaFn/Bookmark-search-plus-2/issues/23
     - Correct option "close search after show bookmark" to imply "leave tree open", else
@@ -1184,7 +1193,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       and less confusing. Benefit is that after search pane close, a shown bookmark remains
       highlighted if it is still visible.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/20
-- 2.0.10 Bugs and improvements
+- 2.0.10 18/03/2018: Bugs and improvements
     - Added option to immediately close search pane after showing a bookmark, per users
       demand. Unchecked by default.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/20
@@ -1210,7 +1219,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       This could get to very high amounts of memory on initial load of the add-on when all
       bookmarks require favicon retrieval, and crash FF.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/12
-- 2.0.9 Bugs and improvements
+- 2.0.9 12/03/2018: Bugs and improvements
     - Refresh search pane on favicon change/update for a bookmark when the pane is open,
       in case a search result contains that bookmark, to display the favicon change in
       "real time".
@@ -1221,7 +1230,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Protect against oddities (neither bookmark nor folder nor separator, or bookmark
       objects which are incomplete like without a URL), and trace them.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/23
-- 2.0.8 Improvements
+- 2.0.8 09/03/2018: Improvements
     - Save the bookmark property popup position when closing it, and restore it at the same
       place. Exception: if invisible / in a different screen, then center it on same screen
       as browser Window.
@@ -1234,7 +1243,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       Note that clicking "Refresh favicon" on the context menu always includes authentication.
       This allows to "force" favicon retrieval with higher chances.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/21
-- 2.0.7 Improvements
+- 2.0.7 26/02/2018: Improvements
     - Large performance improvement on insert / move / delete bookmark.
       This was not visible with medium numbers of bookmarks (up to 10000), but getting more
       and more visible with very big numbers beyond that (some people have nearly 80000 bookmarks).
@@ -1255,7 +1264,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Forbid a paste into cut folder (would lead to unpredictable result ..).
     - Added the version in the add-on title, and show it when hovering on the search magnifying
       glass.
-- 2.0.6 Improvements
+- 2.0.6 25/02/2018: Improvements
     - Added dynamic refresh of search results (if there is a search active) when a bookmark or
       folder (but not a separator) is created, modified or removed.
       This allows to keep the search pane active for longer, while working on  the tree.
@@ -1280,7 +1289,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       long in itself, and I have no way to break it in smaller pieces ..
       However, from experience, this is around 1/3rd of the total time, so that should still allow
       to be faster by a factor of around 3 for people with large number of bookmarks ...
-- 2.0.5 Bugs and improvements
+- 2.0.5 19/02/2018: Bugs and improvements
     - Added support for drag and dropping the (i) icon of the Location bar
         https://github.com/aaFn/Bookmark-search-plus-2/issues/8
     - Changed shortcut for MacOS to Alt+B
@@ -1329,7 +1338,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       And when closing the search, the tree is reset to the state of each folder at moment of
       search close: open folders remain open, and closed folders have their bookmarks hidden again.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/6
-- 2.0.4 Bugs and improvements
+- 2.0.4 12/02/2018: Bugs and improvements
     - Display text besides the animated waiting image at add-on load, to explain this is is for
       loading and preparing bookmarks pane.
     - Added some perf measurements in traces about loading & displaying, to prepare for
@@ -1355,7 +1364,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       triggering a TypeError: row is undefined.
     - Corrected a bug where menu entries in bold (= default) in a context menu were not actioned.
     - Corrected a few minor bugs, no effect, but cleaner without them.
-- 2.0.3 Bugs and improvements
+- 2.0.3 09/02/2018: Bugs and improvements
     - Corrected bug on search result highlight showing all items under first open ancestor,
       and not just the ones at higher level on the path to that ancestor
     	https://github.com/aaFn/Bookmark-search-plus-2/issues/6
@@ -1371,8 +1380,8 @@ Please find here the release notes, TODO's, and some limitations I know of today
       preparing for visual perf improvement with asynchronous/background load and display,
       an improvement to come later.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/6
-- 2.0.2	Reduce console logging to only error cases when retrieving favicons
-- 2.0.1	Initial release version
+- 2.0.2	04/04/2018: Reduce console logging to only error cases when retrieving favicons
+- 2.0.1	04/04/2018: Initial release version
 
 
 LIMitations / TODO's:
