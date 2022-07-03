@@ -1965,6 +1965,8 @@ function bkmkCreatedHandler (id, BTN) {
 	  			 BTN.title, BN.faviconUri, BTN.url, inBSP2Trash);
   // Save new current info
   saveBNList();
+  // Refresh BSP2 toolbar icon in active tabs
+  refreshActiveTabs(BN, false);
 
   // If we receive creation of the BSP2 trash folder, then rebuild pointer
   // and tell open sidebars before they are notified of its creation, to recognize it
@@ -2068,6 +2070,8 @@ function bkmkRemovedHandler (id, removeInfo) {
 				   undefined, undefined, undefined, undefined, undefined,
 				   (type == "folder") ? BN_childIds(BN) : undefined // To increase chances to find childIds in case of desynchro
 				  );
+	// Refresh BSP2 toolbar icon in active tabs
+	refreshActiveTabs(BN, true);
 
 	BN_delete(BN, parentId);
 
@@ -2168,6 +2172,8 @@ function bkmkChangedHandler (id, changeInfo) {
 				  );
 	// Save new values
 	saveBNList();
+	// Refresh BSP2 toolbar icon in active tabs
+	refreshActiveTabs(BN, false);
 
 	// Signal to sidebars to make them change things on display (must work with Private window sidebars
 	// also, which have their own separate copy of curBNList).
@@ -2258,6 +2264,10 @@ function bkmkMovedHandler (id, moveInfo) {
 				  );
 	// Save new values
 	saveBNList();
+	if (tgtInBSP2Trash) {
+	  // Refresh BSP2 toolbar icon in active tabs
+	  refreshActiveTabs(BN, true);
+	}
 
 	// Signal to sidebars to make them change things on display (must work with Private window sidebars
 	// also, which have their own separate copy of curBNList).
@@ -2352,18 +2362,199 @@ function bkmkReorderedHandler (id, reorderInfo, recHistory = true) {
 }
 
 /*
- * When a tab gets new contents, verify its URL and if matching, get its favicon
+ * Find if a the URL of a given tab corresponds to a BN tree. Recursve.
+ *
+ * tab: tabs.Tab
+ * BN: BookmarkNode (tree)
+ *
+ * Retunrs the BN corresponding to the URL, or undefined.
+ */
+let baFoundBN_id = {}; // Global variable set by tabSwitched and tabModified to remember the bookmark found matching current tab.
+					   // Uesd bu onShownContextMenuHandler() on context menu on BSP2 toolbar icon.
+					   // Indexed by windowId, and contains the BN.id of corresponding active tab in that window 
+function matchUrlBN (url, BN) {
+  if (BN.url == url) {
+	return(BN);
+  }
+  else {
+	let children = BN.children;
+	if (children != undefined) {
+	  let len = children.length;
+	  let foundBN;
+	  for (let i=0 ; i<len ; i++) {
+		foundBN = matchUrlBN(url,children[i]);
+		if (foundBN != undefined) {
+		  return(foundBN);
+		}
+	  }
+	}
+	return(undefined);
+  }
+} 
+
+ 
+/*
+ * When a bookmark is created, modified or deleted, update BSP2 icon accordingly in all open FF windows
+ *
+ * BN: BookmarkNode (can be a tree)
+ * is_deleted: Boolean, true is BN was deleted, else false (meaning BN still exists)
+ */
+function refreshActiveTabs (BN, is_deleted) {
+  browser.tabs.query({active: true})
+  .then(
+	function (a_tabs) {
+	  let len = a_tabs.length;
+	  let tab;
+	  for (let i=0 ; i<len ; i++) {
+		tab = a_tabs[i];
+		let foundBN = matchUrlBN(tab.url, BN);
+		if (foundBN != undefined) {
+		  if (!is_deleted) {
+			baFoundBN_id[tab.windowId] = BN.id;
+			browser.browserAction.setIcon(
+			  {path: "icons/star2bkmked.png",
+			   tabId: tab.id
+			  }
+			);
+		  }
+		  else {
+			baFoundBN_id[tab.windowId] = undefined;
+			browser.browserAction.setIcon(
+			  {tabId: tab.id
+			  }
+			);
+		  }
+		} // Else do not touch BSP2 icon for that tab
+	  }
+	}
+  );
+} 
+
+/*
+ * When a tab is switched to, verify its URL and if matching, get its favicon
+ *
+ * activeInfo. ID and Window of the tab that was switched to.
+ */
+function tabSwitched (activeInfo) {
+  let tabId = activeInfo.tabId;
+  let winId = activeInfo.windowId;
+/*
+  trace('-------------------------------------');
+  trace("A tab was switched.\r\n"
+	   +"activeInfo.previousTabId: "+activeInfo.previousTabId+"\r\n"
+	   +"activeInfo.tabId: "+activeInfo.tabId+"\r\n"
+	   +"activeInfo.windowId: "+winId+"\r\n"
+	  );
+*/
+  browser.tabs.get(tabId)
+  .then(
+	function (tab) {
+	  let tabUrl = tab.url;
+	  // Verify this is a searchable url - If not, we get exception:
+	  //   Type error for parameter query (Value must either: be a string value, or .url must match the format "url")
+	  if ((tabUrl != undefined)
+		  && (!tabUrl.startsWith("view-source:"))
+		) {
+		try {
+		  // Handle specific wyciwyg:// case
+		  if (tabUrl.startsWith("wyciwyg://")) { // Cached URL wyciwyg://x/....    Cf. https://en.wikipedia.org/wiki/WYCIWYG
+			// Find start of real URL, which is after the first "/" after "wyciwyg://x"
+			let pos = tabUrl.indexOf("/", 10) + 1;
+			tabUrl = tabUrl.substring(pos);
+		  }
+		  // Look for a bookmark matching the url
+//		  browser.bookmarks.search({url: tabUrl})
+		  browser.bookmarks.search(tabUrl) // Search workaround to avoid exceptions on about:, file: ... URLs, cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1352835
+		  .then(
+			function (a_BTN) { // An array of BookmarkTreeNode
+			  let len = a_BTN.length;
+//console.log("A tab was switched to 2 - tabUrl: "+tabUrl);
+//console.log("Results: "+len);
+			  if (len > 0) { // This could be a bookmarked tab
+				// If there is a favicon and we are collecting them, refresh all coorresponding BookmarkNodes with it
+				let bnId;
+  				let foundBN_id = baFoundBN_id[winId] = undefined; // Forget about previous found one
+				let BN;
+				for (let i=0 ; i<len ; i++) {
+				  bnId = a_BTN[i].id;
+				  BN = curBNList[bnId];
+				  if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
+					reloadFFAPI(true);
+					break;
+				  }
+				  if (!BN.inBSP2Trash && (BN.url == tabUrl)) { // Only the ones not in trash
+															   // + protection against too wide result because of Search workaround above
+					// Match with first one
+					foundBN_id = baFoundBN_id[winId] = bnId;
+//console.log("Matching BTN.id: "+bnId+" "+a_BTN[i].url);
+					break;
+				  }
+				}
+				// Show a bookmarked BSP2 star for this tab, if there is a corresponding bookmark not in BSP2 trash
+				if (foundBN_id != undefined) {
+				  browser.browserAction.setIcon(
+					{path: "icons/star2bkmked.png",
+					 tabId: tabId
+					}
+				  );
+				}
+				else { // Reset to unbookmarked BSP2 icon
+				  browser.browserAction.setIcon(
+					{tabId: tabId
+					}
+				  );
+				}
+			  }
+			  else { // Reset to unbookmarked BSP2 icon
+				baFoundBN_id[winId] = undefined;
+				browser.browserAction.setIcon(
+				  {tabId: tabId
+				  }
+				);
+			  }
+			}
+		  );
+		} catch (err) {
+		  // Reset to unbookmarked BSP2 icon
+		  baFoundBN_id[winId] = undefined;
+		  browser.browserAction.setIcon(
+			{tabId: tabId
+			}
+		  );
+
+		  let msg = "Error in searching url "+tabUrl+" on tabModified : "+err;
+		  console.log(msg);
+		  if (err != undefined) {
+			let fn = err.fileName;
+			if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+			console.log("fileName:   "+fn);
+			console.log("lineNumber: "+err.lineNumber);
+		  }
+		}
+	  }
+	  else { // Reset to unbookmarked BSP2 icon
+		baFoundBN_id[winId] = undefined;
+		browser.browserAction.setIcon(
+		  {tabId: tabId
+		  }
+		);
+	  }
+	}
+  );
+}
+
+/*
+ * When a tab gets new contents, verify its URL and if matching, get its favicon + set BSP2 toolbar icon
  *
  * tabId integer. ID of the tab that was updated.
  * changeInfo object. Contains properties for the tab properties that have changed. See changeInfo below.
  * tab tabs.Tab. The new state of the tab.
  */
-let baFoundBN_id = undefined; // Global variable set by tabModified to remember the bookmark found matching current tab
-							  // for onShownContextMenuHandler() 
 function tabModified (tabId, changeInfo, tabInfo) {
+  let winId = tabInfo.windowId;
 /*
   trace('-------------------------------------');
-  trace("A tab was updated 1.\r\n"
+  trace("A tab was updated.\r\n"
 	   +"tabId: "+tabId+"\r\n"
 	   +"changeInfo.favIconUrl: "+changeInfo.favIconUrl+"\r\n"
 	   +"changeInfo.status: "+changeInfo.status+"\r\n"
@@ -2374,6 +2565,7 @@ function tabModified (tabId, changeInfo, tabInfo) {
 	   +"tabInfo.status: "+tabInfo.status+"\r\n"
 	   +"tabInfo.title: "+tabInfo.title+"\r\n"
 	   +"tabInfo.url: "+tabInfo.url+"\r\n"
+	   +"winId: "+winId+"\r\n"
 	  );
 */
   if (tabInfo.status == "complete") {
@@ -2414,7 +2606,7 @@ function tabModified (tabId, changeInfo, tabInfo) {
 									 )
 								  ;
 			  let bnId;
-  			  baFoundBN_id = undefined; // Forget about previous found one
+  			  let foundBN_id = baFoundBN_id[winId] = undefined; // Forget about previous found one
 			  let BN;
 			  let is_nofavicon = undefined;
 			  for (let i=0 ; i<len ; i++) {
@@ -2426,10 +2618,10 @@ function tabModified (tabId, changeInfo, tabInfo) {
 				}
 				if (!BN.inBSP2Trash && (BN.url == tabUrl)) { // Only the ones not in trash
 															 // + protection against too wide result because of Search workaround above
-				  if (baFoundBN_id == undefined) { // Keep only the first one
-					baFoundBN_id = bnId;
+				  if (foundBN_id == undefined) { // Keep only the first one
+					foundBN_id = baFoundBN_id[winId] = bnId;
 				  }
-//console.log("Matching BTN.id: "+bnId+" "+a_BTN[i].url+" foundBN_Id: "+foundBN_Id);
+//console.log("Matching BTN.id: "+bnId+" "+a_BTN[i].url+" foundBN_id: "+foundBN_id);
 				  // Load the favicon as a data: URI
 				  if (is_refreshFav) {
 					if (tabFaviconUrl.startsWith("data:")) { // Cool, already in good format for us !
@@ -2462,7 +2654,7 @@ function tabModified (tabId, changeInfo, tabInfo) {
 				}
 			  }
 			  // Show a bookmarked BSP2 star for this tab, if there is a corresponding bookmark not in BSP2 trash
-			  if (baFoundBN_id != undefined) {
+			  if (foundBN_id != undefined) {
 				browser.browserAction.setIcon(
 				  {path: "icons/star2bkmked.png",
 				   tabId: tabId
@@ -2470,7 +2662,6 @@ function tabModified (tabId, changeInfo, tabInfo) {
 				);
 			  }
 			  else { // Reset to unbookmarked BSP2 icon
-				baFoundBN_id = undefined;
 				browser.browserAction.setIcon(
 				  {tabId: tabId
 				  }
@@ -2478,7 +2669,7 @@ function tabModified (tabId, changeInfo, tabInfo) {
 			  }
 			}
 			else { // Reset to unbookmarked BSP2 icon
-			  baFoundBN_id = undefined;
+			  baFoundBN_id[winId] = undefined;
 			  browser.browserAction.setIcon(
 				{tabId: tabId
 				}
@@ -2488,7 +2679,7 @@ function tabModified (tabId, changeInfo, tabInfo) {
 		);
 	  } catch (err) {
 		// Reset to unbookmarked BSP2 icon
-		baFoundBN_id = undefined;
+		baFoundBN_id[winId] = undefined;
 		browser.browserAction.setIcon(
 		  {tabId: tabId
 		  }
@@ -2505,7 +2696,7 @@ function tabModified (tabId, changeInfo, tabInfo) {
 	  }
 	}
 	else { // Reset to unbookmarked BSP2 icon
-	  baFoundBN_id = undefined;
+	  baFoundBN_id[winId] = undefined;
 	  browser.browserAction.setIcon(
 		{tabId: tabId
 		}
@@ -2570,10 +2761,14 @@ function onShownContextMenuHandler (info, tab) {
 	  is_onBSP2Icon = true;
 	}
   }
-//let menuIds = info.menuIds;
-//console.log("menu shown on <"+bnId+"> with contexts=["+contexts+"] menuIds=["+menuIds+"]"
-//			+"\n menuItemId="+info.menuItemId+" pageUrl="+info.pageUrl+" targetElementId="+info.targetElementId+" viewType="+info.viewType
-//			+"\n tab="+tab);
+/*
+let menuIds = info.menuIds;
+console.log("menu shown on <"+bnId+"> with contexts=["+contexts+"] menuIds=["+menuIds+"]"
+			+"\n menuItemId="+info.menuItemId+" pageUrl="+info.pageUrl+" targetElementId="+info.targetElementId+" viewType="+info.viewType
+			+"\n tab="+(tab != undefined ? tab.id : "undefined")
+			+"\n winId="+(tab != undefined ? tab.windowid : "undefined")
+		   );
+*/
 
   if (is_onBkmk && (bnId != undefined) && (bnId.length > 0)) {
 	// Check if we are in BSP2 sidebar or not
@@ -2595,8 +2790,10 @@ function onShownContextMenuHandler (info, tab) {
 //	}
   }
   else if (is_onBSP2Icon) { // Check if we should enable the "Show bookmark in sidebar.." submenu
-	if (baFoundBN_id != undefined) { // Enable the submenu
-	  lastMenuBnId = baFoundBN_id; // Remember corresponding bnId for submenu action
+    let winId = tab.windowId;
+    let foundBN_id = baFoundBN_id[winId];
+	if (foundBN_id != undefined) { // Enable the submenu
+	  lastMenuBnId = foundBN_id; // Remember corresponding bnId for submenu action
 	  enableBAShowBkmk();
 	}
 	else { // Disable submenu
@@ -2705,9 +2902,10 @@ function completeBookmarks () {
 	  browser.bookmarks.onChildrenReordered.addListener(bkmkReorderedHandler);
 	}
 
-	// Watch for tabs loading new URL's .. if one matches one of our bookmarks,
-	// then get the favicon from that tab and refresh our bookmarks table and saved storage
-	// with it.
+	// Watch for tabs switches and tabs loading new URL's .. if one matches one of our bookmarks,
+	// then get the favicon from that tab when there is one, refresh our bookmarks table and saved storage
+	// with it, and set BSP2 toolbar icon.
+	browser.tabs.onActivated.addListener(tabSwitched);
 	browser.tabs.onUpdated.addListener(tabModified);
 
 	// Make sure sidebar/popup.html does not pollute history

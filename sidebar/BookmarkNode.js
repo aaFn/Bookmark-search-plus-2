@@ -880,7 +880,7 @@ function BN_search (BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlS
 	  let url;
 	  let i;
 	  let len = children.length;
-	  for (let j=0 ; j<len ;j++) {
+	  for (let j=0 ; j<len ; j++) {
 		i = children[j];
 		if ((i.type != "separator")
 			&& (((url = i.url) == undefined) || !url.startsWith("place:"))  // Ignore special bookmarks

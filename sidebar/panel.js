@@ -4270,6 +4270,7 @@ function checkDragType (dt) {
   //						 "dateAdded":1550944109935000,"lastModified":1551218607521000,"type":"text/x-moz-place","uri":"about:blank"}
   //						{"title":"","id":2239,"itemGuid":"gORenOTsYJdk","instanceId":"jvwImUhXA2rV","parent":2028,"parentGuid":"XmOZ-HAGbfEM",
   //						 "dateAdded":1536396421579000,"lastModified":1551022707690000,"type":"text/x-moz-place-separator"}
+  //        Note that drag and drops from FF History sidebar also have this type, but they have empty data equal to "" -> reject
   // When it is a tab, it will be
   //   dt.types        : text/x-moz-text-internal
   // When it is the (i) in the location bar
@@ -4343,23 +4344,30 @@ function checkDragType (dt) {
 	  itemCount = 1;
 	}
 	// Note: FF native bookmark sidebar doesn't set getData() until the drop is effective,
-	// so we cannot build and check the noDropZone until last moment :-( !! 
+	// so we cannot build and check the noDropZone until last moment :-( !!
+	let item; 
 	if (itemCount == 1) {
-	  data = "[" + dt.getData(format) + "]";
+	  item = dt.getData(format);
+	  isSupported = (item != ""); // If empty, do not accept (e.g. drag & drop from FF History sidebar)
+	  data = "[" + item + "]";
 	}
 	else {
 	  data = "[";
 	  for (let i=0 ; i<itemCount ; i++) { // Get each dragged item
 		if (i>0)   data += ",";
-		data +=	dt.mozGetDataAt(format, i);
+		item = dt.mozGetDataAt(format, i);
+		isSupported = (item != ""); // If empty, do not accept (e.g. drag & drop from FF History sidebar)
+		if (!isSupported) {
+		  break;
+		}
+		data +=	item;
 	  }
 	  data += "]";
 	}
 	// If different dtSignature, update bkmkDragIds, bkmkDrag and noDropZone 
-	if (dtSignature != data) {
+	if (isSupported && (dtSignature != data)) {
 //console.log("dtSignature: "+dtSignature+" - data: "+data);
 	  dtSignature = data;
-//traceDt(dt);
 
 	  let a_bookmark = JSON.parse(data);
 	  // Build bkmkDragIds and bkmkDrag as unique lists
@@ -4386,7 +4394,6 @@ function checkDragType (dt) {
 		zoneAddBN(noDropZone, bkmkDragIds[i], bkmkDrag[i]);
 	  }
 	}
-	isSupported = true;
   }
   else if (types.includes("text/x-moz-text-internal")
 		   || types.includes("text/uri-list")
