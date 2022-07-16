@@ -1113,7 +1113,7 @@ if (traceEnabled_option) {
 		  }
 		  else if (trashEnabled_option_old != trashEnabled_option) {
 			// Create or delete the BSP2 trash folder, as required
-			if (trashEnabled_option) { // Create BSP2 trash folder
+			if (trashEnabled_option) { // Create BSP2 trash folder, if not already existing (else trim it)
 			  createBSP2TrashFolder();
   			}
 			else { // Delete BSP2 trash folder and all its content
@@ -2362,36 +2362,94 @@ function bkmkReorderedHandler (id, reorderInfo, recHistory = true) {
 }
 
 /*
- * Find if a the URL of a given tab corresponds to a BN tree. Recursve.
+ * Identify cases where we will get no collectable favicon from a tab faviconUrl
+ *
+ * faviconUrl: String, URL to favicon
+ * tabUrl: String, URL of tab
+ *
+ * Returns: Boolean, true is not collectable.
+ */
+function is_notCollectableFaviconFromTab (tabFaviconUrl, tabUrl) {
+  // Verify this is a collectable favicon
+  let is_nofavicon = (tabFaviconUrl == undefined)
+  					 || (tabFaviconUrl.startsWith("chrome://global/skin/icons/")) // Internal icon, we can't fetch it, security error
+					 || (tabUrl.startsWith("moz-extension://"))
+					 || (tabUrl.startsWith("about:"))
+					 || (tabUrl.startsWith("data:"))
+					 || (tabUrl.startsWith("file:"))
+					 || (tabUrl.startsWith("blob:"))
+					 ;
+  return(is_nofavicon);
+}
+
+/*
+ * Set favicon from a collected faviconUrl
+ *
+ * bnId: String, bookmark Id
+ * is_noFavicon: Boolean, indicate a non collectable favicon case
+ * faviconUrl: String, URI/URL to favicon
+ */
+function setCollectedFavicon (bnId, is_nofavicon, faviconUrl) {
+// Since a BN create calls favicon refresh worker in background, don't do direct "data:" URLs now,
+// leave a chance for it to happen after the favicon fetch by queueing it behind.
+/*
+  if (faviconUrl.startsWith("data:")) { // Cool, already in good format for us !
+	setFavicon(bnId, faviconUrl);
+//console.log("Directly set favicon: "+faviconUrl);
+  }
+  else {
+*/
+	if (is_nofavicon) {
+	  setNoFavicon(bnId);
+//console.log("Set no favicon: "+faviconUrl);
+	}
+	else { // Fetch favicon
+	  // Presumably a bookmark, so no need for cloneBTN(), there is no tree below
+//	  faviconWorker.postMessage(["iconurl", bnId, tabFaviconUrl, enableCookies_option]);
+	  faviconWorkerPostMessage({data: ["iconurl", bnId, faviconUrl, enableCookies_option]});
+//console.log("Retrieval demand sent for favicon: "+faviconUrl);
+	}
+/*
+  }
+*/
+}
+
+/*
+ * Find if the URL of a given tab corresponds to a BN tree. Recursve.
  *
  * tab: tabs.Tab
  * BN: BookmarkNode (tree)
  *
- * Retunrs the BN corresponding to the URL, or undefined.
+ * Returns the first BN corresponding to the URL, or undefined.
  */
-let baFoundBN_id = {}; // Global variable set by tabSwitched and tabModified to remember the bookmark found matching current tab.
-					   // Uesd bu onShownContextMenuHandler() on context menu on BSP2 toolbar icon.
-					   // Indexed by windowId, and contains the BN.id of corresponding active tab in that window 
-function matchUrlBN (url, BN) {
-  if (BN.url == url) {
-	return(BN);
+function refreshBTNTreeFavicon (BN, tabFaviconUrl, tabUrl, is_refreshFav, is_nofavicon) {
+  let foundBN = undefined;
+  if (BN.url == tabUrl) {
+	if (!BN.inBSP2Trash) { // REturn only when not in trash
+	  foundBN = BN;
+	}
+//console.log("Matching BN.id: "+BN.id+" "+BN.url);
+	// Load the favicon as a data: URI
+	if (is_refreshFav) {
+//console.log("Refreshing its faviconUrl");
+	  setCollectedFavicon(BN.id, is_nofavicon, tabFaviconUrl)
+	}
   }
   else {
 	let children = BN.children;
 	if (children != undefined) {
 	  let len = children.length;
-	  let foundBN;
+	  let tmpBN;
 	  for (let i=0 ; i<len ; i++) {
-		foundBN = matchUrlBN(url,children[i]);
-		if (foundBN != undefined) {
-		  return(foundBN);
+		tmpBN = refreshBTNTreeFavicon(children[i], tabFaviconUrl, tabUrl, is_refreshFav, is_nofavicon);
+		if ((foundBN == undefined) && (tmpBN != undefined)) {
+		  foundBN = tmpBN;
 		}
 	  }
 	}
-	return(undefined);
   }
-} 
-
+  return(foundBN);
+}
  
 /*
  * When a bookmark is created, modified or deleted, update BSP2 icon accordingly in all open FF windows
@@ -2399,36 +2457,88 @@ function matchUrlBN (url, BN) {
  * BN: BookmarkNode (can be a tree)
  * is_deleted: Boolean, true is BN was deleted, else false (meaning BN still exists)
  */
+let baFoundBN_id = {}; // Global variable set by tabSwitched and tabModified to remember the bookmark found matching current tab.
+					   // Uesd bu onShownContextMenuHandler() on context menu on BSP2 toolbar icon.
+					   // Indexed by windowId, and contains the BN.id of corresponding active tab in that window 
 function refreshActiveTabs (BN, is_deleted) {
   browser.tabs.query({active: true})
   .then(
 	function (a_tabs) {
 	  let len = a_tabs.length;
-	  let tab;
+	  let tab, tabUrl, tabFaviconUrl, is_refreshFav, is_nofavicon, foundBN;
 	  for (let i=0 ; i<len ; i++) {
 		tab = a_tabs[i];
-		let foundBN = matchUrlBN(tab.url, BN);
-		if (foundBN != undefined) {
-		  if (!is_deleted) {
-			baFoundBN_id[tab.windowId] = BN.id;
-			browser.browserAction.setIcon(
-			  {path: "icons/star2bkmked.png",
-			   tabId: tab.id
-			  }
-			);
+		tabUrl = tab.url;
+		if ((tabUrl != undefined)
+			&& (!tabUrl.startsWith("view-source:"))
+		   ) {
+		  // Handle specific wyciwyg:// case
+		  if (tabUrl.startsWith("wyciwyg://")) { // Cached URL wyciwyg://x/....    Cf. https://en.wikipedia.org/wiki/WYCIWYG
+			// Find start of real URL, which is after the first "/" after "wyciwyg://x"
+			let pos = tabUrl.indexOf("/", 10) + 1;
+			tabUrl = tabUrl.substring(pos);
 		  }
-		  else {
-			baFoundBN_id[tab.windowId] = undefined;
-			browser.browserAction.setIcon(
-			  {tabId: tab.id
-			  }
-			);
-		  }
-		} // Else do not touch BSP2 icon for that tab
+		  tabFaviconUrl = tab.favIconUrl;
+		  is_refreshFav = !disableFavicons_option		  // Ignore if disableFavicons_option is set
+/*						  && !pauseFavicons_option	  // Ignore if pauseFavicons_option is set */
+						  && (!is_deleted || trashEnabled_option) // Ignore if really deleting bookmarks
+						  && (tabFaviconUrl != undefined) // Need a favicon URI
+						  ;
+		  is_nofavicon = is_notCollectableFaviconFromTab(tabFaviconUrl, tabUrl);
+		  foundBN = refreshBTNTreeFavicon(BN, tabFaviconUrl, tabUrl, is_refreshFav, is_nofavicon);
+		  if (foundBN != undefined) {
+			if (!is_deleted) {
+			  baFoundBN_id[tab.windowId] = foundBN.id;
+			  browser.browserAction.setIcon(
+				{path: "icons/star2bkmked.png",
+				 tabId: tab.id
+				}
+			  );
+			}
+			else {
+			  baFoundBN_id[tab.windowId] = undefined;
+			  browser.browserAction.setIcon(
+				{tabId: tab.id
+				}
+			  );
+			}
+		  } // Else do not touch BSP2 icon for that tab
+		}
 	  }
 	}
   );
 } 
+
+/*
+ * Refresh array of BTNs with a tab faviconUrl
+ *
+ * Returns: String, id of first BookmarkNode in the array matching the URL
+ */
+function refreshBTNArrayFavicon (a_BTN, len, tabFaviconUrl, tabUrl, is_refreshFav) {
+  let foundBN_id = undefined;
+  let is_nofavicon = is_notCollectableFaviconFromTab(tabFaviconUrl, tabUrl);
+  let bnId;
+  let BN;
+  for (let i=0 ; i<len ; i++) {
+	bnId = a_BTN[i].id;
+	BN = curBNList[bnId];
+	if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
+	  reloadFFAPI(true);
+	  break;
+	}
+	if (BN.url == tabUrl) { // Protection against too wide result because of Search workaround above
+	  if (!BN.inBSP2Trash && (foundBN_id == undefined)) { // Keep only the first one not in trash
+		foundBN_id = bnId;
+	  }
+//console.log("Matching BTN.id: "+bnId+" "+a_BTN[i].url+" foundBN_id: "+foundBN_id);
+	  // Load the favicon as a data: URI
+	  if (is_refreshFav) {
+		setCollectedFavicon(bnId, is_nofavicon, tabFaviconUrl)
+	  }
+	}
+  }
+  return(foundBN_id);
+}
 
 /*
  * When a tab is switched to, verify its URL and if matching, get its favicon
@@ -2463,8 +2573,18 @@ function tabSwitched (activeInfo) {
 			tabUrl = tabUrl.substring(pos);
 		  }
 		  // Look for a bookmark matching the url
+		  // It seems that parameters can make the search API fail and return 0 results sometimes, so strip them out,
+		  // we will really compare on gotten results.
+		  let simpleUrl;
+		  let paramsPos = tabUrl.indexOf("?");
+		  if (paramsPos >= 0) {
+			simpleUrl = tabUrl.slice(0, paramsPos);
+		  }
+		  else {
+			simpleUrl = tabUrl;
+		  }
 //		  browser.bookmarks.search({url: tabUrl})
-		  browser.bookmarks.search(tabUrl) // Search workaround to avoid exceptions on about:, file: ... URLs, cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1352835
+		  browser.bookmarks.search(decodeURI(simpleUrl)) // Search workaround to avoid exceptions on about:, file: ... URLs, cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1352835
 		  .then(
 			function (a_BTN) { // An array of BookmarkTreeNode
 			  let len = a_BTN.length;
@@ -2472,25 +2592,14 @@ function tabSwitched (activeInfo) {
 //console.log("Results: "+len);
 			  if (len > 0) { // This could be a bookmarked tab
 				// If there is a favicon and we are collecting them, refresh all coorresponding BookmarkNodes with it
-				let bnId;
-  				let foundBN_id = baFoundBN_id[winId] = undefined; // Forget about previous found one
-				let BN;
-				for (let i=0 ; i<len ; i++) {
-				  bnId = a_BTN[i].id;
-				  BN = curBNList[bnId];
-				  if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
-					reloadFFAPI(true);
-					break;
-				  }
-				  if (!BN.inBSP2Trash && (BN.url == tabUrl)) { // Only the ones not in trash
-															   // + protection against too wide result because of Search workaround above
-					// Match with first one
-					foundBN_id = baFoundBN_id[winId] = bnId;
-//console.log("Matching BTN.id: "+bnId+" "+a_BTN[i].url);
-					break;
-				  }
-				}
-				// Show a bookmarked BSP2 star for this tab, if there is a corresponding bookmark not in BSP2 trash
+				let tabFaviconUrl = tab.favIconUrl;
+				let is_refreshFav = !disableFavicons_option		  // Ignore if disableFavicons_option is set
+/*									&& !pauseFavicons_option	  // Ignore if pauseFavicons_option is set */
+									&& (tabFaviconUrl != undefined) // Need a favicon URI
+									;
+				let foundBN_id = refreshBTNArrayFavicon(a_BTN, len, tabFaviconUrl, tabUrl, winId, is_refreshFav);
+  				baFoundBN_id[winId] = foundBN_id; // Forget about previous found one
+				// Show a bookmarked BSP2 star for this tab, if we found a corresponding bookmark not in BSP2 trash
 				if (foundBN_id != undefined) {
 				  browser.browserAction.setIcon(
 					{path: "icons/star2bkmked.png",
@@ -2584,8 +2693,18 @@ function tabModified (tabId, changeInfo, tabInfo) {
 		  tabUrl = tabUrl.substring(pos);
 		}
 		// Look for a bookmark matching the url
+		// It seems that parameters can make the search API fail and return 0 results sometimes, so strip them out,
+		// we will really compare on gotten results.
+		let simpleUrl;
+		let paramsPos = tabUrl.indexOf("?");
+		if (paramsPos >= 0) {
+		  simpleUrl = tabUrl.slice(0, paramsPos);
+		}
+		else {
+		  simpleUrl = tabUrl;
+		}
 //		browser.bookmarks.search({url: tabUrl})
-		browser.bookmarks.search(tabUrl) // Search workaround to avoid exceptions on about:, file: ... URLs, cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1352835
+		browser.bookmarks.search(decodeURI(simpleUrl)) // Search workaround to avoid exceptions on about:, file: ... URLs, cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1352835
 		.then(
 		  function (a_BTN) { // An array of BookmarkTreeNode
 			let len = a_BTN.length;
@@ -2605,55 +2724,9 @@ function tabModified (tabId, changeInfo, tabInfo) {
 									  || (chgFaviconUrl == tabFaviconUrl) 
 									 )
 								  ;
-			  let bnId;
-  			  let foundBN_id = baFoundBN_id[winId] = undefined; // Forget about previous found one
-			  let BN;
-			  let is_nofavicon = undefined;
-			  for (let i=0 ; i<len ; i++) {
-				bnId = a_BTN[i].id;
-				BN = curBNList[bnId];
-				if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
-				  reloadFFAPI(true);
-				  break;
-				}
-				if (!BN.inBSP2Trash && (BN.url == tabUrl)) { // Only the ones not in trash
-															 // + protection against too wide result because of Search workaround above
-				  if (foundBN_id == undefined) { // Keep only the first one
-					foundBN_id = baFoundBN_id[winId] = bnId;
-				  }
-//console.log("Matching BTN.id: "+bnId+" "+a_BTN[i].url+" foundBN_id: "+foundBN_id);
-				  // Load the favicon as a data: URI
-				  if (is_refreshFav) {
-					if (tabFaviconUrl.startsWith("data:")) { // Cool, already in good format for us !
-					  setFavicon(bnId, tabFaviconUrl);
-//console.log("Directly set favicon: "+tabFaviconUrl);
-					}
-					else {
-					  // Verify this is a collectable favicon
-					  if (is_nofavicon == undefined) {
-						is_nofavicon = (tabFaviconUrl.startsWith("chrome://global/skin/icons/")) // Internal icon, we can't fetch it, security error
-									   || (tabUrl.startsWith("moz-extension://"))
-									   || (tabUrl.startsWith("about:"))
-									   || (tabUrl.startsWith("data:"))
-									   || (tabUrl.startsWith("file:"))
-									   || (tabUrl.startsWith("blob:"))
-									   ;
-					  }
-					  if (is_nofavicon) {
-						setNoFavicon(bnId);
-//console.log("Set no favicon: "+tabFaviconUrl);
-					  }
-					  else { // Fetch favicon
-						// Presumably a bookmark, so no need for cloneBTN(), there is no tree below
-//						faviconWorker.postMessage(["iconurl", bnId, tabFaviconUrl, enableCookies_option]);
-						faviconWorkerPostMessage({data: ["iconurl", bnId, tabFaviconUrl, enableCookies_option]});
-//console.log("Retrieval demand sent for favicon: "+tabFaviconUrl);
-					  }
-					}
-				  }
-				}
-			  }
-			  // Show a bookmarked BSP2 star for this tab, if there is a corresponding bookmark not in BSP2 trash
+			  let foundBN_id = refreshBTNArrayFavicon(a_BTN, len, tabFaviconUrl, tabUrl, winId, is_refreshFav);
+  			  baFoundBN_id[winId] = foundBN_id; // Forget about previous found one
+			  // Show a bookmarked BSP2 star for this tab, if we found a corresponding bookmark not in BSP2 trash
 			  if (foundBN_id != undefined) {
 				browser.browserAction.setIcon(
 				  {path: "icons/star2bkmked.png",

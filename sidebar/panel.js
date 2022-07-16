@@ -1035,7 +1035,17 @@ function updateSearch () {
 	if (!noffapisearch_option
 		&& (searchField_option == "both") && (searchScope_option == "all") && (searchMatch_option == "words")) {
 //console.log("Using FF Search API");
-	  searching = browser.bookmarks.search(value);
+	  // It seems that parameters can make the search API fail and return 0 results sometimes, so strip them out,
+	  // there will be too much result maybe, but at least some results !
+	  let simpleUrl;
+	  let paramsPos = value.indexOf("?");
+	  if (paramsPos >= 0) {
+		simpleUrl = value.slice(0, paramsPos);
+	  }
+	  else {
+		simpleUrl = value;
+	  }
+	  searching = browser.bookmarks.search(decodeURI(simpleUrl));
 	}
 	else {
 //console.log("Using BSP2 internal search algorithm");
@@ -2907,78 +2917,80 @@ function bkmkMouseHandler (e) {
 	}
   }
 
-  // Adjust selection to a simple select if we are inside one and there is no modifier
-  let is_shiftKey = e.shiftKey;
-  let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
-  if (cell.classList.contains(selection.selectHighlight)
-	  && !is_ctrlKey && !is_shiftKey
-	 ) {
-	addCellCursorSelection(cell, cursor, selection);
-  }
+  // Action only if on a valid element
+  if (cell != undefined) {
+	// Adjust selection to a simple select if we are inside one and there is no modifier
+	let is_shiftKey = e.shiftKey;
+	let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
+	if (cell.classList.contains(selection.selectHighlight)
+		&& !is_ctrlKey && !is_shiftKey
+	   ) {
+	  addCellCursorSelection(cell, cursor, selection);
+	}
 
-  // Do action corresponding to click and modifiers
-  if (className == "bkmkitem_b") { // An HTMLDivElement
-	e.preventDefault(); // We do not want the left click to open in a new tab ..
-						// but in the active tab
-	let href = target.href;
-	if ((href != undefined) && (href.length > 0)) {
-	  // Respect the about:config browser.tabs.loadBookmarksInTabs setting
-	  if (openBookmarksInNewTabs_option) { // If option set, open in new tab at end
-		browser.tabs.create({url: href});
-	  }
-	  else if (is_ctrlKey) { // Open in new tab, referred by this tab to come back to it when closing
-		// Get current active tab as opener id to come back to it when closing the new tab
-		if (beforeFF57)
+	// Do action corresponding to click and modifiers
+	if (className == "bkmkitem_b") { // An HTMLDivElement
+	  e.preventDefault(); // We do not want the left click to open in a new tab ..
+						  // but in the active tab
+	  let href = target.href;
+	  if ((href != undefined) && (href.length > 0)) {
+		// Respect the about:config browser.tabs.loadBookmarksInTabs setting
+		if (openBookmarksInNewTabs_option) { // If option set, open in new tab at end
 		  browser.tabs.create({url: href});
-		else {
+		}
+		else if (is_ctrlKey) { // Open in new tab, referred by this tab to come back to it when closing
+		  // Get current active tab as opener id to come back to it when closing the new tab
+		  if (beforeFF57)
+			browser.tabs.create({url: href});
+		  else {
+			browser.tabs.query({windowId: myWindowId, active: true})
+			.then (
+			  function (a_tabs) {
+				browser.tabs.create({url: href, openerTabId: a_tabs[0].id});
+	 		  }
+			);
+		  }
+		}
+		else if (e.shiftKey) { // Open in new window
+		  browser.windows.create({url: href});
+		}
+		else { // Open in current tab, except if we are running BSP2 inside a tab and Alt is not pressed
+		  if (isInSidebar || e.altKey) {
+			browser.tabs.update({url: href});
+		  }
+		}
+	  }
+	}
+	// If folder bkmkitem with active twistie, handle folder click
+	else if (className == "bkmkitem_f") {
+	  if (traceEnabled_option && e.altKey) {
+		let bnId = cell.parentElement.dataset.id;
+		if ((bnId == mostVisitedBNId) || (bnId == recentTagBNId) || (bnId == recentBkmkBNId)) {
+		  // Special trick .. if traces are enabled, authorize this .. with href = "" or SelfURL, it will
+		  // load the add-on itself in the window tab.
+		  // Also available now on the magnifier glass button menu 
+		  // Very useful to use the inpector on it, as we cannot inspect inside the add-on sidebar ..
+		  let href = SelfURL;
+		  // Open in new tab, referred by this tab to come back to it when closing
+		  // Get current active tab as opener id to come back to it when closing the new tab
 		  browser.tabs.query({windowId: myWindowId, active: true})
 		  .then (
 			function (a_tabs) {
-			  browser.tabs.create({url: href, openerTabId: a_tabs[0].id});
+			  if (beforeFF57)
+				browser.tabs.create({url: href});
+			  else
+			    browser.tabs.create({url: href, openerTabId: a_tabs[0].id});
 			}
 		  );
 		}
 	  }
-	  else if (e.shiftKey) { // Open in new window
-		browser.windows.create({url: href});
-	  }
-	  else { // Open in current tab, except if we are running BSP2 inside a tab and Alt is not pressed
-		if (isInSidebar || e.altKey) {
-		  browser.tabs.update({url: href});
-		}
+	  // If active twistie (folder with children), go for folder action
+	  let twistie = target.firstElementChild;
+	  if (twistie.className.startsWith("twistiea")) {
+		handleFolderClick(twistie);
 	  }
 	}
   }
-  // If folder bkmkitem with active twistie, handle folder click
-  else if (className == "bkmkitem_f") {
-	if (traceEnabled_option && e.altKey) {
-	  let bnId = cell.parentElement.dataset.id;
-	  if ((bnId == mostVisitedBNId) || (bnId == recentTagBNId) || (bnId == recentBkmkBNId)) {
-		// Special trick .. if traces are enabled, authorize this .. with href = "" or SelfURL, it will
-		// load the add-on itself in the window tab.
-		// Also available now on the magnifier glass button menu 
-		// Very useful to use the inpector on it, as we cannot inspect inside the add-on sidebar ..
-		let href = SelfURL;
-		// Open in new tab, referred by this tab to come back to it when closing
-		// Get current active tab as opener id to come back to it when closing the new tab
-		browser.tabs.query({windowId: myWindowId, active: true})
-		.then (
-		  function (a_tabs) {
-			if (beforeFF57)
-			  browser.tabs.create({url: href});
-			else
-			  browser.tabs.create({url: href, openerTabId: a_tabs[0].id});
-		  }
-		);
-	  }
-	}
-	// If active twistie (folder with children), go for folder action
-	let twistie = target.firstElementChild;
-	if (twistie.className.startsWith("twistiea")) {
-	  handleFolderClick(twistie);
-	}
-  }
-
   e.stopPropagation(); // Prevent handlers up the DOM chain on same event
 }
 
@@ -3390,215 +3402,225 @@ function bkmkContextHandler (e) {
   let target = e.target; // Type depends ..
 //console.log("Bookmark context event: "+e.type+" target: "+target+" class: "+target.classList);
 
-  // Go up to the row level
-  let className = target.className;
-  let row;
-  let cell;
-  if (className.includes("fav") || className.startsWith("twistie")) {
-	row = (cell = target.parentElement.parentElement).parentElement;
-  }
-  else if (className.startsWith("bkmkitem_")) {
-	row = (cell = target.parentElement).parentElement;
-  }
-  else { // .brow
-	row = (cell = target).parentElement;
-  }
-
-  // Highlight bookmark item
-  cell.focus();
-
-  // If there is a previous menu, clear it
-  clearMenu();
-
-  // Determine proper menu from type, signal it is open,
-  // and store the rowIndex in it as data-index attribute
-  // If the clipboard is not empty, show "Paste"
-  let type = row.dataset.type;
-  let rowIndex = row.rowIndex;
-  let menu;
-//trace("Row: "+row+" rowIndex: "+rowIndex+" type: "+type);
-  if (beforeFF64) { // Use our built-in menus
-	if (selection.selectIds.length > 1) { // Menu for multiple selection
-	  myMenu_open = myBMultMenu_open = true;
-	  menu = MyBMultMenu;
-	}
-	else if (type == "bookmark") { // Menu for single bookmark
-	  if (row.dataset.protect == "true") { // Protected row
-		menu = MyBProtMenu;
-		myMenu_open = myBProtMenu_open = true;
-	  }
-	  else { // Non protected row
-		// Check if we are on an highlighted result row which is hidden
-		if (!openTree_option && row.firstElementChild.classList.contains(Reshidden)) {
-		  menu = MyBResBkmkMenu;
-		  if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)) {
-			if (MyBResBkmkMenuPaste.className == "menudisabled")
-			  MyBResBkmkMenuPaste.className = "menupaste";
-		  }
-		  else {
-			if (MyBResBkmkMenuPaste.className == "menupaste")
-			  MyBResBkmkMenuPaste.className = "menudisabled";
-		  }
-		  if (disableFavicons_option) {
-			MyBResBkmkMenuFavicon.className = "menudisabled";
-		  }
-		  else {
-			MyBResBkmkMenuFavicon.className = "menurefreshfav";
-		  }
-		  myMenu_open = myBResBkmkMenu_open = true;
-		}
-		else {
-		  menu = MyBBkmkMenu;
-		  if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)) {
-			if (MyBBkmkMenuPaste.className == "menudisabled")
-			  MyBBkmkMenuPaste.className = "menupaste";
-		  }
-		  else {
-			if (MyBBkmkMenuPaste.className == "menupaste")
-			  MyBBkmkMenuPaste.className = "menudisabled";
-		  }
-		  if (disableFavicons_option) {
-			MyBBkmkMenuFavicon.className = "menudisabled";
-		  }
-		  else {
-			MyBBkmkMenuFavicon.className = "menurefreshfav";
-		  }
-		  myMenu_open = myBBkmkMenu_open = true;
-		}
-	  }
-	}
-	else if (type == "folder") { // Menu for single folder
-	  if (row.dataset.protect == "true") { // Protected row
-		menu = MyBProtFMenu;
-		// Disable paste into if this is the "Most visited .." or one of the "Recent .." folders
-		let bn_id = row.dataset.id;
-		if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)
-			&& (bn_id != mostVisitedBNId) && (bn_id != recentTagBNId) && (bn_id != recentBkmkBNId)
-		   ) {
-		  if (MyBProtFMenuPasteInto.className == "menudisabled")
-			MyBProtFMenuPasteInto.className = "menupasteinto";
-		}
-		else {
-		  if (MyBProtFMenuPasteInto.className == "menupasteinto")
-			MyBProtFMenuPasteInto.className = "menudisabled";
-		}
-		myMenu_open = myBProtFMenu_open = true;
-	  }
-	  else { // Non protected row
-		// Check if we are on an highlighted result row which is hidden
-		if (!openTree_option && row.firstElementChild.classList.contains(Reshidden)) {
-		  menu = MyBResFldrMenu;
-		  if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)) {
-			if (MyBResFldrMenuPaste.className == "menudisabled")
-			  MyBResFldrMenuPaste.className = "menupaste";
-			if (MyBResFldrMenuPasteInto.className == "menudisabled")
-			  MyBResFldrMenuPasteInto.className = "menupasteinto";
-		  }
-		  else {
-			if (MyBResFldrMenuPaste.className == "menupaste")
-			  MyBResFldrMenuPaste.className = "menudisabled";
-			if (MyBResFldrMenuPasteInto.className == "menupasteinto")
-			  MyBResFldrMenuPasteInto.className = "menudisabled";
-		  }
-		  myMenu_open = myBResFldrMenu_open = true;
-		}
-		else {
-		  menu = MyBFldrMenu;
-		  if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)) {
-			if (MyBFldrMenuPaste.className == "menudisabled")
-			  MyBFldrMenuPaste.className = "menupaste";
-			if (MyBFldrMenuPasteInto.className == "menudisabled")
-			  MyBFldrMenuPasteInto.className = "menupasteinto";
-		  }
-		  else {
-			if (MyBFldrMenuPaste.className == "menupaste")
-			  MyBFldrMenuPaste.className = "menudisabled";
-			if (MyBFldrMenuPasteInto.className == "menupasteinto")
-			  MyBFldrMenuPasteInto.className = "menudisabled";
-		  }
-		  myMenu_open = myBFldrMenu_open = true;
-		}
-	  }
-	}
-	else { // Menu for single separator
-	  if (row.dataset.protect != "true") { // Non protected row
-		menu = MyBSepMenu;
-		if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)) {
-		  if (MyBSepMenuPaste.className == "menudisabled")
-			MyBSepMenuPaste.className = "menupaste";
-		}
-		else {
-		  if (MyBSepMenuPaste.className == "menupaste")
-			MyBSepMenuPaste.className = "menudisabled";
-		}
-		myMenu_open = myBSepMenu_open = true;
-	  }
-	}
-
-	if (menu != undefined) {
-	  menu.dataset.index = rowIndex;
-
-	  // Display the context menu function of click position
-	  drawMenu(menu, e.clientY, e.clientX);
-	}
+  if (target.id == "bookmarks") { // If click outside the bookmarksTable, ignore
 	e.preventDefault();
   }
-  else { // Use integrated FF context menu function -> the background task will build its contents
-	let pasteEnabled = false;
-	if (type == "bookmark") {
-	  if (row.dataset.protect == "true") { // Protected row
-		menu = Menu_bprot;
-	  }
-	  else { // Non protected row
-		pasteEnabled = ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex));
-		// Check if we are on an highlighted result row which is hidden
-		if (!openTree_option && row.firstElementChild.classList.contains(Reshidden)) {
-		  menu = Menu_bresbkmk;
-		}
-		else {
-		  menu = Menu_bbkmk;
-		}
-	  }
+  else {
+	// Go up to the row level
+	let className = target.className;
+	let row;
+	let cell;
+	if (className.includes("fav") || className.startsWith("twistie")) {
+	  row = (cell = target.parentElement.parentElement).parentElement;
 	}
-	else if (type == "folder") {
-	  pasteEnabled = ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex));
-	  if (row.dataset.protect == "true") { // Protected row
-		menu = Menu_bprotf;
-		// Disable paste into if this is the "Most visited .." or one of the "Recent .." folders
-		let bn_id = row.dataset.id;
-		if ((bn_id == mostVisitedBNId) || (bn_id == recentTagBNId) || (bn_id == recentBkmkBNId)) {
-		  pasteEnabled = false;
-		}
-	  }
-	  else { // Non protected row
-		// Check if we are on an highlighted result row which is hidden
-		if (!openTree_option && row.firstElementChild.classList.contains(Reshidden)) {
-		  menu = Menu_bresfldr;
-		}
-		else {
-		  menu = Menu_bfldr;
-		}
-	  }
+	else if (className.startsWith("bkmkitem_")) {
+	  row = (cell = target.parentElement).parentElement;
 	}
-	else { // Separator
-	  if (row.dataset.protect == "true") { // Protected row
-		e.preventDefault(); // No menu on protected separators
-//		menu = Menu_bprots;
-	  }
-	  else { // Non protected row
-		pasteEnabled = ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex));
-		menu = Menu_bsep;
-	  }
+	else { // .brow
+	  row = (cell = target).parentElement;
 	}
 
-	if (menu != undefined) {
-	  updateBSP2ContextMenu(menu, pasteEnabled, (selection.selectIds.length > 1), !disableFavicons_option);
-	  myMenu_open = true; // Remember that this instance opened the menu when processing the onClicked event
-	  // Open menu
-	  browser.menus.overrideContext({
-		context: "bookmark",
-		bookmarkId: row.dataset.id
-	  });
+	// Highlight bookmark item
+	cell.focus();
+
+	// If there is a previous menu, clear it
+	clearMenu();
+
+	// Determine proper menu from type, signal it is open,
+	// and store the rowIndex in it as data-index attribute
+	// If the clipboard is not empty, show "Paste"
+	let type = row.dataset.type;
+	let rowIndex = row.rowIndex;
+	let menu;
+//trace("Row: "+row+" rowIndex: "+rowIndex+" type: "+type);
+	if (beforeFF64) { // Use our built-in menus
+	  if (selection.selectIds.length > 1) { // Menu for multiple selection
+		myMenu_open = myBMultMenu_open = true;
+		menu = MyBMultMenu;
+	  }
+	  else if (type == "bookmark") { // Menu for single bookmark
+		if (row.dataset.protect == "true") { // Protected row
+		  menu = MyBProtMenu;
+		  myMenu_open = myBProtMenu_open = true;
+		}
+		else { // Non protected row
+		  // Check if we are on an highlighted result row which is hidden
+		  if (!openTree_option && row.firstElementChild.classList.contains(Reshidden)) {
+			menu = MyBResBkmkMenu;
+			if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)) {
+			  if (MyBResBkmkMenuPaste.className == "menudisabled")
+				MyBResBkmkMenuPaste.className = "menupaste";
+			}
+			else {
+			  if (MyBResBkmkMenuPaste.className == "menupaste")
+				MyBResBkmkMenuPaste.className = "menudisabled";
+			}
+			if (disableFavicons_option) {
+			  MyBResBkmkMenuFavicon.className = "menudisabled";
+			}
+			else {
+			  MyBResBkmkMenuFavicon.className = "menurefreshfav";
+			}
+			myMenu_open = myBResBkmkMenu_open = true;
+		  }
+		  else {
+			menu = MyBBkmkMenu;
+			if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)) {
+			  if (MyBBkmkMenuPaste.className == "menudisabled")
+				MyBBkmkMenuPaste.className = "menupaste";
+			}
+			else {
+			  if (MyBBkmkMenuPaste.className == "menupaste")
+				MyBBkmkMenuPaste.className = "menudisabled";
+			}
+			if (disableFavicons_option) {
+			  MyBBkmkMenuFavicon.className = "menudisabled";
+			}
+			else {
+			  MyBBkmkMenuFavicon.className = "menurefreshfav";
+			}
+			myMenu_open = myBBkmkMenu_open = true;
+		  }
+		}
+	  }
+	  else if (type == "folder") { // Menu for single folder
+		if (row.dataset.protect == "true") { // Protected row
+		  menu = MyBProtFMenu;
+		  // Disable paste into if this is the "Most visited .." or one of the "Recent .." folders
+		  let bn_id = row.dataset.id;
+		  if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)
+			  && (bn_id != mostVisitedBNId) && (bn_id != recentTagBNId) && (bn_id != recentBkmkBNId)
+			 ) {
+			if (MyBProtFMenuPasteInto.className == "menudisabled")
+			  MyBProtFMenuPasteInto.className = "menupasteinto";
+		  }
+		  else {
+			if (MyBProtFMenuPasteInto.className == "menupasteinto")
+			  MyBProtFMenuPasteInto.className = "menudisabled";
+		  }
+		  myMenu_open = myBProtFMenu_open = true;
+		}
+		else { // Non protected row
+		  // Check if we are on an highlighted result row which is hidden
+		  if (!openTree_option && row.firstElementChild.classList.contains(Reshidden)) {
+			menu = MyBResFldrMenu;
+			if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)) {
+			  if (MyBResFldrMenuPaste.className == "menudisabled")
+				MyBResFldrMenuPaste.className = "menupaste";
+			  if (MyBResFldrMenuPasteInto.className == "menudisabled")
+				MyBResFldrMenuPasteInto.className = "menupasteinto";
+			}
+			else {
+			  if (MyBResFldrMenuPaste.className == "menupaste")
+				MyBResFldrMenuPaste.className = "menudisabled";
+			  if (MyBResFldrMenuPasteInto.className == "menupasteinto")
+				MyBResFldrMenuPasteInto.className = "menudisabled";
+			}
+			myMenu_open = myBResFldrMenu_open = true;
+		  }
+		  else {
+			menu = MyBFldrMenu;
+			if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)) {
+			  if (MyBFldrMenuPaste.className == "menudisabled")
+				MyBFldrMenuPaste.className = "menupaste";
+			  if (MyBFldrMenuPasteInto.className == "menudisabled")
+				MyBFldrMenuPasteInto.className = "menupasteinto";
+			}
+			else {
+			  if (MyBFldrMenuPaste.className == "menupaste")
+				MyBFldrMenuPaste.className = "menudisabled";
+			  if (MyBFldrMenuPasteInto.className == "menupasteinto")
+				MyBFldrMenuPasteInto.className = "menudisabled";
+			}
+			myMenu_open = myBFldrMenu_open = true;
+		  }
+		}
+	  }
+	  else { // Menu for single separator
+		if (row.dataset.protect != "true") { // Non protected row
+		  menu = MyBSepMenu;
+		  if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)) {
+			if (MyBSepMenuPaste.className == "menudisabled")
+			  MyBSepMenuPaste.className = "menupaste";
+		  }
+		  else {
+			if (MyBSepMenuPaste.className == "menupaste")
+			  MyBSepMenuPaste.className = "menudisabled";
+		  }
+		  myMenu_open = myBSepMenu_open = true;
+		}
+	  }
+
+	  if (menu != undefined) {
+		menu.dataset.index = rowIndex;
+
+		// Display the context menu function of click position
+		drawMenu(menu, e.clientY, e.clientX);
+	  }
+	  e.preventDefault();
+	}
+	else { // Use integrated FF context menu function -> the background task will build its contents
+	  let pasteEnabled = false;
+	  let sortVisible = false;
+	  if (type == "bookmark") {
+		if (row.dataset.protect == "true") { // Protected row
+		  menu = Menu_bprot;
+		}
+		else { // Non protected row
+		  pasteEnabled = ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex));
+		  // Check if we are on an highlighted result row which is hidden
+		  if (!openTree_option && row.firstElementChild.classList.contains(Reshidden)) {
+			menu = Menu_bresbkmk;
+		  }
+		  else {
+			menu = Menu_bbkmk;
+		  }
+		}
+	  }
+	  else if (type == "folder") {
+		pasteEnabled = ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex));
+		if (row.dataset.protect == "true") { // Protected row
+		  menu = Menu_bprotf;
+		  // Disable paste into if this is the "Most visited .." or one of the "Recent .." folders
+		  let bn_id = row.dataset.id;
+		  if ((bn_id == mostVisitedBNId) || (bn_id == recentTagBNId) || (bn_id == recentBkmkBNId)) {
+			pasteEnabled = false;
+		  }
+		  // Authorize sort on top level protected folders
+		  if ((bn_id == PersonalToobar) || (bn_id == BookmarksMenu) || (bn_id == OtherBookmarks) || (bn_id == MobileBookmarks)) {
+			sortVisible = true;
+		  }
+		}
+		else { // Non protected row
+		  // Check if we are on an highlighted result row which is hidden
+		  if (!openTree_option && row.firstElementChild.classList.contains(Reshidden)) {
+			menu = Menu_bresfldr;
+		  }
+		  else {
+			menu = Menu_bfldr;
+		  }
+		}
+	  }
+	  else { // Separator
+		if (row.dataset.protect == "true") { // Protected row
+		  e.preventDefault(); // No menu on protected separators
+//		  menu = Menu_bprots;
+		}
+		else { // Non protected row
+		  pasteEnabled = ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex));
+		  menu = Menu_bsep;
+		}
+	  }
+
+	  if (menu != undefined) {
+		updateBSP2ContextMenu(menu, pasteEnabled, (selection.selectIds.length > 1), !disableFavicons_option, sortVisible);
+		myMenu_open = true; // Remember that this instance opened the menu when processing the onClicked event
+		// Open menu
+		browser.menus.overrideContext({
+		  context: "bookmark",
+		  bookmarkId: row.dataset.id
+		});
+	  }
 	}
   }
   e.stopPropagation(); // Prevent handlers up the DOM chain on same event
@@ -4260,9 +4282,9 @@ function traceDt (dt) {
  * Updates dtSignature, bkmkDragIds, bkmkDrag and noDropZone when not an internal drag (both isBkmkItemDragged and isRsltItemDragged false)
  */
 function checkDragType (dt) {
-  // When the dragged element is one of our bookmarks its dt.types will be
+  // When the dragged element is one of our BSP2 bookmarks ,its dt.types will be
   //   dt.types        : application/x-bookmark,[text/uri-list,]text/plain
-  // When it is a native Bookmark, it will be
+  // When it is a native FF Bookmark, it will be
   //   dt.types        : text/x-moz-place
   //		with data like: {"title":"Nouveau dossier","id":2238,"itemGuid":"VQ8ulNGyfXk0","instanceId":"jvwImUhXA2rV","parent":2099,"parentGuid":"CLSASmpIpBmQ",
   //                         "dateAdded":1536393478662000,"lastModified":1536393478662000,"type":"text/x-moz-place-container"}
@@ -4270,7 +4292,8 @@ function checkDragType (dt) {
   //						 "dateAdded":1550944109935000,"lastModified":1551218607521000,"type":"text/x-moz-place","uri":"about:blank"}
   //						{"title":"","id":2239,"itemGuid":"gORenOTsYJdk","instanceId":"jvwImUhXA2rV","parent":2028,"parentGuid":"XmOZ-HAGbfEM",
   //						 "dateAdded":1536396421579000,"lastModified":1551022707690000,"type":"text/x-moz-place-separator"}
-  //        Note that drag and drops from FF History sidebar also have this type, but they have empty data equal to "" -> reject
+  //        Note that drag and drops from FF History sidebar also have this type, but they have "id":-1 and "itemGuid":"" -> no corresponding bookmark
+  //						{"title":"Suggestion","id":-1,"itemGuid":"","instanceId":"Fb4st0KZ4ASX","type":"text/x-moz-place","uri":"https://github.com/aaFn/Bookmark-search-plus-2/issues/237"}
   // When it is a tab, it will be
   //   dt.types        : text/x-moz-text-internal
   // When it is the (i) in the location bar
@@ -4332,7 +4355,7 @@ function checkDragType (dt) {
 	}
 	isSupported = true;
   }
-  else if (types.includes(format = "text/x-moz-place")) { // Native FF Bookmark sidebar drag
+  else if (types.includes(format = "text/x-moz-place")) { // Native FF Bookmark sidebar drag, of FF History drag
 	// Cannot be an internal drag, build signature to compare with stored one (only manipulate as String to be quick)
 	// Handle multiple items drag -- GECKO SPECIFIC !! -- No more supported as of FF71, didn't find an alternative yet :-(
 	let itemCount;
@@ -4345,46 +4368,45 @@ function checkDragType (dt) {
 	}
 	// Note: FF native bookmark sidebar doesn't set getData() until the drop is effective,
 	// so we cannot build and check the noDropZone until last moment :-( !!
-	let item; 
 	if (itemCount == 1) {
-	  item = dt.getData(format);
-	  isSupported = (item != ""); // If empty, do not accept (e.g. drag & drop from FF History sidebar)
-	  data = "[" + item + "]";
+	  data = "[" + dt.getData(format) + "]";
 	}
 	else {
 	  data = "[";
 	  for (let i=0 ; i<itemCount ; i++) { // Get each dragged item
 		if (i>0)   data += ",";
-		item = dt.mozGetDataAt(format, i);
-		isSupported = (item != ""); // If empty, do not accept (e.g. drag & drop from FF History sidebar)
-		if (!isSupported) {
-		  break;
-		}
-		data +=	item;
+		data +=	dt.mozGetDataAt(format, i);
 	  }
 	  data += "]";
 	}
 	// If different dtSignature, update bkmkDragIds, bkmkDrag and noDropZone 
-	if (isSupported && (dtSignature != data)) {
+	if (dtSignature != data) {
 //console.log("dtSignature: "+dtSignature+" - data: "+data);
 	  dtSignature = data;
 
 	  let a_bookmark = JSON.parse(data);
 	  // Build bkmkDragIds and bkmkDrag as unique lists
 	  let bnId;
+	  let j;
 	  let BN;
 	  bkmkDragIds = [];
 	  bkmkDrag = [];
 	  let len = a_bookmark.length;
 	  for (let i=0 ; i<len ; i++) {
-		bnId = a_bookmark[i].itemGuid;
-		BN = curBNList[bnId];
-		if ((BN == undefined) && (bnId != MobileBookmarks)) { // Desynchro !! => reload bookmarks from FF API
-		  // Signal reload to background, and then redisplay to all
-		  sendAddonMessage("reloadFFAPI_auto");
+		bnId = (j = a_bookmark[i]).itemGuid;
+		if (bnId == "") { // FF Histoy drag (presumably)
+//						{"title":"Suggestion","id":-1,"itemGuid":"","instanceId":"Fb4st0KZ4ASX","type":"text/x-moz-place","uri":"https://github.com/aaFn/Bookmark-search-plus-2/issues/237"}
+  		  bkmkDrag.push({title: j.title, url: j.uri});
 		}
-		else {
-		  uniqueListAddBN(bnId, BN, bkmkDragIds, bkmkDrag);
+		else { // FF native sidebar Bookmark drag (presumably)
+		  BN = curBNList[bnId];
+		  if ((BN == undefined) && (bnId != MobileBookmarks)) { // Desynchro !! => reload bookmarks from FF API
+			// Signal reload to background, and then redisplay to all
+			sendAddonMessage("reloadFFAPI_auto");
+		  }
+		  else {
+			uniqueListAddBN(bnId, BN, bkmkDragIds, bkmkDrag);
+		  }
 		}
 	  }
 	  // Set no drop zone
@@ -4394,6 +4416,7 @@ function checkDragType (dt) {
 		zoneAddBN(noDropZone, bkmkDragIds[i], bkmkDrag[i]);
 	  }
 	}
+	isSupported = true;
   }
   else if (types.includes("text/x-moz-text-internal")
 		   || types.includes("text/uri-list")
@@ -5112,13 +5135,25 @@ console.log("dt.types        : "+dt.types);
 	  let types = dt.types;
 	  let type;
 	  if (types.includes(type = "application/x-bookmark")	// Move or copy the dragged bookmark
-		  || types.includes(type = "text/x-moz-place")		// Dragging a native Bookmark to us
+		  || types.includes(type = "text/x-moz-place")		// Dragging a native Bookmark to us, or an FF History entry
 		 ) {
-		if (is_ctrlKey) { // Copy
-		  copyBkmk(bkmkDragIds, bkmkDrag, (is_infolder ? BN_id : BN.parentId), bnIndex);
+		if (bkmkDragIds.length == 0) { // FF History drag
+		  let tgtBN_id = (is_infolder ? BN_id : BN.parentId);
+		  let len = bkmkDrag.length;
+		  let j;
+		  for (let i=0 ; i<len ; i++) {
+			// Create new bookmark item and open properties if Alt key is pressed at same time than drop
+			j = bkmkDrag[i];
+			createBkmkItem(tgtBN_id, bnIndex, j.title, j.url, "bookmark", e.altKey);
+		  }
 		}
-		else { // Move
-		  moveBkmk(bkmkDragIds, bkmkDrag, (is_infolder ? BN_id : BN.parentId), bnIndex);
+		else { // BSP2 bookmark or FF native sideba bookmark drag
+		  if (is_ctrlKey) { // Copy
+			copyBkmk(bkmkDragIds, bkmkDrag, (is_infolder ? BN_id : BN.parentId), bnIndex);
+		  }
+		  else { // Move
+			moveBkmk(bkmkDragIds, bkmkDrag, (is_infolder ? BN_id : BN.parentId), bnIndex);
+		  }
 		}
 	  }
 	  else if (types.includes(type = "text/x-moz-text-internal")) { // Dragging one or multiple tabs to us

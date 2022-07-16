@@ -636,6 +636,7 @@ async function fetchFavicon (bnUrl, enableCookies) {
 }
 
 /*
+ * Background worker.
  * Dequeue a request and process it.
  * Then re-dispatch itself if more work, after <cadence> milliseconds delay
  */
@@ -664,11 +665,17 @@ async function handleRequest () {
 	else if (action == "iconurl") { // We already got the favicon URL (e.g. tab refresh)
 	  								// so simply get it.
 //console.log("faviconUrl: <<"+action.slice(5)+">> 2");
-	  // In case we get the icon directly, this is on updated tab .. let's not remove the previous favicon
+	  // In case we get the icon directly, this is on updated/switched/.. tab. Let's not remove the previous favicon
 	  // to leave a chance to detect this is the same and to not do massive favicon saves when doing
 	  // History -> Restore previous session
 	  //answerBack(bnId, "starting:"); // Signal we are starting to retrieve favicon for that BN
-	  uri = await getUri(bnUrl, enableCookies); // async function !!
+	  if (bnUrl.startsWith("data:")) { // Cool, it is already a self contained piece ..
+//console.log("Got it directly !");
+		uri = bnUrl;
+	  }
+	  else {
+		uri = await getUri(bnUrl, enableCookies); // async function !!
+	  }
 	}
 	else { // Normal get process
 	  answerBack(bnId, "starting:"); // Signal we are starting to retrieve favicon for that BN

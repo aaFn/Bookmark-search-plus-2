@@ -129,9 +129,11 @@ ContextMenu["bsp2del"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bse
 };
 //------------------------------------------------------------------
 ContextMenu["bsp2sep5"+Menu_bfldr+Menu_bresfldr] = {
+	is_sort: true,
 	type: "separator"
 };
 ContextMenu["bsp2sort"+Menu_bfldr+Menu_bresfldr] = {
+	is_sort: true,
 	title: "So&rt by Name"
 };
 //------------------------------------------------------------------
@@ -467,8 +469,9 @@ function createBSP2ContextMenu () {
  * pasteEnabled = Boolean to enable (true) or disable (false) the paste menu items
  * multiSelected = Boolean to signal a multi-selection of more than 1 bookmarkt (true), or a single one (false)
  * refreshfavEnabled = Boolean to enable (true) or disable (false / undefined) the refresh favicon menu items
+ * sortEnabled = Boolean to enable (true) or disable (false / undefined) the sort by name menu items
  */
-function updateBSP2ContextMenu (menu, pasteEnabled, multiSelected, refreshfavEnabled = false) {
+function updateBSP2ContextMenu (menu, pasteEnabled, multiSelected, refreshfavEnabled = false, sortVisible = false) {
   let menuIds = Object.keys(ContextMenu);
   let menuItem;
   let id;
@@ -476,7 +479,9 @@ function updateBSP2ContextMenu (menu, pasteEnabled, multiSelected, refreshfavEna
   for (let i=0 ; i<len ; i++) {
 	id = menuIds[i];
 	menuItem = ContextMenu[id];
-	if (id.includes(menu)) {
+	if (id.includes(menu)
+		|| (menuItem.is_sort && sortVisible)
+	   ) {
 	  browser.menus.update(
 		id,
 		{enabled: (!menuItem.is_paste || pasteEnabled)
