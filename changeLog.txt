@@ -1,6 +1,21 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.109 16/07/2022 Improvements
+    - Palliate to FF bookmark search API apparently failing and returning 0 results when too many "&" arguments, to
+      improve search results completeness and tab favicon matching on tab switching or modification.
+    - Add a decodeUri() at front of any FF bookmark search, as it seems that the FF API does not interpret
+      escape sequences, and so return 0 result -> To improve search results completeness and tab favicon matching on
+      tab switching or modification.
+- 2.0.108 09/07/2022 Bugs and Improvements
+    - Refresh favicon from tabs also on tab switches or on BSP2 toolbar icon modifications for active tabs.
+    - Corrected a regression on FF native bookmark sidebar drag
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/246, introduced in 2.0.107
+    - Added support for FF History sidebar drag
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/240
+     - Corrected bugs where clicking on blank parts of the panel were generating internal exceptions.
+     - Added "Sort by Name" to top menus
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/239
 - 2.0.107 03/07/2022 Bugs & Improvements
     - Do not accept drag & drops from FF History sidebar (or from History section in FF Bookmark Library), they are
       empty and provoke a BP2 reload.
