@@ -926,6 +926,10 @@ function displayResults (a_BTN) {
 
   let len = a_BTN.length;
 //trace("Results: "+len);
+  if ((len <= 3) && (searchlistTimeoutId != undefined)) { // Close search history immediately when there are too few results
+	clearTimeout(searchlistTimeoutId);
+	closeSearchList();
+  }
   if (len > 0) {
 	let i;
 	for (let j=0 ; j<len; j++) {
@@ -957,7 +961,20 @@ function displayResults (a_BTN) {
 }
 
 /*
- * Update search history list - Keep only last 3 searches, ordere by most recent
+ * Close the search history list
+ */
+let searchlistTimeoutId;
+function closeSearchList () {
+  searchlistTimeoutId == undefined;
+  SearchTextInput.blur(); // This closes the search list
+  SearchTextInput.focus(); // Givz back focus to be able to type again
+  let l = SearchTextInput.value.length; // Focus is selecting all text in the input => de-select to type at end ...
+  SearchTextInput.setSelectionRange(l, l);
+}
+
+/*
+ * Update search history list - Keep only last SearchListMax searches, ordered by most recent.
+ * Merge entries to most specific ones to not keep a flurry of things liek e, ee, eee (so keep only eee).
  */
 function updateSearchList (text) {
   let options = SearchDatalist.options;
@@ -992,6 +1009,7 @@ function updateSearchList (text) {
 	  option.value = text;
 	}
   }
+  searchlistTimeoutId = setTimeout(closeSearchList, 3000);
 }
 
 /*
@@ -7782,6 +7800,17 @@ function openSearchResultsInNewTabs_change (value) {
 }
 
 /*
+ * Set font to bold or normal
+ * 
+ * is_bold = Boolean
+ */
+function setPageFontWeight (is_bold) {
+  let w = (is_bold ? "bold" : "normal");
+  Body.style.fontWeight = w;
+  SearchTextInput.style.fontWeight = w;
+}
+
+/*
  * Set font size for the page
  * 
  * fs = Integer, size in px
@@ -8107,6 +8136,11 @@ function setupUI () {
 	  	ms += 5 * fs / DfltFontSize;
 	  setMenuSize(ms);
 	}
+  }
+
+  // Set bold fonts if optoin is set
+  if (setFontBold_option) {
+	setPageFontWeight(true);
   }
 
   // Set spacing between bookmark items

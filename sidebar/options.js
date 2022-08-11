@@ -40,6 +40,7 @@ const RememberSizesInput = document.querySelector("#remembersizes");
 const ResetSizesButton = document.querySelector("#resetsizes");
 const SetFontSizeInput = document.querySelector("#setfontsize");
 const FontSizeInput = document.querySelector("#fontsize");
+const SetFontBoldInput = document.querySelector("#setfontbold");
 const SetSpaceSizeInput = document.querySelector("#setspacesize");
 const SpaceSizeInput = document.querySelector("#spacesize");
 const MatchThemeInput = document.querySelector("#matchtheme");
@@ -288,6 +289,7 @@ function saveOptions (e) {
 	,remembersizes_option: RememberSizesInput.checked
 	,setfontsize_option: setfontsize
 	,fontsize_option: fontSize
+	,setfontbold_option: SetFontBoldInput.checked
 	,setspacesize_option: setspacesize
 	,spacesize_option: spaceSize
 	,matchtheme_option: matchtheme
@@ -632,6 +634,10 @@ function restoreOptions () {
   }
   else {
 	FontSizeInput.value = DfltFontSize;
+  }
+
+  if (setFontBold_option_file) {
+	SetFontBoldInput.checked = true;
   }
 
   if (setSpaceSize_option_file) {
@@ -1215,6 +1221,7 @@ function initialize2 () {
   ResetSizesButton.addEventListener("click", resetSizes);
   SetFontSizeInput.addEventListener("click", saveOptions);
   FontSizeInput.addEventListener("change", changeFontSize);
+  SetFontBoldInput.addEventListener("click", saveOptions);
   SetSpaceSizeInput.addEventListener("click", saveOptions);
   SpaceSizeInput.addEventListener("change", changeSpaceSize);
   MatchThemeInput.addEventListener("click", fetchTheme);

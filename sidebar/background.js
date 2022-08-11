@@ -1042,6 +1042,7 @@ if (traceEnabled_option) {
 //	  let rememberSizes_option_old = rememberSizes_option;
 	  let setFontSize_option_old = setFontSize_option;
 	  let fontSize_option_old = fontSize_option;
+	  let setFontBold_option_old = setFontBold_option;
 	  let setSpaceSize_option_old = setSpaceSize_option;
 	  let spaceSize_option_old = spaceSize_option;
 	  let matchTheme_option_old = matchTheme_option;
@@ -1098,6 +1099,10 @@ if (traceEnabled_option) {
 			  // Change to FS requires a full reload of all sidebars
 			  sendAddonMessage("reload");
 			}
+		  }
+		  else if (setFontBold_option_old != setFontBold_option) {
+			// Change to font weight requires a full reload of all sidebars
+			sendAddonMessage("reload");
 		  }
 		  else if ((SSSChanged = (setSpaceSize_option_old != setSpaceSize_option))
 			  	   || (spaceSize_option_old != spaceSize_option)

@@ -36,6 +36,7 @@ var rememberSizes_option; // Boolean
 var searchHeight_option; // Integer
 var setFontSize_option; // Boolean
 var fontSize_option; // Integer
+var setFontBold_option; //Boolean
 var setSpaceSize_option; // Boolean
 var spaceSize_option; // Integer
 var matchTheme_option; // Boolean - true by default
@@ -82,6 +83,7 @@ var rememberSizes_option_file; // Boolean
 var searchHeight_option_file; // Integer
 var setFontSize_option_file; // Boolean
 var fontSize_option_file; // Integer
+var setFontBold_option_file; // Boolean
 var setSpaceSize_option_file; // Boolean
 var spaceSize_option_file; // Integer
 var matchTheme_option_file; // Boolean
@@ -174,6 +176,8 @@ function refreshOptionsBgnd(backgroundPage) {
 	setFontSize_option = backgroundPage.setFontSize_option;
 	fontSize_option_file = backgroundPage.fontSize_option_file;
 	fontSize_option = backgroundPage.fontSize_option;
+	setFontBold_option_file = backgroundPage.setFontBold_option_file;
+	setFontBold_option = backgroundPage.setFontBold_option;
 	setSpaceSize_option_file = backgroundPage.setSpaceSize_option_file;
 	setSpaceSize_option = backgroundPage.setSpaceSize_option;
 	spaceSize_option_file = backgroundPage.spaceSize_option_file;
@@ -251,6 +255,7 @@ function refreshOptionsLStore() {
 					, "historywidth_option"
 					, "setfontsize_option"
 					, "fontsize_option"
+					, "setfontbold_option"
 					, "setspacesize_option"
 					, "spacesize_option"
 					, "matchtheme_option"
@@ -444,6 +449,13 @@ function refreshOptionsLStore() {
 				}
 				else {
 					fontSize_option = undefined;
+				}
+				// -- Read SFB option..
+				if ((setFontBold_option_file = res.setfontbold_option) != undefined) {
+					setFontBold_option = setFontBold_option_file;
+				}
+				else {
+					setFontBold_option = false;
 				}
 				// -- Read SSS option..
 				if ((setSpaceSize_option_file = res.setspacesize_option) != undefined) {
@@ -714,6 +726,7 @@ function launchReadFullLStore(isSidebar) {
 				, "historywidth_option"
 				, "setfontsize_option"
 				, "fontsize_option"
+				, "setfontbold_option"
 				, "setspacesize_option"
 				, "spacesize_option"
 				, "matchtheme_option"
@@ -765,6 +778,7 @@ function launchReadFullLStore(isSidebar) {
 				, "historywidth_option"
 				, "setfontsize_option"
 				, "fontsize_option"
+				, "setfontbold_option"
 				, "setspacesize_option"
 				, "spacesize_option"
 				, "matchtheme_option"
@@ -1021,6 +1035,13 @@ function readFullOptions(res, isSidebar, waitMsg) {
 	}
 	else {
 		fontSize_option = undefined;
+	}
+	waitMsg("Read SFB option..");
+	if ((setFontBold_option_file = res.setfontbold_option) != undefined) {
+		setFontBold_option = setFontBold_option_file;
+	}
+	else {
+		setFontBold_option = false;
 	}
 	waitMsg("Read SSS option..");
 	if ((setSpaceSize_option_file = res.setspacesize_option) != undefined) {
