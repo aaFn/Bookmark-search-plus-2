@@ -1,6 +1,11 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.110 11/08/2022 Improvements
+    - Changed behavior of search history on search box to get less intrusive, especially when few results are displayed.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/247
+    - Add option for setting bold fonts
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/249
 - 2.0.109 16/07/2022 Improvements
     - Palliate to FF bookmark search API apparently failing and returning 0 results when too many "&" arguments, to
       improve search results completeness and tab favicon matching on tab switching or modification.
