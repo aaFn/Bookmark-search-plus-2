@@ -252,6 +252,10 @@ tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
 tmpElem1.classList.add("favtext");
 tmpElem1.draggable = false; // False by default for <span>
 RFolderTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
+tmpElem1.classList.add("favpath");
+tmpElem1.draggable = false; // False by default for <span>
+RFolderTempl.appendChild(tmpElem1);
 /*
  *******  Prepare special Folder structure for node cloning
  */
@@ -286,6 +290,10 @@ tmpElem1.draggable = false; // True by default for <img>
 RSFolderTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
 tmpElem1.classList.add("favtext");
+tmpElem1.draggable = false; // False by default for <span>
+RSFolderTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
+tmpElem1.classList.add("favpath");
 tmpElem1.draggable = false; // False by default for <span>
 RSFolderTempl.appendChild(tmpElem1);
 /*
@@ -560,6 +568,7 @@ function appendResult (BN) {
 	// Create elements
 	let div2;
 	let span;
+	let path_span;
 	if (BN.fetchedUri) { // Special bookmark folder with special favicon
 	  div2 = RSFolderTempl.cloneNode(true);
 	  let img = div2.firstElementChild.nextElementSibling;
@@ -573,6 +582,9 @@ function appendResult (BN) {
 	if (BN.inBSP2Trash) { // Set to italics
 	  span.style.fontStyle = "italic";
 	}
+
+	path_span = div2.firstElementChild.nextElementSibling.nextElementSibling.nextElementSibling;
+	path_span.textContent = BN_path(BN.parentId);
 
 	let title = BN.title;
 	if (showPath_option) {

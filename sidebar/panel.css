@@ -226,6 +226,8 @@ p {
 table {
   min-width: 100%;
   border-spacing: 0;
+  width: 100%;
+  table-layout: fixed;
 }
 
 tbody {
@@ -323,6 +325,10 @@ tbody {
   border-bottom: solid 2px transparent;
   margin-top: -2px;
   margin-bottom: -2px;
+  width: 100%;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: row;
 }
 
 .bkmkitem_s {
@@ -375,6 +381,7 @@ tbody {
   vertical-align: text-bottom;
   background-image: url("/icons/rtwistieac.png");
   cursor: default;
+  flex: inherit;
 }
 
 .brow:hover .twistieac, .selbrow:hover .twistieac {
@@ -400,6 +407,7 @@ tbody {
   width: 16px;
   vertical-align: text-bottom;
   background-image: url("/icons/folder.png");
+  flex: inherit;
 }
 
 .nofavicon {
@@ -420,6 +428,17 @@ tbody {
 .favtext {
   margin-left: 3px;
   white-space: pre;
+  flex: inherit;
+}
+
+.favpath {
+  font-style: italic;
+  font-size: 90%;
+  color: grey;
+  margin-left: auto;
+  overflow-x: hidden;
+  text-overflow: ellipsis;
+  padding-left: 10%;
 }
 
 .mymenu {
