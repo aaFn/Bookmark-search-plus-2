@@ -253,7 +253,7 @@ tmpElem1.classList.add("favtext");
 tmpElem1.draggable = false; // False by default for <span>
 RFolderTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
-tmpElem1.classList.add("favpath");
+tmpElem1.classList.add("rfavpath");
 tmpElem1.draggable = false; // False by default for <span>
 RFolderTempl.appendChild(tmpElem1);
 /*
@@ -293,7 +293,7 @@ tmpElem1.classList.add("favtext");
 tmpElem1.draggable = false; // False by default for <span>
 RSFolderTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
-tmpElem1.classList.add("favpath");
+tmpElem1.classList.add("rfavpath");
 tmpElem1.draggable = false; // False by default for <span>
 RSFolderTempl.appendChild(tmpElem1);
 /*
@@ -561,6 +561,7 @@ function appendResult (BN) {
   //   - a <div> (class "rtwistiexx") if a folder
   //   - an <div>, or <img> if special folder, (class "favicon")
   //   - and a <span> with text (class "favtext")
+  //   - for folder results, additionally, a <span> with path to the folder (class "rfavpath") 
   if (type == "folder") {				// Folder
 	// Mark that row as folder
 	row.dataset.type = "folder";
@@ -568,7 +569,7 @@ function appendResult (BN) {
 	// Create elements
 	let div2;
 	let span;
-	let path_span;
+	let pathspan;
 	if (BN.fetchedUri) { // Special bookmark folder with special favicon
 	  div2 = RSFolderTempl.cloneNode(true);
 	  let img = div2.firstElementChild.nextElementSibling;
@@ -582,19 +583,20 @@ function appendResult (BN) {
 	if (BN.inBSP2Trash) { // Set to italics
 	  span.style.fontStyle = "italic";
 	}
-
-	path_span = div2.firstElementChild.nextElementSibling.nextElementSibling.nextElementSibling;
-	path_span.textContent = BN_path(BN.parentId);
-
 	let title = BN.title;
+	span.textContent = title;
+//	span.draggable = false;
+
+	pathspan = span.nextElementSibling;
+	let p = pathspan.textContent = BN_path(BN.parentId);
+//	pathspan.draggable = false;
+
 	if (showPath_option) {
-	  div2.title = BN_path(BN.parentId);
+	  div2.title = p;
 	}
 	else {
 	  div2.title = title;
 	}
-	span.textContent = title;
-//	span.draggable = false;
 	cell.appendChild(div2);
   }
   else {								// "bookmark"
@@ -615,7 +617,7 @@ function appendResult (BN) {
 	  anchor = RNFBookmarkTempl.cloneNode(true);
 	  span = anchor.firstElementChild.nextElementSibling;
 	}
-	else { // clone normal one, and fill image
+	else { // Clone normal one, and fill image
 	  anchor = RBookmarkTempl.cloneNode(true);
 	  let img = anchor.firstElementChild;
 	  img.src = uri;
@@ -933,6 +935,7 @@ function displayResults (a_BTN) {
   // Create search results table
 //  resultsFragment = document.createDocumentFragment();
   resultsTable = document.createElement("table");
+  resultsTable.id = "resultstable";
   SearchResult.appendChild(resultsTable); // Display the search results table + reflow
 //  resultsFragment.appendChild(resultsTable);
 
@@ -979,7 +982,7 @@ let searchlistTimeoutId;
 function closeSearchList () {
   searchlistTimeoutId == undefined;
   SearchTextInput.blur(); // This closes the search list
-  SearchTextInput.focus(); // Givz back focus to be able to type again
+  SearchTextInput.focus(); // Give back focus to be able to type again
   let l = SearchTextInput.value.length; // Focus is selecting all text in the input => de-select to type at end ...
   SearchTextInput.setSelectionRange(l, l);
 }
@@ -5134,7 +5137,7 @@ console.log("dt.types        : "+dt.types);
 	// Note: when the mouse is over the lifts, an HTMLDivElement is returned
 	let row = getDragToRow(target);
 //console.log("Drop on row: "+row+" class: "+row.classList+" BN_id: "+row.dataset.id);
-//traceDt(dt);
+traceDt(dt);
 
 	// Can't happen when in a dropEffect=none zone .. but in case, let's protect against it
 	let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey); // When Ctrl is pressed, this is a copy, no protection
@@ -7142,7 +7145,7 @@ if (traceEnabled_option) {
 		  }
 		  // If a show path option changed, update any open search result 
 		  if ((showPath_option_old != showPath_option)
-			  || (showPath_option && (reversePath_option_old != reversePath_option))
+			  || (reversePath_option_old != reversePath_option)
 			 ) {
 			// Trigger an update as results can change, if there is a search active
 			triggerUpdate();

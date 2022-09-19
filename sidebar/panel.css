@@ -1,4 +1,4 @@
-:root{
+:root {
   --bg-color: white; 
   --txt-color: #222426;
 }
@@ -200,11 +200,10 @@ p {
 }
 
 #trace {
-  width: 200px;
+  width: calc(100% - 9px);
   resize: none;
   font-size: x-small;
   white-space: pre;
-  overflow: visible;
   flex: none;
   margin-left: 4px;
 }
@@ -226,8 +225,11 @@ p {
 table {
   min-width: 100%;
   border-spacing: 0;
+}
+
+#resultstable {
   width: 100%;
-  table-layout: fixed;
+  table-layout: fixed;	
 }
 
 tbody {
@@ -375,13 +377,13 @@ tbody {
 }
 
 .rtwistieac {
+  flex: none;
   display: inline-block;
   height: 16px;
   width: 16px;
   vertical-align: text-bottom;
   background-image: url("/icons/rtwistieac.png");
   cursor: default;
-  flex: inherit;
 }
 
 .brow:hover .twistieac, .selbrow:hover .twistieac {
@@ -402,12 +404,12 @@ tbody {
 }
 
 .ffavicon {
+  flex: none;
   display: inline-block;
   height: 16px;
   width: 16px;
   vertical-align: text-bottom;
   background-image: url("/icons/folder.png");
-  flex: inherit;
 }
 
 .nofavicon {
@@ -428,17 +430,17 @@ tbody {
 .favtext {
   margin-left: 3px;
   white-space: pre;
-  flex: inherit;
 }
 
-.favpath {
+.rfavpath {
+  flex-grow: 1;
+  text-align: end;
   font-style: italic;
   font-size: 90%;
-  color: grey;
-  margin-left: auto;
+  padding-left: 10%;
+  opacity: 0.6;
   overflow-x: hidden;
   text-overflow: ellipsis;
-  padding-left: 10%;
 }
 
 .mymenu {
