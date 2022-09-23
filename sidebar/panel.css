@@ -437,7 +437,7 @@ tbody {
   text-align: end;
   font-style: italic;
   font-size: 90%;
-  padding-left: 10%;
+  padding-left: 10px;
   opacity: 0.6;
   overflow-x: hidden;
   text-overflow: ellipsis;

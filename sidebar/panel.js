@@ -5137,7 +5137,7 @@ console.log("dt.types        : "+dt.types);
 	// Note: when the mouse is over the lifts, an HTMLDivElement is returned
 	let row = getDragToRow(target);
 //console.log("Drop on row: "+row+" class: "+row.classList+" BN_id: "+row.dataset.id);
-traceDt(dt);
+//traceDt(dt);
 
 	// Can't happen when in a dropEffect=none zone .. but in case, let's protect against it
 	let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey); // When Ctrl is pressed, this is a copy, no protection
@@ -5381,19 +5381,39 @@ console.log("tabs length: "+len);
 			   || types.includes(type = "text/x-moz-url")	// Dragging the location bar URL address
 			  ) {
 		let url = dt.getData(type);
-		let title = dt.getData("text/x-moz-url-desc");
-		if (title.length == 0) {
-		  title = dt.getData("text/x-moz-url");
+		// Try the URL description type
+		let title = dt.getData("text/x-moz-url-desc").trim();
+		let splitIndex = title.indexOf("\n"); // Remove any "\n" and following part if there is in title 
+		if (splitIndex > 0) {
+		  title = title.slice(0, splitIndex);
 		}
 
-		let splitIndex = url.indexOf("\n"); // Remove any "\n" and following part if there is in URL 
+		// Get URL
+		splitIndex = url.indexOf("\n"); // Remove any "\n" and following part if there is in URL
 		if (splitIndex > 0) {
 		  url = url.slice(0, splitIndex);
 		}
-		if (title.length == 0) { // If title is empty, use the URL as title
+		if (url.startsWith("https://www.google.com/url?")) { // Handle Google search result drag = simplify it
+		  splitIndex = url.indexOf("&url="); // Remove any "&url=" and parts before
+		  if (splitIndex > 0) {
+			url = url.slice(splitIndex+5);
+			splitIndex = url.indexOf("&"); // Remove any following "&" and parts after, to keep only the real URL
+			if (splitIndex > 0) {
+			  url = url.slice(0, splitIndex);
+			}
+			// Decode the URL
+			url = decodeURIComponent(url);
+		  }
+		}
+
+		// Adjust title if empty
+		if (title.length == 0) { // If title is empty, try the URL content (e.g. location bar drag & drop)
+		  title = dt.getData("text/x-moz-url");
+		}
+		if (title.length == 0) { // If title is still empty, use the URL as title
 		  title = url;
 		}
-		else { // If there is an "\n", keep the part after
+		else { // If there is an "\n", keep the part after (can only be for "text/x-moz-url", e.g. location bar drag & drop)
 		  splitIndex = title.indexOf("\n");
 		  title = title.slice(splitIndex+1);
 		}
