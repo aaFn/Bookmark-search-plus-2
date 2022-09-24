@@ -252,6 +252,10 @@ tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
 tmpElem1.classList.add("favtext");
 tmpElem1.draggable = false; // False by default for <span>
 RFolderTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
+tmpElem1.classList.add("rfavpath");
+tmpElem1.draggable = false; // False by default for <span>
+RFolderTempl.appendChild(tmpElem1);
 /*
  *******  Prepare special Folder structure for node cloning
  */
@@ -286,6 +290,10 @@ tmpElem1.draggable = false; // True by default for <img>
 RSFolderTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
 tmpElem1.classList.add("favtext");
+tmpElem1.draggable = false; // False by default for <span>
+RSFolderTempl.appendChild(tmpElem1);
+tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
+tmpElem1.classList.add("rfavpath");
 tmpElem1.draggable = false; // False by default for <span>
 RSFolderTempl.appendChild(tmpElem1);
 /*
@@ -553,6 +561,7 @@ function appendResult (BN) {
   //   - a <div> (class "rtwistiexx") if a folder
   //   - an <div>, or <img> if special folder, (class "favicon")
   //   - and a <span> with text (class "favtext")
+  //   - for folder results, additionally, a <span> with path to the folder (class "rfavpath") 
   if (type == "folder") {				// Folder
 	// Mark that row as folder
 	row.dataset.type = "folder";
@@ -560,6 +569,7 @@ function appendResult (BN) {
 	// Create elements
 	let div2;
 	let span;
+	let pathspan;
 	if (BN.fetchedUri) { // Special bookmark folder with special favicon
 	  div2 = RSFolderTempl.cloneNode(true);
 	  let img = div2.firstElementChild.nextElementSibling;
@@ -573,16 +583,20 @@ function appendResult (BN) {
 	if (BN.inBSP2Trash) { // Set to italics
 	  span.style.fontStyle = "italic";
 	}
-
 	let title = BN.title;
+	span.textContent = title;
+//	span.draggable = false;
+
+	pathspan = span.nextElementSibling;
+	let p = pathspan.textContent = BN_path(BN.parentId);
+//	pathspan.draggable = false;
+
 	if (showPath_option) {
-	  div2.title = BN_path(BN.parentId);
+	  div2.title = p;
 	}
 	else {
 	  div2.title = title;
 	}
-	span.textContent = title;
-//	span.draggable = false;
 	cell.appendChild(div2);
   }
   else {								// "bookmark"
@@ -603,7 +617,7 @@ function appendResult (BN) {
 	  anchor = RNFBookmarkTempl.cloneNode(true);
 	  span = anchor.firstElementChild.nextElementSibling;
 	}
-	else { // clone normal one, and fill image
+	else { // Clone normal one, and fill image
 	  anchor = RBookmarkTempl.cloneNode(true);
 	  let img = anchor.firstElementChild;
 	  img.src = uri;
@@ -921,6 +935,7 @@ function displayResults (a_BTN) {
   // Create search results table
 //  resultsFragment = document.createDocumentFragment();
   resultsTable = document.createElement("table");
+  resultsTable.id = "resultstable";
   SearchResult.appendChild(resultsTable); // Display the search results table + reflow
 //  resultsFragment.appendChild(resultsTable);
 
@@ -967,7 +982,7 @@ let searchlistTimeoutId;
 function closeSearchList () {
   searchlistTimeoutId == undefined;
   SearchTextInput.blur(); // This closes the search list
-  SearchTextInput.focus(); // Givz back focus to be able to type again
+  SearchTextInput.focus(); // Give back focus to be able to type again
   let l = SearchTextInput.value.length; // Focus is selecting all text in the input => de-select to type at end ...
   SearchTextInput.setSelectionRange(l, l);
 }
@@ -5366,19 +5381,39 @@ console.log("tabs length: "+len);
 			   || types.includes(type = "text/x-moz-url")	// Dragging the location bar URL address
 			  ) {
 		let url = dt.getData(type);
-		let title = dt.getData("text/x-moz-url-desc");
-		if (title.length == 0) {
-		  title = dt.getData("text/x-moz-url");
+		// Try the URL description type
+		let title = dt.getData("text/x-moz-url-desc").trim();
+		let splitIndex = title.indexOf("\n"); // Remove any "\n" and following part if there is in title 
+		if (splitIndex > 0) {
+		  title = title.slice(0, splitIndex);
 		}
 
-		let splitIndex = url.indexOf("\n"); // Remove any "\n" and following part if there is in URL 
+		// Get URL
+		splitIndex = url.indexOf("\n"); // Remove any "\n" and following part if there is in URL
 		if (splitIndex > 0) {
 		  url = url.slice(0, splitIndex);
 		}
-		if (title.length == 0) { // If title is empty, use the URL as title
+		if (url.startsWith("https://www.google.com/url?")) { // Handle Google search result drag = simplify it
+		  splitIndex = url.indexOf("&url="); // Remove any "&url=" and parts before
+		  if (splitIndex > 0) {
+			url = url.slice(splitIndex+5);
+			splitIndex = url.indexOf("&"); // Remove any following "&" and parts after, to keep only the real URL
+			if (splitIndex > 0) {
+			  url = url.slice(0, splitIndex);
+			}
+			// Decode the URL
+			url = decodeURIComponent(url);
+		  }
+		}
+
+		// Adjust title if empty
+		if (title.length == 0) { // If title is empty, try the URL content (e.g. location bar drag & drop)
+		  title = dt.getData("text/x-moz-url");
+		}
+		if (title.length == 0) { // If title is still empty, use the URL as title
 		  title = url;
 		}
-		else { // If there is an "\n", keep the part after
+		else { // If there is an "\n", keep the part after (can only be for "text/x-moz-url", e.g. location bar drag & drop)
 		  splitIndex = title.indexOf("\n");
 		  title = title.slice(splitIndex+1);
 		}
@@ -7130,7 +7165,7 @@ if (traceEnabled_option) {
 		  }
 		  // If a show path option changed, update any open search result 
 		  if ((showPath_option_old != showPath_option)
-			  || (showPath_option && (reversePath_option_old != reversePath_option))
+			  || (reversePath_option_old != reversePath_option)
 			 ) {
 			// Trigger an update as results can change, if there is a search active
 			triggerUpdate();

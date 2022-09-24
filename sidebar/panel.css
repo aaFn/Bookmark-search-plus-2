@@ -1,4 +1,4 @@
-:root{
+:root {
   --bg-color: white; 
   --txt-color: #222426;
 }
@@ -200,11 +200,10 @@ p {
 }
 
 #trace {
-  width: 200px;
+  width: calc(100% - 9px);
   resize: none;
   font-size: x-small;
   white-space: pre;
-  overflow: visible;
   flex: none;
   margin-left: 4px;
 }
@@ -226,6 +225,11 @@ p {
 table {
   min-width: 100%;
   border-spacing: 0;
+}
+
+#resultstable {
+  width: 100%;
+  table-layout: fixed;	
 }
 
 tbody {
@@ -323,6 +327,10 @@ tbody {
   border-bottom: solid 2px transparent;
   margin-top: -2px;
   margin-bottom: -2px;
+  width: 100%;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: row;
 }
 
 .bkmkitem_s {
@@ -369,6 +377,7 @@ tbody {
 }
 
 .rtwistieac {
+  flex: none;
   display: inline-block;
   height: 16px;
   width: 16px;
@@ -395,6 +404,7 @@ tbody {
 }
 
 .ffavicon {
+  flex: none;
   display: inline-block;
   height: 16px;
   width: 16px;
@@ -420,6 +430,17 @@ tbody {
 .favtext {
   margin-left: 3px;
   white-space: pre;
+}
+
+.rfavpath {
+  flex-grow: 1;
+  text-align: end;
+  font-style: italic;
+  font-size: 90%;
+  padding-left: 10px;
+  opacity: 0.6;
+  overflow-x: hidden;
+  text-overflow: ellipsis;
 }
 
 .mymenu {
