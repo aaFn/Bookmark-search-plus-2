@@ -1160,7 +1160,8 @@ function updateSearch () {
 function triggerUpdate () {
   if (SearchTextInput.value.length > 0) { // Refresh only if a search is active
 	// Clear input timeout if there was one active, to replace it by new (maybe faster) one
-	// This allows to integrate together multiple events, like remove of a folder and its subtree
+	// This allows to integrate together multiple events without intermediate displays,
+	// like remove of a folder and its subtree
 	if (inputTimeout != null) {
 	  clearTimeout(inputTimeout);
 	}
@@ -1231,6 +1232,27 @@ function manageSearchTextHandler () {
   }
   else { // Clear search mode
 	inputTimeout = null; // We just cleared any last timeout, so set to null
+
+	// Remember search pane height if needed, before closing it
+	let sh = SearchResult.style.height; 
+	if (sh != "") { // The search result pane size is different
+	  				// from its default value set in the CSS
+	  				// which is 20% (as seen in Computed Style)
+	  if (rememberSizes_option) {
+		if (searchHeight_option != sh) { // Save only if different from already saved
+		  searchHeight_option = sh;
+		  browser.storage.local.set({
+			searchheight_option: sh
+		  })
+		  .then(
+			function () {
+			  // Signal change to all
+			  sendAddonMessage("savedOptions");
+			}
+		  );
+		}
+	  }
+	}
 	disableCancelSearch();
 
 	// Discard the results table if any
@@ -1247,21 +1269,6 @@ function manageSearchTextHandler () {
 
 	// Restore bookmarks tree to its initial visibility state
 	resetTreeVisiblity();
-
-	// Remember search pane height if needed
-	let sh = SearchResult.style.height; 
-	if (sh != "") { // The search result pane size is different
-	  				// from its default value set in the CSS
-	  				// which is 20% (as seen in Computed Style)
-	  if (rememberSizes_option) {
-		if (searchHeight_option != sh) { // Save only if different from already saved
-		  searchHeight_option = sh;
-		  browser.storage.local.set({
-			searchheight_option: sh
-		  });
-		}
-	  }
-	}
   }
 }
 
@@ -7144,6 +7151,8 @@ if (traceEnabled_option) {
 //		let closeSearch_option_old = closeSearch_option;
 //		let noffapisearch_option_old = noffapisearch_option;
 		let reversePath_option_old = reversePath_option;
+		let rememberSizes_option_old = rememberSizes_option;
+		let searchHeight_option_old = searchHeight_option;
 //		let openTree_option_old = openTree_option;
 		let matchTheme_option_old = matchTheme_option;
 		let setColors_option_old = setColors_option;
@@ -7169,6 +7178,14 @@ if (traceEnabled_option) {
 			 ) {
 			// Trigger an update as results can change, if there is a search active
 			triggerUpdate();
+		  }
+		  if ((rememberSizes_option_old != rememberSizes_option)
+			  && (rememberSizes_option == false)) {
+			// To reset the height to CSS default ("20%"), just set
+			SearchResult.style.height = "";
+		  }
+		  if (searchHeight_option_old != searchHeight_option) {
+			SearchResult.style.height = searchHeight_option; 
 		  }
 		  // If match FF theme option changed
 		  if (matchTheme_option_old != matchTheme_option) {

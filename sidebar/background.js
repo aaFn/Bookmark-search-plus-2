@@ -1039,7 +1039,8 @@ if (traceEnabled_option) {
 	  let searchOnEnter_option_old = searchOnEnter_option;
 	  let reversePath_option_old = reversePath_option;
 	  let closeSibblingFolders_option_old = closeSibblingFolders_option;
-//	  let rememberSizes_option_old = rememberSizes_option;
+	  let rememberSizes_option_old = rememberSizes_option;
+	  let searchHeight_option_old = searchHeight_option;
 	  let setFontSize_option_old = setFontSize_option;
 	  let fontSize_option_old = fontSize_option;
 	  let setFontBold_option_old = setFontBold_option;
@@ -1136,6 +1137,8 @@ if (traceEnabled_option) {
 			   	   || (searchOnEnter_option_old != searchOnEnter_option)
 			  	   || (reversePath_option_old != reversePath_option)
 			  	   || (closeSibblingFolders_option_old != closeSibblingFolders_option)
+			  	   || (rememberSizes_option_old != rememberSizes_option)
+			  	   || (searchHeight_option_old != searchHeight_option)
 				   || (trashVisible_option_old != trashVisible_option)
 			       || (traceEnabled_option_old != traceEnabled_option)
 			       || (matchTheme_option_old != matchTheme_option)
