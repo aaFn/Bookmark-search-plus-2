@@ -1,6 +1,16 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.112 17/01/2023 Bugs
+    - Fixed regression which was making the search pane height not remembered across BSP2 sessions, and not properly reset
+      when disabling the remember sizes option.
+- 2.0.111 24/09/2022 Improvements
+    - Show path of folders on the right in search results, to distinguish multiple folders with same names.
+      Thank you to Morikko (Eric Masseran) for his contribution.
+        https://github.com/aaFn/Bookmark-search-plus-2/pull/254
+    - Better handle URL drag & drops from Google search result pages, including when using the add-on
+      "Make Google Search great again".
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/253
 - 2.0.110 11/08/2022 Improvements
     - Changed behavior of search history on search box to get less intrusive, especially when few results are displayed.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/247
