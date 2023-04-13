@@ -1,6 +1,22 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.113 13/04/2023 Bugs and Improvements
+    - Added function to open all bookmarks of a Folder in a new Window when using Shift + Click on "Open All in Tabs"
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/268
+    - Fixed a bug where some bookmark favicons where updated unduly during a tab reload
+    - Decreased number of favicon refreshes triggered upon tab reload events
+    - Removed spurious refreshes to "no favicon" when reloading a tab, to keep more stability on favicons.
+      Small impact when a favicon is no more existing on a site, the old favicon will remain until a full refresh is forced
+      through the advanced context menu.
+        https://addons.mozilla.org/fr/firefox/addon/bookmark-search-plus-2/reviews/1951354/
+    - Added support for "maxResults=xx" in Most visited and in Recently bookmarked smart bookmarks.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/266
+    - Corrected a bug on the BSP2 options page where function keys in the BSP2 shortcut were all displaying as "F1" (although
+      they were correctly handled with the proper shortcut key behind the scene).
+    - Added function to cycle displayed search results through Show all / Show folders only / Show bookmarks only
+      when middle clicking on the magnifying glass button.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/265
 - 2.0.112 17/01/2023 Bugs
     - Fixed regression which was making the search pane height not remembered across BSP2 sessions, and not properly reset
       when disabling the remember sizes option.
