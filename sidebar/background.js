@@ -714,9 +714,20 @@ function triggerRefreshMostVisited () {
 	  .then(refreshMostVisited);
 	}
 	else { // After FF63, get the favicon data URL which is now made available
+	  let maxResults = 10;
+	  let url = mostVisitedBN.url;
+	  if (url != undefined) {
+		let p = url.indexOf("maxResults=");
+		if (p > -1) {
+		  let l = parseInt(url.slice(p+11), 10);
+		  if (l > 0) {
+			maxResults = l;
+		  }
+		}
+	  }
 	  browser.topSites.get({
 		includeFavicon: true,
-		limit: 10
+		limit: maxResults
 	  })
 	  .then(refreshMostVisited);
 	}
@@ -728,7 +739,18 @@ function triggerRefreshMostVisited () {
  */
 function triggerRecentRefreshBkmks () {
   if (recentBkmkBNId != undefined) {
-	browser.bookmarks.getRecent(10)
+	let maxResults = 10;
+	let url = recentBkmkBN.url;
+	if (url != undefined) {
+	  let p = url.indexOf("maxResults=");
+	  if (p > -1) {
+		let l = parseInt(url.slice(p+11), 10);
+		if (l > 0) {
+		  maxResults = l;
+		}
+	  }
+	}
+	browser.bookmarks.getRecent(maxResults)
 	.then(refreshRecentBkmks);
   }
 }
@@ -2604,8 +2626,9 @@ function tabSwitched (activeInfo) {
 				let is_refreshFav = !disableFavicons_option		  // Ignore if disableFavicons_option is set
 /*									&& !pauseFavicons_option	  // Ignore if pauseFavicons_option is set */
 									&& (tabFaviconUrl != undefined) // Need a favicon URI
+									&& (tabUrl != "about:blank")  // Do not refresh about:blank bookmarks
 									;
-				let foundBN_id = refreshBTNArrayFavicon(a_BTN, len, tabFaviconUrl, tabUrl, winId, is_refreshFav);
+				let foundBN_id = refreshBTNArrayFavicon(a_BTN, len, tabFaviconUrl, tabUrl, is_refreshFav);
   				baFoundBN_id[winId] = foundBN_id; // Forget about previous found one
 				// Show a bookmarked BSP2 star for this tab, if we found a corresponding bookmark not in BSP2 trash
 				if (foundBN_id != undefined) {
@@ -2685,7 +2708,8 @@ function tabModified (tabId, changeInfo, tabInfo) {
 	   +"winId: "+winId+"\r\n"
 	  );
 */
-  if (tabInfo.status == "complete") {
+//  if (tabInfo.status == "complete") {
+  if ((tabInfo.status == "complete") && (changeInfo.status == "complete")) {
 	let tabUrl = tabInfo.url;
 //console.log("A tab was updated 1 - tabUrl: "+tabUrl);
 	// Verify this is a searchable url - If not, we get exception:
@@ -2702,7 +2726,7 @@ function tabModified (tabId, changeInfo, tabInfo) {
 		}
 		// Look for a bookmark matching the url
 		// It seems that parameters can make the search API fail and return 0 results sometimes, so strip them out,
-		// we will really compare on gotten results.
+		// we will really compare on returned results.
 		let simpleUrl;
 		let paramsPos = tabUrl.indexOf("?");
 		if (paramsPos >= 0) {
@@ -2716,23 +2740,39 @@ function tabModified (tabId, changeInfo, tabInfo) {
 		.then(
 		  function (a_BTN) { // An array of BookmarkTreeNode
 			let len = a_BTN.length;
-//console.log("A tab was updated 2 - tabUrl: "+tabUrl);
-//console.log("Results: "+len);
+/*
+console.log('-------------------------------------');
+console.log("A tab was updated 2 - tabUrl: "+tabUrl);
+console.log("Results: "+len);
+console.log("A tab was updated.\r\n"
+			+"tabId: "+tabId+"\r\n"
+			+"changeInfo.favIconUrl: "+changeInfo.favIconUrl+"\r\n"
+			+"changeInfo.status: "+changeInfo.status+"\r\n"
+			+"changeInfo.title: "+changeInfo.title+"\r\n"
+			+"changeInfo.url: "+changeInfo.url+"\r\n"
+			+"tabInfo.favIconUrl: "+tabInfo.favIconUrl+"\r\n"
+			+"tabInfo.index: "+tabInfo.index+"\r\n"
+			+"tabInfo.status: "+tabInfo.status+"\r\n"
+			+"tabInfo.title: "+tabInfo.title+"\r\n"
+			+"tabInfo.url: "+tabInfo.url+"\r\n"
+			+"winId: "+winId+"\r\n"
+		   );
+*/
 			if (len > 0) { // This could be a bookmarked tab
 			  // If there is a favicon and we are collecting them, refresh all coorresponding BookmarkNodes with it
 			  let tabFaviconUrl = tabInfo.favIconUrl;
 			  let chgFaviconUrl = changeInfo.favIconUrl;
-			  let chgStatus = changeInfo.status;
+//			  let chgStatus = changeInfo.status;
 			  let is_refreshFav = !disableFavicons_option		  // Ignore if disableFavicons_option is set
 /*								  && !pauseFavicons_option		  // Ignore if pauseFavicons_option is set */
 								  && (tabFaviconUrl != undefined) // Need a favicon URI
-								  && (tabUrl != "about:blank")    // For something else than about:blank, which appears intermitently when relaoding a tab
+								  && (tabUrl != "about:blank")    // For something else than about:blank, which appears intermitently when reloading a tab
 																  // There was no favicon change, just a tab switch OR this is a tab reload with a new URL / favicon
-								  && (((chgFaviconUrl == undefined) && ((chgStatus == undefined) || (chgStatus == "complete")) && (changeInfo.title == undefined) && (changeInfo.url == undefined))		
-									  || (chgFaviconUrl == tabFaviconUrl) 
-									 )
+//								  && (((chgFaviconUrl == undefined) && ((chgStatus == undefined) || (chgStatus == "complete")) && (changeInfo.title == undefined) && (changeInfo.url == undefined))
+//									  || (chgFaviconUrl == tabFaviconUrl) 
+//									 )
 								  ;
-			  let foundBN_id = refreshBTNArrayFavicon(a_BTN, len, tabFaviconUrl, tabUrl, winId, is_refreshFav);
+			  let foundBN_id = refreshBTNArrayFavicon(a_BTN, len, tabFaviconUrl, tabUrl, is_refreshFav);
   			  baFoundBN_id[winId] = foundBN_id; // Forget about previous found one
 			  // Show a bookmarked BSP2 star for this tab, if we found a corresponding bookmark not in BSP2 trash
 			  if (foundBN_id != undefined) {

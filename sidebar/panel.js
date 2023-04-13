@@ -2138,7 +2138,7 @@ function bkmkMoved (bnId, curParentId, targetParentId, targetIndex) {
 	else   insertRowIndex = targetRow.rowIndex; // Get the updated row index of target
 	insertBkmks(BN, targetParentRow);
   }
-  else { // Npormal case
+  else { // Normal case
 	let movedRow = curRowList[bnId];
 	let curRowIndex = movedRow.rowIndex;
 	let targetParentRow = curRowList[targetParentId];
@@ -2162,7 +2162,7 @@ function bkmkMoved (bnId, curParentId, targetParentId, targetIndex) {
 		   //       so the BN tree is not any more in sync with display.
 	  let previousSibblingBN = children[targetIndex-1];
 	  if (previousSibblingBN.inBSP2Trash && !trashVisible_option) { // Protect against inserting just after BSP2 trash when not visible
-		if (targetIndex < 2) {
+		if (targetIndex <= children.length) { // Remember that the child was already added in the BN tree in the background task
 		  targetCurRowIndex = targetParentRow.rowIndex + 1;
 		  targetRow = targetParentRow.nextElementSibling; // Can be null if we move at end
 		}
@@ -6229,34 +6229,50 @@ function menuOpen (row, mode) {
  * Handle open all in tabs action on context menu
  * 
  * BN_id = String identifying the bookmark folder for which to open all direct children
+ * is_shiftKey = Boolean, true is Shift is pressed at same time then clicking (means open in new window)
  */
-function menuOpenAllInTabs (BN_id) {
+function menuOpenAllInTabs (BN_id, is_shiftKey) {
   let BN = curBNList[BN_id];
   let children = BN.children;
   let len;
   let node;
 
   if ((children != undefined) && ((len = children.length) > 0)) {
-	if (beforeFF57)
+	if (is_shiftKey) { // Open in a new window
+	  let a_url = [];
+	  let l = 0;
 	  for (let i=len-1 ; i>=0 ; i--) {
 		node = children[i];
 		if (node.type == "bookmark") {
-		  browser.tabs.create({url: node.url});
+		  l = a_url.push(node.url);
 		}
 	  }
-	else {
-	  // Get current active tab as opener id to come back to it when closing the new tab
-	  browser.tabs.query({windowId: myWindowId, active: true})
-	  .then (
-		function (a_tabs) {
-		  for (let i=len-1 ; i>=0 ; i--) {
-			node = children[i];
-			if (node.type == "bookmark") {
-			  browser.tabs.create({url: node.url, openerTabId: a_tabs[0].id});
-			}
+	  if (l > 0) {
+		browser.windows.create({url: a_url});
+	  }
+	}
+	else { // Open in new tabs in same window
+	  if (beforeFF57)
+		for (let i=len-1 ; i>=0 ; i--) {
+		  node = children[i];
+		  if (node.type == "bookmark") {
+			browser.tabs.create({url: node.url});
 		  }
 		}
-	  );
+	  else {
+		// Get current active tab as opener id to come back to it when closing the new tab
+		browser.tabs.query({windowId: myWindowId, active: true})
+		.then (
+		  function (a_tabs) {
+			for (let i=len-1 ; i>=0 ; i--) {
+			  node = children[i];
+			  if (node.type == "bookmark") {
+				browser.tabs.create({url: node.url, openerTabId: a_tabs[0].id});
+			  }
+			}
+		  }
+		);
+	  }
 	}
   }
 }
@@ -6602,8 +6618,9 @@ function clickHandler (e) {
 	  menuAction = true;
 	  // Retrieve parent context menu, the rowIndex and row on which it is
 	  let row = getMenuRow(target);
-	  // Retrieve bookmark item in that row
-	  menuOpenAllInTabs(row.dataset.id);
+	  // Retrieve bookmark item in that row, and open all bookmarks in folder
+	  let is_shiftKey = e.shiftKey;
+	  menuOpenAllInTabs(row.dataset.id, is_shiftKey);
 	}
 	else if (classList.contains("menuopentree")) { // Open parent(s) of selected .reshidden row
 	  menuAction = true;
@@ -6830,7 +6847,8 @@ function onClickedContextMenuHandler (info, tab) {
 		break;
 	  case "bsp2openall":
 		// Open all bookmarks in folder
-		menuOpenAllInTabs(bnId);
+	    let is_shiftKey = (info.modifiers.indexOf("Shift") != -1);
+		menuOpenAllInTabs(bnId, is_shiftKey);
 		break;
 	  case "bsp2opentree":
 		// Open parent folder of the .reshidden row
@@ -6928,6 +6946,28 @@ function resetFiltersButtonHandler (e) {
 }
 
 /*
+ * Auxclick on Magnifier glass (only act on middle button click = button 1)
+ * = switch through Show all/folders only/bookmarks only
+ */
+function searchButtonSwitchMode (e) {
+//console.log("searchButtonHandler event: "+e.type+" button: "+e.button+" phase: "+e.eventPhase);
+  if (e.button == 1) {
+	switch (searchFilter_option) {
+	  case "all":
+		setSFilterFldrOnlyHandler();
+	    break;
+	  case "fldr":
+		searchField_option = "both"; // Reset which parts a search is made on to title + url
+		setSFilterBkmkOnlyHandler();
+		break;
+	  case "bkmk":
+		setSFilterAllHandler();
+		break;
+	}
+  }
+}
+
+/*
  * Context menu on Magnifier glass
  */
 function searchButtonHandler (e) {
@@ -6937,7 +6977,7 @@ function searchButtonHandler (e) {
 let button = e.button;
 let target = e.target;
 let classList = target.classList;
-console.log("noDefaultAction event: "+e.type+" button: "+button+" phase: "+e.eventPhase+" target: "+target+" class: "+target.classList);
+console.log("searchButtonHandler event: "+e.type+" button: "+button+" phase: "+e.eventPhase+" target: "+target+" class: "+target.classList);
 */
   clearMenu(); // Clear any open menu
 
@@ -7669,6 +7709,7 @@ function completeDisplay () {
   ResetFiltersButtonInput.addEventListener("click", resetFiltersButtonHandler);
   SearchButtonInput.addEventListener("click", searchButtonHandler);
   SearchButtonInput.addEventListener("contextmenu", searchButtonHandler);
+  SearchButtonInput.addEventListener("auxclick", searchButtonSwitchMode);
 
   // General event handlers for a click anywhere in the document .. used to clear menus
   // and prevent default menus
