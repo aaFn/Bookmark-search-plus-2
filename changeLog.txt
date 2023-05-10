@@ -1,11 +1,28 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.114 10/05/2023 Bugs and Improvements
+    - Made the explanation text for "Advanced click" more understandable in the BSP2 options page.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/272
+    - Cleaned and optimized code for managing options (no functional effect - was long due).
+    - Corrected bugs on the BSP2 options page where some options values implied by other options where not showing
+      real time.
+    - Corrected bugs on the BSP2 options where some options values were saved as string rather than number.
+    - Added a legend / label to the grouping boxes in the BSP2 options page, to be more explicit on their content.
+    - Added a BSP2 option to add new bookmarks at start or at end (default) of a folder, when dragging and dropping to
+      a folder, or when using an action on the right click menu of a folder.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/271
+    - Removed a spurious reload of the sidebar when changing an option for the first time after a restart.
+    - Added buttons to export and import settings on the BSP2 options page. The exported file is a json file.
+      This can be used to propagate a BSP2 config, or to save settings for a reinstall later. Integrity and consistency
+      checks are made on import, and tolerance for old disappeared settings or for new settings since last export have
+      been included, to be able to restore in future a past config which can be quite old.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/267
 - 2.0.113 13/04/2023 Bugs and Improvements
-    - Added function to open all bookmarks of a Folder in a new Window when using Shift + Click on "Open All in Tabs"
+    - Added function to open all bookmarks of a Folder in a new Window when using Shift + Click on "Open All in Tabs".
         https://github.com/aaFn/Bookmark-search-plus-2/issues/268
-    - Fixed a bug where some bookmark favicons where updated unduly during a tab reload
-    - Decreased number of favicon refreshes triggered upon tab reload events
+    - Fixed a bug where some bookmark favicons where updated unduly during a tab reload.
+    - Decreased number of favicon refreshes triggered upon tab reload events.
     - Removed spurious refreshes to "no favicon" when reloading a tab, to keep more stability on favicons.
       Small impact when a favicon is no more existing on a site, the old favicon will remain until a full refresh is forced
       through the advanced context menu.

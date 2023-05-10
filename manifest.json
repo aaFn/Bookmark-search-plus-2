@@ -6,7 +6,7 @@
   "description": "Displays and filters bookmarks on search string, show parent folders.",
   "author": "aaFn",
 
-  "version": "2.0.113",
+  "version": "2.0.114",
 
   "browser_specific_settings": {
     "gecko": {
@@ -20,8 +20,8 @@
   },
 
   "background": {
-    "scripts": ["sidebar/libstore.js", "sidebar/libimage.js", "sidebar/BookmarkNode.js", "sidebar/HistoryNode.js", "sidebar/favicon.js",
-                "sidebar/contextmenu.js", "sidebar/background.js"]
+    "scripts": ["sidebar/OptionDesc.js", "sidebar/libstore.js", "sidebar/libimage.js", "sidebar/BookmarkNode.js", "sidebar/HistoryNode.js",
+                "sidebar/favicon.js", "sidebar/contextmenu.js", "sidebar/background.js"]
 
   },
 
