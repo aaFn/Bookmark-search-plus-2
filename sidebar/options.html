@@ -7,25 +7,36 @@
   </head>
 
 <body id="body" class="fontdflt">
-  <p> Changing an option will be applied immediately most of the time</p>
+  <p>
+    <button type="button" id="exportsettings">Export settings</button>
+    <a id="exportsettingslink" type="application/json" download="config-bookmark-search-plus2.json" style="display:none"></a>
+    <button type="button" id="importsettings">Import settings</button>
+    <input type="file" id="importsettingsinput" accept="application/json" style="display:none">
+    <span id="importerrormsg" hidden>Error while importing selected file, the import didn't complete !</span>
+    <span id="importokmsg" hidden>Successful import</span>
+    <br/>
+    <br/>
+    Changing an option will be applied immediately most of the time
+  </p>
   <p>
     <b>Statistics:</b><i> Refresh this page to get latest values</i>
     <br/>
 	<textarea readonly id="stats"></textarea>
   </p>
   <p>
-    <b>Favicon fetching:</b><i> Retrieved only once and then cached</i>
+    <b>Favicons:</b><i> Retrieved only once and then cached</i>
   </p>
-  <div class="group">
+  <fieldset>
+    <legend>Favicon fetching</legend>
     <input type="radio" name="faviconfetchmode" id="activeff" checked>
     <label for="activeff">Active</label>
     <br/>
     <input type="radio" name="faviconfetchmode" id="pauseff">
     <label for="pauseff">Pause. <i>Keeps already fetched favicons in the cache</i></label>
-  </div>
+  </fieldset>
   <p>
     <input type="checkbox" id="disablefavicons">
-    <label for="disablefavicons">Disable favicon fetching. <i>Warning: this deletes all cached favicons !</i></label>
+    <label for="disablefavicons">Disable favicon fetching. <i>Warning: this deletes all cached favicons ! Implies no cookie setting.</i></label>
     <br/>
     <input type="checkbox" id="enablecookies">
     <label for="enablecookies">Include cookies to increase background favicon retrieval success rate. <i>Drawback: prompts for user/pwd on some URLs</i></label>
@@ -36,15 +47,16 @@
     <label for="enableflipflop">Dual save to protect from local store corruption. <i>Activate only when you experience favicons loss when stopping/restarting BSP2 or Firefox</i></label>
   </p>
   <p>
-    <b>Search results bookmark behaviour:</b>
+    <b>Search results:</b>
   </p>
-  <div class="group">
+  <fieldset>
+    <legend>When clicking on a search result</legend>
  	<input type="radio" name="clickoption" id="simple" checked>
     <label for="simple">Simple click = always "Show bookmark"</label>
     <br/>
     <input type="radio" name="clickoption" id="advanced">
-    <label for="advanced">Advanced click = blank <img src="/icons/clickshow.png"> "Show bookmark", and bookmark <img src="/icons/clickopen.png"> "Open" in active tab</label>
-  </div>
+    <label for="advanced">Advanced click = click on blank <img src="/icons/clickshow.png"> -> "Show bookmark", and click on bookmark label <img src="/icons/clickopen.png"> -> "Open" in active tab</label>
+  </fieldset>
   <p>
     <input type="checkbox" id="showpath">
     <label for="showpath">On mouse hover above search result, show path to bookmark item instead of title + url</label>
@@ -81,7 +93,8 @@
     <input type="checkbox" id="closesibblingfolders">
     <label for="closesibblingfolders">Only 1 open folder at a time : close all other open folders under same parent when opening a folder</label>
   </p>
-  <div class="group">
+  <fieldset>
+    <legend>Alternate icons</legend>
 	<span>Alternate folder icon: <img src="" height="16" width="16" alt="No image" id="altfldrimg"> </span><label for="altfldrfile"> -> Load a new one: </label><input type="file" accept="image/*" id="altfldrfile">
 	<br/>
 	<input type="checkbox" id="usealtfldr" disabled>
@@ -93,7 +106,7 @@
 	<label for="usealtnofav">Use alternate no-favicon icon</label>
 	<br/>
 	<span><i>Note: you can use <a href="https://github.com/aaFn/Bookmark-search-plus-2/tree/master/altFldrIcons">github repo</a> to find other icons or for your contributions</i></span>
-  </div>
+  </fieldset>
   <p>
     <input type="checkbox" id="remembersizes">
     <label for="remembersizes">Remember size of resizeable objects - search pane, edit bookmark property, history ..</label>
@@ -184,6 +197,19 @@
     <button type="button" id="resetcommand">Reset</button>
   </p>
   <p>
+    <b>Bookmark handling:</b><br/>
+  </p>
+  <fieldset>
+    <legend>When adding a bookmark to a folder (drag & drop or menu right click)</legend>
+    <input type="radio" name="addtofolder" id="addatend" checked>
+    <label for="addatend">Append the new bookmark as last child of folder</label>
+    <br/>
+    <input type="radio" name="addtofolder" id="addatstart">
+    <label for="addatstart">Insert the new bookmark as first child of folder</i></label>
+  </fieldset>
+  <p>
+  </p>
+  <p>
     <b>Bookmark history & undo/redo:</b><br/>
     <input type="checkbox" id="trashEnabled" checked>
     <label for="trashEnabled">Create & use BSP2 trash folder to undo bookmark deletes (workaround for FF API limitations) <i>CAREFUL - disabling this option will really delete all your "deleted" bookmarks still in the folder, and restrain BSP2 undo capabilities (a delete undo will be a re-create, from history)</i></label>
@@ -204,6 +230,7 @@
     <br/>
     <button type="button" id="resetmigr16x16" disabled>Re-trigger 16x16 favicon migration</button>
   </p>
+  <script src="OptionDesc.js"></script>
   <script src="libstore.js"></script>
   <script src="libimage.js"></script>
   <script src="options.js"></script>

@@ -265,7 +265,7 @@ function BN_path (bnId) {
 	let parentId = BN.parentId;
 	let path;
 	if (parentId != Root) {
-	  if (reversePath_option) {
+	  if (options.reversePath) {
 		path = " < " + BN_path(parentId); // Separator on the path ...
 	  }
 	  else {
@@ -280,7 +280,7 @@ function BN_path (bnId) {
 	if ((title == "") && ((url = BN.url) != undefined)) {
 	  title = suggestDisplayTitle(url);
 	}
-	if (reversePath_option) {
+	if (options.reversePath) {
 	  return(title + path);
 	}
 	else {
@@ -676,7 +676,7 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 	  // They are draggable, but keep favicon = nofavicon
 	  protect = false;
 	}
-	else if (disableFavicons_option) {
+	else if (options.disableFavicons) {
 	  fetchedUri = false;
 	  protect = false;
 	}
@@ -732,10 +732,10 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 	  title, uri, fetchedUri, url
 	);
 
-	if (triggerFetch && !pauseFavicons_option) { // Trigger favicon fetch, except if paused
+	if (triggerFetch && !options.pauseFavicons) { // Trigger favicon fetch, except if paused
 	  // This is a bookmark, so here no need for cloneBN(), there is no tree below
 	  if (faviconWorker != undefined) {
-		faviconWorker({data: ["get", BTN_id, url, enableCookies_option]});
+		faviconWorker({data: ["get", BTN_id, url, options.enableCookies]});
 	  }
 	}
   }
@@ -1124,7 +1124,7 @@ function uniqueListCopy (a_BN) {
 
 /*
  * Scan a BN tree for stats and for favicons to fetch, and updates as needed
- * function of disableFavicons_option.
+ * function of options.disableFavicons.
  * 
  * BN = BN tree to scan
  * faviconWorker = function to post favicons fetching to
@@ -1224,7 +1224,7 @@ function scanBNTree (BN, faviconWorker, doStats = true) {
 		recentBkmkBN = BN;
 	  }
 	}
-	else if (disableFavicons_option) {
+	else if (options.disableFavicons) {
 	  BN.faviconUri = undefined;
 	  BN.fetchedUri = false;
 	}
@@ -1260,10 +1260,10 @@ function scanBNTree (BN, faviconWorker, doStats = true) {
 		  countNoFavicon++;
 	  }
 
-	  if (triggerFetch && !pauseFavicons_option) { // Trigger favicon fetch, except if paused
+	  if (triggerFetch && !options.pauseFavicons) { // Trigger favicon fetch, except if paused
 		// This is a bookmark, so here no need for cloneBN(), there is no tree below
-//		faviconWorker.postMessage(["get", BN.id, BN.url, enableCookies_option]);
-		faviconWorker({data: ["get", bnId, url, enableCookies_option]});
+//		faviconWorker.postMessage(["get", BN.id, BN.url, options.enableCookies]);
+		faviconWorker({data: ["get", bnId, url, options.enableCookies]});
 	  }
 	}
   }
@@ -1271,14 +1271,14 @@ function scanBNTree (BN, faviconWorker, doStats = true) {
 
 /*
  * Scan a BN tree for unsuccessful favicons to fetch, and trigger updates as needed
- * function of disableFavicons_option.
+ * function of options.disableFavicons.
  * 
  * BN = BN tree to scan
  * faviconWorker = function to post favicons fetching to
  * setFavicon = function to call for directly setting favicon
  */
 function scanFavBNTree (BN, faviconWorker, setFavicon) {
-  if (!disableFavicons_option && !pauseFavicons_option) {
+  if (!options.disableFavicons && !options.pauseFavicons) {
 	let type = BN.type;
 	if (type == "folder") {
 	  let children = BN.children;
@@ -1301,7 +1301,7 @@ function scanFavBNTree (BN, faviconWorker, setFavicon) {
 		  else {
 			setFavicon(bnId, "/icons/nofavicontmp.png");
 			countFetchFav++;
-			faviconWorker({data: ["get", bnId, url, enableCookies_option]});
+			faviconWorker({data: ["get", bnId, url, options.enableCookies]});
 		  }
 		}
 	  }

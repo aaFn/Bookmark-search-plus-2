@@ -131,7 +131,7 @@ let startTime, endLoadTime, endTreeLoadTime, endTreeBuildTime, endSaveTime;
  * force (optional) = if true, force putting trace in box even if not activated (for later display)
  */
 function trace (text, force = false) {
-  if (traceEnabled_option || force) {
+  if (options.traceEnabled || force) {
 	console.log(text+"\r\n");
   }
 }
@@ -179,7 +179,7 @@ function endSaveBNList () { // Save finished
 //	trace("End of saveBNList. Delay = "+(t2.getTime() - t1.getTime())+" ms", true);
   // Record last slot which was saved
 //console.log("saveFIndex: "+fIndex);
-  if (enableFlipFlop_option) { // Go to other slot on next save
+  if (options.enableFlipFlop) { // Go to other slot on next save
 	fIndex = 1 - fIndex;
   }
 
@@ -222,7 +222,7 @@ function executeSaveBNList () {
   }
   try {
 	let saveObj;
-//	if (delayLoad_option && (savedBNList != undefined)) { // Merge both list when saving to
+//	if (options.delayLoad && (savedBNList != undefined)) { // Merge both list when saving to
 //														  // keep what was not yet verified
 //	  saveObj = Object.assign({}, savedBNList, curBNList);
 //	}
@@ -238,7 +238,7 @@ function executeSaveBNList () {
 //resolve();
 
 	let saveObject;
-	if (!enableFlipFlop_option || (fIndex == 0)) {
+	if (!options.enableFlipFlop || (fIndex == 0)) {
 	  saveObject = saveObject0;
 	  saveObject0.savedBNList = jsonBN;
 	  saveObject0.savedHNList = jsonHN;
@@ -346,7 +346,7 @@ function newSidebar (windowId) {
   isSidebarOpen[windowId] = true;
   let bnId = sidebarCurId[windowId];
   if (bnId == undefined) { // No value for that window, use last saved value instead
-	bnId = lastcurbnid_option;
+	bnId = options.lastcurbnid;
   }
   if ((showInSidebarWId == windowId) && (showInSidebarBnId != undefined)) {
 	setTimeout(
@@ -373,7 +373,7 @@ function closeSidebar (windowId) {
  * next FF restart.
  */
 function saveCurBnId (windowId, bnId) {
-  lastcurbnid_option = sidebarCurId[windowId] = bnId;
+  options.lastcurbnid = sidebarCurId[windowId] = bnId;
   browser.storage.local.set({
 	lastcurbnid_option: bnId
   });
@@ -646,7 +646,7 @@ function refreshMostVisited (a_MVU) {
 //	BTN.unmodifiable      = undefined;
 	BTN.url               = i.url;
 	node = BN_create(BTN, 2, undefined); // Do not fetch any favicon yet
-	if (!disableFavicons_option) { // Try to get the favicon URI if available (and not disabled)
+	if (!options.disableFavicons) { // Try to get the favicon URI if available (and not disabled)
 	  let uri = i.favicon;
 	  if (uri != undefined) { // Only with FF63+, when the favicon is known by FF
 		node.faviconUri = uri;
@@ -930,7 +930,7 @@ function createBSP2TrashFolder () {
 	}
   }
   else { // It already exists, simply trim its content
-	BN_folderTrim(curBNList[bsp2TrashFldrBNId], historyRetention_option * 24 * 3600000);
+	BN_folderTrim(curBNList[bsp2TrashFldrBNId], options.historyRetention * 24 * 3600000);
   }
 }
 
@@ -948,7 +948,7 @@ function removeBSP2TrashFolder () {
  */
 function handleMsgResponse (message) {
   // Is always called, even if destination didn't specifically reply (then message is undefined)
-  if (traceEnabled_option) {
+  if (options.traceEnabled) {
 	console.log("Sidebar sent a response: <<"+message.content+">> received in background");
   }
 }
@@ -1028,7 +1028,7 @@ function handleAddonMessage (request, sender, sendResponse) {
 	// When coming from sidebar:
 	//   sender.url: moz-extension://28a2a188-53d6-4f91-8974-07cd0d612f9e/sidebar/panel.html
 	let msg = request.content;
-if (traceEnabled_option) {
+if (options.traceEnabled) {
   console.log("Got message <<"+msg+">> from "+request.source+" in background");
   console.log("  sender.tab: "+sender.tab);
   console.log("  sender.frameId: "+sender.frameId);
@@ -1049,36 +1049,36 @@ if (traceEnabled_option) {
 	}
 	else if (msg.startsWith("savedOptions")) { // Option page changed something to options, reload them
 	  // Look at what changed
-	  let pauseFavicons_option_old = pauseFavicons_option;
-	  let disableFavicons_option_old = disableFavicons_option;
-	  let enableCookies_option_old = enableCookies_option;
-	  let enableFlipFlop_option_old = enableFlipFlop_option;
-	  let advancedClick_option_old = advancedClick_option;
-	  let showPath_option_old = showPath_option;
-	  let closeSearch_option_old = closeSearch_option;
-	  let openTree_option_old = openTree_option;
-	  let noffapisearch_option_old = noffapisearch_option;
-	  let searchOnEnter_option_old = searchOnEnter_option;
-	  let reversePath_option_old = reversePath_option;
-	  let closeSibblingFolders_option_old = closeSibblingFolders_option;
-	  let rememberSizes_option_old = rememberSizes_option;
-	  let searchHeight_option_old = searchHeight_option;
-	  let setFontSize_option_old = setFontSize_option;
-	  let fontSize_option_old = fontSize_option;
-	  let setFontBold_option_old = setFontBold_option;
-	  let setSpaceSize_option_old = setSpaceSize_option;
-	  let spaceSize_option_old = spaceSize_option;
-	  let matchTheme_option_old = matchTheme_option;
-	  let setColors_option_old = setColors_option;
-	  let textColor_option_old = textColor_option;
-	  let bckgndColor_option_old = bckgndColor_option;
-	  let altFldrImg_option_old = altFldrImg_option;
-	  let useAltFldr_option_old = useAltFldr_option;
-	  let altNoFavImg_option_old = altNoFavImg_option;
-	  let useAltNoFav_option_old = useAltNoFav_option;
-	  let trashEnabled_option_old = trashEnabled_option;
-	  let trashVisible_option_old = trashVisible_option;
-	  let traceEnabled_option_old = traceEnabled_option;
+	  let pauseFavicons_option_old = options.pauseFavicons;
+	  let disableFavicons_option_old = options.disableFavicons;
+	  let enableCookies_option_old = options.enableCookies;
+	  let enableFlipFlop_option_old = options.enableFlipFlop;
+	  let advancedClick_option_old = options.advancedClick;
+	  let showPath_option_old = options.showPath;
+	  let closeSearch_option_old = options.closeSearch;
+	  let openTree_option_old = options.openTree;
+	  let noffapisearch_option_old = options.noffapisearch;
+	  let searchOnEnter_option_old = options.searchOnEnter;
+	  let reversePath_option_old = options.reversePath;
+	  let closeSibblingFolders_option_old = options.closeSibblingFolders;
+	  let rememberSizes_option_old = options.rememberSizes;
+	  let searchHeight_option_old = options.searchHeight;
+	  let setFontSize_option_old = options.setFontSize;
+	  let fontSize_option_old = options.fontSize;
+	  let setFontBold_option_old = options.setFontBold;
+	  let setSpaceSize_option_old = options.setSpaceSize;
+	  let spaceSize_option_old = options.spaceSize;
+	  let matchTheme_option_old = options.matchTheme;
+	  let setColors_option_old = options.setColors;
+	  let textColor_option_old = options.textColor;
+	  let bckgndColor_option_old = options.bckgndColor;
+	  let altFldrImg_option_old = options.altFldrImg;
+	  let useAltFldr_option_old = options.useAltFldr;
+	  let altNoFavImg_option_old = options.altNoFavImg;
+	  let useAltNoFav_option_old = options.useAltNoFav;
+	  let trashEnabled_option_old = options.trashEnabled;
+	  let trashVisible_option_old = options.trashVisible;
+	  let traceEnabled_option_old = options.traceEnabled;
 	  refreshOptionsLStore()
 	  .then(
 		function () {
@@ -1086,8 +1086,8 @@ if (traceEnabled_option) {
 //		  let FSChanged;
 		  let SSSChanged;
 //		  let SSChanged;
-		  if (pauseFavicons_option_old != pauseFavicons_option) {
-			if (pauseFavicons_option) {
+		  if (pauseFavicons_option_old != options.pauseFavicons) {
+			if (options.pauseFavicons) {
 			  // Stop queued favicon fetching
 			  faviconWorkerPostMessage({data: ["stopfetching"]});
 			}
@@ -1099,7 +1099,7 @@ if (traceEnabled_option) {
 			// Signal to others the change in option
 			sendAddonMessage("savedOptions");
 		  }
-		  else if (disableFavicons_option_old != disableFavicons_option) {
+		  else if (disableFavicons_option_old != options.disableFavicons) {
 			// Stop queued favicon fetching
 			faviconWorkerPostMessage({data: ["stopfetching"]});
 
@@ -1111,10 +1111,10 @@ if (traceEnabled_option) {
 			// Change to DFF requires a full reload of all sidebars
 			sendAddonMessage("reload");
 		  }
-		  else if ((SFSChanged = (setFontSize_option_old != setFontSize_option))
-			  	   || (fontSize_option_old != fontSize_option)
+		  else if ((SFSChanged = (setFontSize_option_old != options.setFontSize))
+			  	   || (fontSize_option_old != options.fontSize)
 		  		  ) {
-			if ((SFSChanged && !setFontSize_option
+			if ((SFSChanged && !options.setFontSize
 							&& (fontSize_option_old != DfltFontSize)
 				)				// SFS changed state to unset, refresh only if FS changed
 				|| !SFSChanged	// Only the fontSize changed, which can happen only when SFS is set
@@ -1123,14 +1123,14 @@ if (traceEnabled_option) {
 			  sendAddonMessage("reload");
 			}
 		  }
-		  else if (setFontBold_option_old != setFontBold_option) {
+		  else if (setFontBold_option_old != options.setFontBold) {
 			// Change to font weight requires a full reload of all sidebars
 			sendAddonMessage("reload");
 		  }
-		  else if ((SSSChanged = (setSpaceSize_option_old != setSpaceSize_option))
-			  	   || (spaceSize_option_old != spaceSize_option)
+		  else if ((SSSChanged = (setSpaceSize_option_old != options.setSpaceSize))
+			  	   || (spaceSize_option_old != options.spaceSize)
 		  		  ) {
-			if ((SSSChanged && !setSpaceSize_option
+			if ((SSSChanged && !options.setSpaceSize
 							&& (spaceSize_option_old != DfltSpaceSize)
 				)				// SFS changed state to unset, refresh only if FS changed
 				|| !SSSChanged	// Only the fontSize changed, which can happen only when SFS is set
@@ -1139,9 +1139,9 @@ if (traceEnabled_option) {
 			  sendAddonMessage("reload");
 			}
 		  }
-		  else if (trashEnabled_option_old != trashEnabled_option) {
+		  else if (trashEnabled_option_old != options.trashEnabled) {
 			// Create or delete the BSP2 trash folder, as required
-			if (trashEnabled_option) { // Create BSP2 trash folder, if not already existing (else trim it)
+			if (options.trashEnabled) { // Create BSP2 trash folder, if not already existing (else trim it)
 			  createBSP2TrashFolder();
   			}
 			else { // Delete BSP2 trash folder and all its content
@@ -1149,31 +1149,31 @@ if (traceEnabled_option) {
 			}
 			sendAddonMessage("savedOptions");
 		  }
-		  else if ((enableCookies_option_old != enableCookies_option)
-			  	   || (enableFlipFlop_option_old != enableFlipFlop_option)
-			  	   || (advancedClick_option_old != advancedClick_option)
-			  	   || (showPath_option_old != showPath_option)
-			  	   || (closeSearch_option_old != closeSearch_option)
-			  	   || (openTree_option_old != openTree_option)
-				   || (noffapisearch_option_old != noffapisearch_option)
-			   	   || (searchOnEnter_option_old != searchOnEnter_option)
-			  	   || (reversePath_option_old != reversePath_option)
-			  	   || (closeSibblingFolders_option_old != closeSibblingFolders_option)
-			  	   || (rememberSizes_option_old != rememberSizes_option)
-			  	   || (searchHeight_option_old != searchHeight_option)
-				   || (trashVisible_option_old != trashVisible_option)
-			       || (traceEnabled_option_old != traceEnabled_option)
-			       || (matchTheme_option_old != matchTheme_option)
-			       || (setColors_option_old != setColors_option)
-			       || (setColors_option && ((textColor_option_old != textColor_option)
-			    	   						|| (bckgndColor_option_old != bckgndColor_option)
+		  else if ((enableCookies_option_old != options.enableCookies)
+			  	   || (enableFlipFlop_option_old != options.enableFlipFlop)
+			  	   || (advancedClick_option_old != options.advancedClick)
+			  	   || (showPath_option_old != options.showPath)
+			  	   || (closeSearch_option_old != options.closeSearch)
+			  	   || (openTree_option_old != options.openTree)
+				   || (noffapisearch_option_old != options.noffapisearch)
+			   	   || (searchOnEnter_option_old != options.searchOnEnter)
+			  	   || (reversePath_option_old != options.reversePath)
+			  	   || (closeSibblingFolders_option_old != options.closeSibblingFolders)
+			  	   || (rememberSizes_option_old != options.rememberSizes)
+			  	   || (searchHeight_option_old != options.searchHeight)
+				   || (trashVisible_option_old != options.trashVisible)
+			       || (traceEnabled_option_old != options.traceEnabled)
+			       || (matchTheme_option_old != options.matchTheme)
+			       || (setColors_option_old != options.setColors)
+			       || (options.setColors && ((textColor_option_old != options.textColor)
+			    	   						|| (bckgndColor_option_old != options.bckgndColor)
 			    	   					   )
 			    	  )
-			       || ((useAltFldr_option && (altFldrImg_option_old != altFldrImg_option))
-				  	   || (useAltFldr_option_old != useAltFldr_option)
+			       || ((options.useAltFldr && (altFldrImg_option_old != options.altFldrImg))
+				  	   || (useAltFldr_option_old != options.useAltFldr)
 				  	  )
-			       || ((useAltNoFav_option && (altNoFavImg_option_old != altNoFavImg_option))
-				  	   || (useAltNoFav_option_old != useAltNoFav_option)
+			       || ((options.useAltNoFav && (altNoFavImg_option_old != options.altNoFavImg))
+				  	   || (useAltNoFav_option_old != options.useAltNoFav)
 				  	  )
 			      ) { // Those options only require a re-read and some minor actions
 			sendAddonMessage("savedOptions");
@@ -1985,7 +1985,7 @@ function bkmkCreatedHandler (id, BTN) {
 //trace(t1+" Create event on: "+id+" type: "+BTN.type+" parentId: "+parentId+" index: "+index);
 
   // Create the new BN tree and insert it under its parent + maintain inBSP2Trash and trashDate fields
-  let inBSP2Trash = trashEnabled_option && parentBN.inBSP2Trash;
+  let inBSP2Trash = options.trashEnabled && parentBN.inBSP2Trash;
   let BN = buildTree(BTN, parentBN.level+1, inBSP2Trash);
   BN_insert(BN, parentBN, index);
 
@@ -2176,7 +2176,7 @@ function bkmkChangedHandler (id, changeInfo) {
 		BN.faviconUri = "/icons/nofavicon.png";
 		countNoFavicon++;
 	  }
-	  else if (disableFavicons_option) {
+	  else if (options.disableFavicons) {
 		BN.faviconUri = undefined;
 	  }
 	  else {
@@ -2184,8 +2184,8 @@ function bkmkChangedHandler (id, changeInfo) {
 		BN.faviconUri = "/icons/nofavicontmp.png";
 		countFetchFav++;
 		// This is a bookmark, so here no need for cloneBN(), there is no tree below
-//		faviconWorker.postMessage(["get2", id, cUrl, enableCookies_option]);
-		faviconWorkerPostMessage({data: ["get2", id, cUrl, enableCookies_option]});
+//		faviconWorker.postMessage(["get2", id, cUrl, options.enableCookies]);
+		faviconWorkerPostMessage({data: ["get2", id, cUrl, options.enableCookies]});
 	  }
 	  BN.fetchedUri = false;
 	}
@@ -2246,9 +2246,9 @@ function bkmkMovedHandler (id, moveInfo) {
 		// Record action sent to us at source of detecting the problem
 		let BTN = a_BTN[0];
 		historyListAdd(curHNList,
-					   (trashEnabled_option && (targetParentId == bsp2TrashFldrBNId) // Imperfect, but not daring a double error by fetching possibly non existing parent
+					   (options.trashEnabled && (targetParentId == bsp2TrashFldrBNId) // Imperfect, but not daring a double error by fetching possibly non existing parent
 						? HNACTION_BKMKREMOVETOTRASH_DESYNC
-						: (trashEnabled_option && (curParentId == bsp2TrashFldrBNId) // Same ..
+						: (options.trashEnabled && (curParentId == bsp2TrashFldrBNId) // Same ..
 						   ? HNACTION_BKMKCREATEFROMTRASH_DESYNC
 						   : HNACTION_BKMKMOVE_DESYNC
 						  )
@@ -2272,7 +2272,7 @@ function bkmkMovedHandler (id, moveInfo) {
 	// Then insert it at new place, again not touching the list
 	let curInBSP2Trash = BN.inBSP2Trash; // Remember current trash state
 	let tgtInBSP2Trash;
-	if (trashEnabled_option) { // Maintain inBSP2Trash and trashDate fields
+	if (options.trashEnabled) { // Maintain inBSP2Trash and trashDate fields
 	  BN_markTrash(BN, tgtInBSP2Trash = targetParentBN.inBSP2Trash);
 	}
 	BN_insert(BN, targetParentBN, targetIndex, false);
@@ -2282,7 +2282,7 @@ function bkmkMovedHandler (id, moveInfo) {
 	historyListAdd(curHNList,
 				   ((tgtInBSP2Trash == true)
 					? HNACTION_BKMKREMOVETOTRASH
-					: ((trashEnabled_option && curInBSP2Trash)
+					: ((options.trashEnabled && curInBSP2Trash)
 					   ? HNACTION_BKMKCREATEFROMTRASH
 					   : HNACTION_BKMKMOVE
 					  )
@@ -2435,8 +2435,8 @@ function setCollectedFavicon (bnId, is_nofavicon, faviconUrl) {
 	}
 	else { // Fetch favicon
 	  // Presumably a bookmark, so no need for cloneBTN(), there is no tree below
-//	  faviconWorker.postMessage(["iconurl", bnId, tabFaviconUrl, enableCookies_option]);
-	  faviconWorkerPostMessage({data: ["iconurl", bnId, faviconUrl, enableCookies_option]});
+//	  faviconWorker.postMessage(["iconurl", bnId, tabFaviconUrl, options.enableCookies]);
+	  faviconWorkerPostMessage({data: ["iconurl", bnId, faviconUrl, options.enableCookies]});
 //console.log("Retrieval demand sent for favicon: "+faviconUrl);
 	}
 /*
@@ -2509,9 +2509,9 @@ function refreshActiveTabs (BN, is_deleted) {
 			tabUrl = tabUrl.substring(pos);
 		  }
 		  tabFaviconUrl = tab.favIconUrl;
-		  is_refreshFav = !disableFavicons_option		  // Ignore if disableFavicons_option is set
-/*						  && !pauseFavicons_option	  // Ignore if pauseFavicons_option is set */
-						  && (!is_deleted || trashEnabled_option) // Ignore if really deleting bookmarks
+		  is_refreshFav = !options.disableFavicons		  // Ignore if options.disableFavicons is set
+/*						  && !options.pauseFavicons	  // Ignore if options.pauseFavicons is set */
+						  && (!is_deleted || options.trashEnabled) // Ignore if really deleting bookmarks
 						  && (tabFaviconUrl != undefined) // Need a favicon URI
 						  ;
 		  is_nofavicon = is_notCollectableFaviconFromTab(tabFaviconUrl, tabUrl);
@@ -2623,8 +2623,8 @@ function tabSwitched (activeInfo) {
 			  if (len > 0) { // This could be a bookmarked tab
 				// If there is a favicon and we are collecting them, refresh all coorresponding BookmarkNodes with it
 				let tabFaviconUrl = tab.favIconUrl;
-				let is_refreshFav = !disableFavicons_option		  // Ignore if disableFavicons_option is set
-/*									&& !pauseFavicons_option	  // Ignore if pauseFavicons_option is set */
+				let is_refreshFav = !options.disableFavicons		  // Ignore if options.disableFavicons is set
+/*									&& !options.pauseFavicons	  // Ignore if options.pauseFaviconsis set */
 									&& (tabFaviconUrl != undefined) // Need a favicon URI
 									&& (tabUrl != "about:blank")  // Do not refresh about:blank bookmarks
 									;
@@ -2763,8 +2763,8 @@ console.log("A tab was updated.\r\n"
 			  let tabFaviconUrl = tabInfo.favIconUrl;
 			  let chgFaviconUrl = changeInfo.favIconUrl;
 //			  let chgStatus = changeInfo.status;
-			  let is_refreshFav = !disableFavicons_option		  // Ignore if disableFavicons_option is set
-/*								  && !pauseFavicons_option		  // Ignore if pauseFavicons_option is set */
+			  let is_refreshFav = !options.disableFavicons		  // Ignore if options.disableFavicons is set
+/*								  && !options.pauseFavicons		  // Ignore if options.pauseFavicons is set */
 								  && (tabFaviconUrl != undefined) // Need a favicon URI
 								  && (tabUrl != "about:blank")    // For something else than about:blank, which appears intermitently when reloading a tab
 																  // There was no favicon change, just a tab switch OR this is a tab reload with a new URL / favicon
@@ -2988,7 +2988,7 @@ function completeBookmarks () {
   faviconWorkerPostMessage({data: ["nohysteresis"]});
 
   // Align BSP2 trash folder existence with option
-  if (trashEnabled_option) { // If it should, create it if not already existing, else trim it
+  if (options.trashEnabled) { // If it should, create it if not already existing, else trim it
 	createBSP2TrashFolder();
   }
   else { // Make sure it is removed
@@ -3127,7 +3127,7 @@ function storeAndConvertTree (a_BTN) {
 //trace("Root: <<"+root.id+">>"+"<<"+root.title+">>"+"<<"+root.type+">>");
   rootBN = new BookmarkNode (root.id, "folder", -1, undefined, root.dateAdded, true);
   curBNList[0] = curBNList[root.id] = rootBN;
-//  if (delayLoad_option) {
+//  if (options.delayLoad) {
 //	delete savedBNList[0];
 //  }
 
@@ -3191,7 +3191,7 @@ function initialize2 () {
 
 	// If just installed, or if load FF API each time is forced, or if we didn't retrieve the Bookmark node
 	// saved structure, then re-read the Bookmark tree from FF API to sync / re-sync.
-	if (justInstalled || loadffapi_option || (savedBNList == undefined)) {
+	if (justInstalled || options.loadffapi || (savedBNList == undefined)) {
 	  trace("(Loading from FF API)", true);
 	  browser.bookmarks.getTree()
 	  .then(storeAndConvertTree, onRejected)
@@ -3306,8 +3306,8 @@ readFullLStore(false, trace)
 .then(
   function () {
 	// Set shortcut if different from default
-	trace("sidebarCommand_option: "+sidebarCommand_option, true);
-	if (sidebarCommand_option == undefined) {
+	trace("options.sidebarCommand: "+options.sidebarCommand, true);
+	if (options.sidebarCommand == undefined) {
 	  // Workaround the fact that manifest.json "suggested_key" in "commands" cannot contain "Alt" before FF63
 	  // Indeed, default key for Linux is "Ctrl+Alt+B", but this fails the add-on load for FF < 63, so default
 	  // in manifest is set to "Ctrl+Shift+B" in Linux, which conflicts with FF reserved combinations later on.
@@ -3323,7 +3323,7 @@ readFullLStore(false, trace)
 	  if (!beforeFF60) {
 		browser.commands.update(
 		  {name: "_execute_sidebar_action",
-		   shortcut: sidebarCommand_option
+		   shortcut: options.sidebarCommand
 		  }
 		);
 	  }
@@ -3375,13 +3375,13 @@ readFullLStore(false, trace)
 		savedHNList = undefined;
 	  }
 	  else {
-		historyListTrim(savedHNList, historyRetention_option * 24 * 3600000);
+		historyListTrim(savedHNList, options.historyRetention * 24 * 3600000);
 	  }
 	}
 
 	trace("structureVersion: "+structureVersion, true);
-	trace("disableFavicons_option: "+disableFavicons_option, true);
-	trace("pauseFavicons_option: "+pauseFavicons_option, true);
+	trace("options.disableFavicons: "+options.disableFavicons, true);
+	trace("options.pauseFavicons: "+options.pauseFavicons, true);
 	if (!structureVersion.includes(VersionBNList)) {
 	  // Signal to migrate from savedBkmkUriList
 	  migration_bnlist = true;

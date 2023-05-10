@@ -673,7 +673,7 @@ function historyListSearchFaviconUri (hl, id, btn) {
 	  if (btn.url.startsWith("about:")) { // about: is protected - security error ..
 		uri = "/icons/nofavicon.png";
 	  }
-	  else if (!disableFavicons_option) {
+	  else if (!options.disableFavicons) {
 		uri = "/icons/nofavicontmp.png";
 	  }
 	}

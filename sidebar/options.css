@@ -23,11 +23,6 @@ html, body {
   font: 12px "Segoe UI";
 }
 
-.group {
-  border: 1px solid #D7D7D7;
-  padding: 10px 10px;
-}
-
 img {
   border: 1px solid black;
 }
@@ -37,6 +32,18 @@ textarea {
   font-size: 11px;
   height: 80px;
   width: 300px;
+}
+
+#importsettings {
+  margin-left: 1em;
+}
+
+#importerrormsg {
+  color: red;
+}
+
+#importokmsg {
+  color: green;
 }
 
 #fontsize, #spacesize, #historyretention {

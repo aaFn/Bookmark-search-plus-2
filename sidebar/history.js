@@ -9,7 +9,7 @@
 const HistoryWidth  = 800;
 const HistoryHeight = 800;
 
-let remembersizes_option;
+let remembersizes_option; // At this stage, we didn't collect all options yet
 let gettingItem = browser.storage.local.get(
   {historytop_option: 50,
    historyleft_option: 100,
@@ -498,16 +498,16 @@ let sidebarTextColor = undefined; // Contains text color if we apply a theme's c
 function setSearchOptions () {
 /*
   let cn;
-  if (searchMatch_option == "regexp") {
-	cn = "sr" + searchField_option;
+  if (options.searchMatch == "regexp") {
+	cn = "sr" + options.searchField;
 	SMatchRegexpInput.checked = true;
   }
   else {
-	cn = "sw" + searchField_option;
+	cn = "sw" + options.searchField;
 	SMatchWordsInput.checked = true;
   }
   SearchButtonInput.className = cn;
-  if (searchScope_option == "all") {
+  if (options.searchScope == "all") {
 	MGlassImgStyle.backgroundImage = 'url("/icons/search.png"';
 	SScopeAllInput.checked = true;
   }
@@ -516,10 +516,10 @@ function setSearchOptions () {
 	SScopeSubfolderInput.checked = true;
   }
 
-  if (searchField_option == "both") {
+  if (options.searchField == "both") {
 	SFieldTitleUrlInput.checked = true;
   }
-  else if (searchField_option == "title") {
+  else if (options.searchField == "title") {
 	SFieldTitleOnlyInput.checked = true;
   }
   else {
@@ -536,8 +536,8 @@ function setSearchOptions () {
  *
  */
 function handleURListClick () {
-  if (!historyDispURList_option) { // Option is changed
-	historyDispURList_option = true;
+  if (!options.historyDispURList) { // Option is changed
+	options.historyDispURList = true;
 	browser.storage.local.set({
 	  historydispurlist_option: true
 	})
@@ -566,8 +566,8 @@ function handleURListClick () {
  *
  */
 function handleRawListClick () {
-  if (historyDispURList_option) { // Option is changed
-	historyDispURList_option = false;
+  if (options.historyDispURList) { // Option is changed
+	options.historyDispURList = false;
 	browser.storage.local.set({
 	  historydispurlist_option: false
 	})
@@ -634,7 +634,7 @@ function appendBookmarkHN (id, HN) {
 	type = row.dataset.type = HN.type;
 	let div, seqnum;
 	let revOp = HN.revOp; // If undefined, normal operation, else undo or redo
-	if ((revOp != undefined) && historyDispURList_option) { // Special display as URList item
+	if ((revOp != undefined) && options.historyDispURList) { // Special display as URList item
 	  let textOp;
 	  if (revOp == HNREVOP_ISUNDO) {
 		div = UItemTempl.cloneNode(true);
@@ -951,7 +951,7 @@ function displayPath (node, a_path) {
   }
   else {
 	let text;
-	if (reversePath_option) {
+	if (options.reversePath) {
 	  text = a_path[len-1];
 	  for (let i=len-2 ; i>=0 ; i--) {
 		text += " < " + a_path[i]; // Separator on the path ...
@@ -1076,7 +1076,7 @@ function displayHN (hnId) {
 	else {								// Presumably a Bookmark
 	  NDTitle.textContent = HN.title;
 	  let uri;
-	  if (disableFavicons_option || ((uri = HN.faviconUri) == undefined)) { // Show nofavicon
+	  if (options.disableFavicons || ((uri = HN.faviconUri) == undefined)) { // Show nofavicon
 		NDFavicon.style = "";
 		NDFavicon.className = "nofavicon";
 	  }
@@ -1133,7 +1133,7 @@ function displayURList () {
 function showRow (srcRow) {
   // Highlight the source cell + scroll it into view
   setCellHighlight(srcRow.firstElementChild);
-  // BUG: "smooth" has a bug when the viewport content is modified, it points at the origin position before modification
+  // Bug: "smooth" has a bug when the viewport content is modified, it points at the origin position before modification
   // See https://bugzilla.mozilla.org/show_bug.cgi?id=1139745
   // So using "auto" instead of "smooth", which appears to work all time .. even if less nice
   //
@@ -1680,7 +1680,7 @@ function displayHNList (hnList) {
 	HN = hnList[i];
 	let revop;
 	if ((HN.multi_HNref == undefined)		// Do not display items part of a multiple selection as they are done with their "parent"
-		&& (!historyDispURList_option || ((revop = HN.revOp) == undefined))	// If historyDispURList_option, do not display undo/redo, they are done after each bookamrk item
+		&& (!options.historyDispURList || ((revop = HN.revOp) == undefined))	// If options.historyDispURList, do not display undo/redo, they are done after each bookamrk item
 	   ) {
 	  appendBookmarkHN(i, HN);
 	  if (HN.is_multi) { // Display all multiple selection "children" now
@@ -1693,7 +1693,7 @@ function displayHNList (hnList) {
 		}
 	  }
 	  let reversion = HN.reversion;
-	  if (historyDispURList_option && (reversion != undefined) && (reversion > 0)) { // Special display of URList items
+	  if (options.historyDispURList && (reversion != undefined) && (reversion > 0)) { // Special display of URList items
 		appendURList(); // Create a new URList header
 		// Now display all redo / undo actions as URList items
 		let hnref_list = HN.revOp_HNref_list;
@@ -1714,7 +1714,7 @@ function displayHNList (hnList) {
 
   // Finish displaying favicons asynchronously
   isDisplayComplete = true;
-  if (!disableFavicons_option) {
+  if (!options.disableFavicons) {
 	setTimeout(completeFavicons, 0);
   }
 }
@@ -1805,7 +1805,7 @@ function handleMsgResponse (message) {
   // Is always called, even is destination didn't specifically reply (then message is undefined)
   if (message != undefined) {
 	let msg = message.content;
-if (traceEnabled_option) {
+if (options.traceEnabled) {
   console.log("Background sent a response: <<"+msg+">> received in options");
 }
 	if (msg == "getStats") {
@@ -1845,7 +1845,7 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  // When coming from sidebar:
 	  //   sender.url: moz-extension://28a2a188-53d6-4f91-8974-07cd0d612f9e/sidebar/panel.html
 	  let msg = request.content;
-if (traceEnabled_option) {
+if (options.traceEnabled) {
   console.log("Got message <<"+msg+">> from "+request.source+" in "+myWindowId);
   console.log("  sender.tab: "+sender.tab);
   console.log("  sender.frameId: "+sender.frameId);
@@ -1856,37 +1856,37 @@ if (traceEnabled_option) {
 
 	  if (msg.startsWith("savedOptions")) { // Option page changed something to options, reload them
 		// Look at what changed
-//		let advancedClick_option_old = advancedClick_option;
-//		let showPath_option_old = showPath_option;
-//		let closeSearch_option_old = closeSearch_option;
-//		let openTree_option_old = openTree_option;
-//		let matchTheme_option_old = matchTheme_option;
-//		let setColors_option_old = setColors_option;
-//		let textColor_option_old = textColor_option;
-//		let bckgndColor_option_old = bckgndColor_option;
-		let reversePath_option_old = reversePath_option;
-		let matchTheme_option_old = matchTheme_option;
-		let setColors_option_old = setColors_option;
-		let textColor_option_old = textColor_option;
-		let bckgndColor_option_old = bckgndColor_option;
-		let altFldrImg_option_old = altFldrImg_option;
-		let useAltFldr_option_old = useAltFldr_option;
-		let altNoFavImg_option_old = altNoFavImg_option;
-		let useAltNoFav_option_old = useAltNoFav_option;
-//		let traceEnabled_option_old = traceEnabled_option;
+//		let advancedClick_option_old = options.advancedClick;
+//		let showPath_option_old = options.showPath;
+//		let closeSearch_option_old = options.closeSearch;
+//		let openTree_option_old = options.openTree;
+//		let matchTheme_option_old = options.matchTheme;
+//		let setColors_option_old = options.setColors;
+//		let textColor_option_old = options.textColor;
+//		let bckgndColor_option_old = options.bckgndColor;
+		let reversePath_option_old = options.reversePath;
+		let matchTheme_option_old = options.matchTheme;
+		let setColors_option_old = options.setColors;
+		let textColor_option_old = options.textColor;
+		let bckgndColor_option_old = options.bckgndColor;
+		let altFldrImg_option_old = options.altFldrImg;
+		let useAltFldr_option_old = options.useAltFldr;
+		let altNoFavImg_option_old = options.altNoFavImg;
+		let useAltNoFav_option_old = options.useAltNoFav;
+//		let traceEnabled_option_old = options.traceEnabled;
 
 		// Function to process option changes
 		function changedOptions () {
 		  // If path option changed, update any open search result 
-		  if (reversePath_option_old != reversePath_option) {
+		  if (reversePath_option_old != options.reversePath) {
 			// Update displayed HN
 			if (cellHighlight != null) {
 			  displayHN(cellHighlight.parentElement.dataset.id);
 			}
 		  }
 		  // If match FF theme option changed
-		  if (matchTheme_option_old != matchTheme_option) {
-			if (matchTheme_option) {
+		  if (matchTheme_option_old != options.matchTheme) {
+			if (options.matchTheme) {
 			  // Align colors with window theme 
 			  browser.theme.getCurrent(myWindowId)
 			  .then(setPanelColors);
@@ -1902,31 +1902,31 @@ if (traceEnabled_option) {
 			}
 		  }
 		  // If set colors option changed, or if one of the colors changed while that option is set
-		  if (setColors_option_old != setColors_option
-			  || (setColors_option && ((textColor_option_old != textColor_option)
-									   || (bckgndColor_option_old != bckgndColor_option)
+		  if (setColors_option_old != options.setColors
+			  || (options.setColors && ((textColor_option_old != options.textColor)
+									   || (bckgndColor_option_old != options.bckgndColor)
 				 					  )
 				 )
 			 ) {
-			if (setColors_option) {
+			if (options.setColors) {
 			  // Align colors with chosen ones 
-			  setPanelColorsTB(textColor_option, bckgndColor_option);
+			  setPanelColorsTB(options.textColor, options.bckgndColor);
 			}
 			else { // Cannot change while machTheme option is set, so no theme to match, reset ..
 			  resetPanelColors();
 			}
 		  }
 		  // If folder image options changed
-		  if ((useAltFldr_option && (altFldrImg_option_old != altFldrImg_option))
-			  || (useAltFldr_option_old != useAltFldr_option)
+		  if ((options.useAltFldr && (altFldrImg_option_old != options.altFldrImg))
+			  || (useAltFldr_option_old != options.useAltFldr)
 			 ) {
-			setPanelFolderImg(useAltFldr_option, altFldrImg_option);
+			setPanelFolderImg(options.useAltFldr, options.altFldrImg);
 		  }
 		  // If no-favicon image options changed
-		  if ((useAltNoFav_option && (altNoFavImg_option_old != altNoFavImg_option))
-			  || (useAltNoFav_option_old != useAltNoFav_option)
+		  if ((options.useAltNoFav && (altNoFavImg_option_old != options.altNoFavImg))
+			  || (useAltNoFav_option_old != options.useAltNoFav)
 			 ) {
-			setPanelNoFaviconImg(useAltNoFav_option, altNoFavImg_option);
+			setPanelNoFaviconImg(options.useAltNoFav, options.altNoFavImg);
 		  }
 		}
 
@@ -1937,7 +1937,7 @@ if (traceEnabled_option) {
 	  }
 	  else if (msg.startsWith("savedSearchOptions")) { // Reload and process search options
 		// Refresh options
-		// Bacground page is accessible, all was loaded inside it, so get from there
+		// Background page is accessible, all was loaded inside it, so get from there
 		refreshOptionsBgnd(backgroundPage);
 		setSearchOptions();
 	  }
@@ -2034,7 +2034,7 @@ function closeHandler (e) {
 //console.log("closeHandler() - calc left: "+(window.screen.left+window.screenX));
 	  let top = wInfo.top;
 	  let left = wInfo.left;
-	  if (remembersizes_option) {
+	  if (options.rememberSizes) {
 //	  let height = Math.floor(window.outerHeight*pixelsPerCSS);
 //	  let width = Math.floor(window.outerWidth*pixelsPerCSS);
 		let height = wInfo.height;
@@ -2045,7 +2045,7 @@ function closeHandler (e) {
 		  historyheight_option: height,
 		  historywidth_option: width
 		});
-//console.log("closeHandler() - remembersizes_option set - top="+top+" left="+left+" height="+height+" width="+width);
+//console.log("closeHandler() - options.rememberSizes set - top="+top+" left="+left+" height="+height+" width="+width);
 	  }
 	  else {
 		browser.storage.local.set({
@@ -2206,7 +2206,7 @@ function initialize2 () {
   }
 
   // Align colors with window theme
-  if (matchTheme_option) {
+  if (options.matchTheme) {
 	browser.theme.getCurrent(myWindowId)
 	.then(setPanelColors);
 
@@ -2214,24 +2214,24 @@ function initialize2 () {
 	browser.theme.onUpdated.addListener(themeRefreshedHandler);
   }
   else { // If set colors option is set, align colors with specified values
-	if (setColors_option) {
+	if (options.setColors) {
 	  // Align colors with chosen ones 
-	  setPanelColorsTB(textColor_option, bckgndColor_option);
+	  setPanelColorsTB(options.textColor, options.bckgndColor);
 	}
   }
 
   // Set folder image as per options
-  if (useAltFldr_option) {
-	setPanelFolderImg(true, altFldrImg_option);
+  if (options.useAltFldr) {
+	setPanelFolderImg(true, options.altFldrImg);
   }
 
   // Set no-favicon image as per options
-  if (useAltNoFav_option) {
-	setPanelNoFaviconImg(true, altNoFavImg_option);
+  if (options.useAltNoFav) {
+	setPanelNoFaviconImg(true, options.altNoFavImg);
   }
 
-  // Show historyDispURList_option on screen radio buttons
-  if (historyDispURList_option) {
+  // Show options.historyDispURList on screen radio buttons
+  if (options.historyDispURList) {
 	URListInput.checked = true;
   }
   else {

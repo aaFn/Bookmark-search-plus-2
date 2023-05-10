@@ -9,7 +9,7 @@
 const PopupWidth  = 380;
 const PopupHeight = 190;
 
-let remembersizes_option;
+let remembersizes_option; // At this stage, we didn't collect all options yet
 let gettingItem = browser.storage.local.get(
   {popuptop_option: 300,
    popupleft_option: 300,

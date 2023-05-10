@@ -16,6 +16,12 @@ let p_commands = browser.commands.getAll();
  * Constants
  */
 const Body = document.querySelector("#body"); // Assuming it is an HTMLBodyElement
+const ExportSettingsButton = document.querySelector("#exportsettings");
+const ExportSettingsLink = document.querySelector("#exportsettingslink");
+const ImportSettingsButton = document.querySelector("#importsettings");
+const ImportSettingsInput = document.querySelector("#importsettingsinput");
+const ImportErrorSpan = document.querySelector("#importerrormsg");
+const ImportOkSpan = document.querySelector("#importokmsg");
 const StatsTextarea = document.querySelector("#stats");
 const ActiveFaviconsInput = document.querySelector("#activeff");
 const PauseFaviconsInput = document.querySelector("#pauseff");
@@ -65,6 +71,8 @@ const Opt4 = document.createElement("option");
 Opt4.value = Opt4.text = "MacCtrl";
 const Command3Select = document.querySelector("#command3");
 const ResetCommandButton = document.querySelector("#resetcommand");
+const AddAtFldrEndInput = document.querySelector("#addatend");
+const AddAtFldrStartInput = document.querySelector("#addatstart");
 const TrashEnabledInput = document.querySelector("#trashEnabled");
 const TrashVisibleInput = document.querySelector("#trashVisible");
 const HistoryRetentionInput = document.querySelector("#historyretention");
@@ -126,7 +134,7 @@ function handleMsgResponse (message) {
   // Is always called, even is destination didn't specifically reply (then message is undefined)
   if (message != undefined) {
 	let msg = message.content;
-if (traceEnabled_option) {
+if (options.traceEnabled) {
   console.log("Background sent a response: <<"+msg+">> received in options");
 }
 	if (msg == "getStats") {
@@ -195,12 +203,21 @@ function displaySidebarCommand (cmd) {
  * Save options in storage
  */
 function saveOptions (e) {
-  // Adjust options visibility function of others
-  EnableCookiesInput.disabled = DisableFaviconsInput.checked;
-  ActiveFaviconsInput.disabled = DisableFaviconsInput.checked;
-  PauseFaviconsInput.disabled = DisableFaviconsInput.checked;
-  RefetchFavButton.disabled =  DisableFaviconsInput.checked || PauseFaviconsInput.checked;
-  OpenTreeInput.disabled = CloseSearchInput.checked;
+  // Adjust options values and visibility function of others
+  let pausefavicons = PauseFaviconsInput.checked;
+  let disablefavicons = DisableFaviconsInput.checked;
+  if (disablefavicons) {
+	EnableCookiesInput.checked = false;
+  }
+  EnableCookiesInput.disabled = disablefavicons;
+  ActiveFaviconsInput.disabled = disablefavicons;
+  PauseFaviconsInput.disabled = disablefavicons;
+  RefetchFavButton.disabled =  disablefavicons || pausefavicons;
+  let closesearch = CloseSearchInput.checked;
+  if (closesearch) {
+	OpenTreeInput.checked = true;
+  }
+  OpenTreeInput.disabled = closesearch;
   ReloadFFAPIButton.disabled = LoadFFAPIInput.checked;
   ResetSizesButton.disabled = !(RememberSizesInput.checked);
   let fontSize = DfltFontSize;
@@ -208,7 +225,7 @@ function saveOptions (e) {
   FontSizeInput.disabled = !(setfontsize);
   if (setfontsize) {
 	if (FontSizeInput.validity.valid) {
-	  fontSize = FontSizeInput.value;
+	  fontSize = FontSizeInput.valueAsNumber;
 	}
 	else {
 	  FontSizeInput.value = DfltFontSize;
@@ -222,7 +239,7 @@ function saveOptions (e) {
   SpaceSizeInput.disabled = !(setspacesize);
   if (setspacesize) {
 	if (SpaceSizeInput.validity.valid) {
-	  spaceSize = SpaceSizeInput.value;
+	  spaceSize = SpaceSizeInput.valueAsNumber;
 	}
 	else {
 	  SpaceSizeInput.value = DfltSpaceSize;
@@ -263,7 +280,7 @@ function saveOptions (e) {
   TrashVisibleInput.disabled = !trashEnabled;
   let historyRetention = DfltHistoryRetention;
   if (HistoryRetentionInput.validity.valid) {
-	historyRetention = HistoryRetentionInput.value;
+	historyRetention = HistoryRetentionInput.valueAsNumber;
   }
   else {
 	HistoryRetentionInput.value = DfltHistoryRetention;
@@ -271,40 +288,41 @@ function saveOptions (e) {
 
   // Save options
   browser.storage.local.set({
-	 pausefavicons_option: PauseFaviconsInput.checked
-	,disablefavicons_option: DisableFaviconsInput.checked
-	,enablecookies_option: EnableCookiesInput.checked
-	,enableflipflop_option: EnableFlipFlop.checked
-	,advanced_option: AdvancedClickInput.checked
-	,showpath_option: ShowPathInput.checked
-	,closesearch_option: CloseSearchInput.checked
-	,opentree_option: OpenTreeInput.checked
-	,immediatefavdisplay_option: ImmediateFavDisplayInput.checked
-	,loadffapi_option: LoadFFAPIInput.checked
-	,noffapisearch_option: NoFFAPISearchInput.checked
-	,delayLoad_option: DelayLoadInput.checked
-	,searchonenter_option: SearchOnEnterInput.checked
-	,reversepath_option: ReversePathInput.checked
-	,closesibblingfolders_option: CloseSibblingFoldersInput.checked
-	,remembersizes_option: RememberSizesInput.checked
-	,setfontsize_option: setfontsize
-	,fontsize_option: fontSize
-	,setfontbold_option: SetFontBoldInput.checked
-	,setspacesize_option: setspacesize
-	,spacesize_option: spaceSize
-	,matchtheme_option: matchtheme
-	,setcolors_option: setcolors
-	,textcolor_option: textColor
-	,bckgndcolor_option: bckgndColor
-	,altfldrimg_option: altFldrImgSrc
-	,usealtfldr_option: useAltFldr
-	,altnofavimg_option: altNoFavImgSrc
-	,usealtnofav_option: useAltNoFav
-	,sidebarcommand_option: sidebarCommand
-	,trashenabled_option: trashEnabled
-	,trashvisible_option: TrashVisibleInput.checked
-	,historyretention_option: historyRetention
-	,traceEnabled_option: TraceEnabledInput.checked
+	 pausefavicons_option: (options.pauseFavicons = pausefavicons)
+	,disablefavicons_option: (options.disableFavicons = disablefavicons)
+	,enablecookies_option: (options.enableCookies = EnableCookiesInput.checked)
+	,enableflipflop_option: (options.enableFlipFlop = EnableFlipFlop.checked)
+	,advanced_option: (options.advancedClick = AdvancedClickInput.checked)
+	,showpath_option: (options.showPath = ShowPathInput.checked)
+	,closesearch_option: (options.closeSearch = closesearch)
+	,opentree_option: (options.openTree = OpenTreeInput.checked)
+	,immediatefavdisplay_option: (options.immediateFavDisplay = ImmediateFavDisplayInput.checked)
+	,loadffapi_option: (options.loadffapi = LoadFFAPIInput.checked)
+	,noffapisearch_option: (options.noffapisearch = NoFFAPISearchInput.checked)
+	,delayLoad_option: (options.delayLoad = DelayLoadInput.checked)
+	,searchonenter_option: (options.searchOnEnter = SearchOnEnterInput.checked)
+	,reversepath_option: (options.reversePath = ReversePathInput.checked)
+	,closesibblingfolders_option: (options.closeSibblingFolders = CloseSibblingFoldersInput.checked)
+	,remembersizes_option: (options.rememberSizes = RememberSizesInput.checked)
+	,setfontsize_option: (options.setFontSize = setfontsize)
+	,fontsize_option: (options.fontSize = fontSize)
+	,setfontbold_option: (options.setFontBold = SetFontBoldInput.checked)
+	,setspacesize_option: (options.setSpaceSize = setspacesize)
+	,spacesize_option: (options.spaceSize = spaceSize)
+	,matchtheme_option: (options.matchTheme = matchtheme)
+	,setcolors_option: (options.setColors = setcolors)
+	,textcolor_option: (options.textColor = textColor)
+	,bckgndcolor_option: (options.bckgndColor = bckgndColor)
+	,altfldrimg_option: (options.altFldrImg = altFldrImgSrc)
+	,usealtfldr_option: (options.useAltFldr = useAltFldr)
+	,altnofavimg_option: (options.altNoFavImg = altNoFavImgSrc)
+	,usealtnofav_option: (options.useAltNoFav = useAltNoFav)
+	,sidebarcommand_option: (options.sidebarCommand = sidebarCommand)
+	,appendatfldrend_option: (options.appendAtFldrEnd = AddAtFldrEndInput.checked)
+	,trashenabled_option: (options.trashEnabled = trashEnabled)
+	,trashvisible_option: (options.trashVisible = TrashVisibleInput.checked)
+	,historyretention_option: (options.historyRetention = historyRetention)
+	,traceEnabled_option: (options.traceEnabled = TraceEnabledInput.checked)
   })
   .then(
 	function () {
@@ -478,7 +496,7 @@ function normalizeColors (color) {
 }
 
 /*
- * Get colors from current windows theme, and register changes to it
+ * Get colors from current windows theme, display them on UI, and register for changes to it
  * 
  * wTheme is a theme.Theme object
  */
@@ -551,108 +569,108 @@ function themeRefreshedHandler (updateInfo) {
  * Restore options on Options page at page load time
  */
 function restoreOptions () {
-  if (pauseFavicons_option_file) {
+  if (options.pauseFavicons) {
 	PauseFaviconsInput.checked = true;
 	RefetchFavButton.disabled = true;
   }
 
-  if (disableFavicons_option_file) {
+  if (options.disableFavicons) {
 	DisableFaviconsInput.checked = true;
-	// Disable enableCookies_option and Favicon fetching mode
+	// Disable options.enableCookies and Favicon fetching mode
 	EnableCookiesInput.disabled = true;
 	ActiveFaviconsInput.disabled = true;
 	PauseFaviconsInput.disabled = true;
 	RefetchFavButton.disabled = true;
   }
 
-  if (enableCookies_option_file) {
+  if (options.enableCookies) {
 	EnableCookiesInput.checked = true;
   }
 
-  if (enableFlipFlop_option_file) {
+  if (options.enableFlipFlop) {
 	EnableFlipFlop.checked = true;
   }
 
-  if (advancedClick_option_file) {
+  if (options.advancedClick) {
 	AdvancedClickInput.checked = true;
   }
 
-  if (showPath_option_file) {
+  if (options.showPath) {
 	ShowPathInput.checked = true;
   }
 
-  if (closeSearch_option_file) {
+  if (options.closeSearch) {
 	CloseSearchInput.checked = true;
-	// Disable openTree_option
+	// Disable options.openTree
 	OpenTreeInput.disabled = true;
   }
 
-  if (openTree_option_file) {
+  if (options.openTree) {
   	OpenTreeInput.checked = true;
   }
 
-  if (immediateFavDisplay_option_file) {
+  if (options.immediateFavDisplay) {
 	ImmediateFavDisplayInput.checked = true;
   }
 
-  if (loadffapi_option_file) {
+  if (options.loadffapi) {
 	LoadFFAPIInput.checked = true;
 	ReloadFFAPIButton.disabled = true;
   }
 
-  if (noffapisearch_option_file) {
+  if (options.noffapisearch) {
 	NoFFAPISearchInput.checked = true;
   }
 
-  if (delayLoad_option_file) {
+  if (options.delayLoad) {
 	DelayLoadInput.checked = true;
   }
 
-  if (searchOnEnter_option_file) {
+  if (options.searchOnEnter) {
 	SearchOnEnterInput.checked = true;
   }
 
-  if (reversePath_option_file) {
+  if (options.reversePath) {
 	ReversePathInput.checked = true;
   }
 
-  if (closeSibblingFolders_option_file) {
+  if (options.closeSibblingFolders) {
 	CloseSibblingFoldersInput.checked = true;
   }
 
-  if (rememberSizes_option_file) {
+  if (options.rememberSizes) {
 	RememberSizesInput.checked = true;
 	ResetSizesButton.disabled = false;
   }
 
-  if (setFontSize_option_file) {
+  if (options.setFontSize) {
 	SetFontSizeInput.checked = true;
 	FontSizeInput.disabled = false;
   }
-  if (fontSize_option_file != undefined) {
-	FontSizeInput.value = fontSize_option_file;
+  if (options.fontSize != undefined) {
+	FontSizeInput.value = options.fontSize;
   }
   else {
 	FontSizeInput.value = DfltFontSize;
   }
 
-  if (setFontBold_option_file) {
+  if (options.setFontBold) {
 	SetFontBoldInput.checked = true;
   }
 
-  if (setSpaceSize_option_file) {
+  if (options.setSpaceSize) {
 	SetSpaceSizeInput.checked = true;
 	SpaceSizeInput.disabled = false;
   }
-  if (spaceSize_option_file != undefined) {
-	SpaceSizeInput.value = spaceSize_option_file;
+  if (options.spaceSize != undefined) {
+	SpaceSizeInput.value = options.spaceSize;
   }
   else {
 	SpaceSizeInput.value = DfltSpaceSize;
   }
 
   let matchtheme = false;
-  if (matchTheme_option_file && !beforeFF58) { // The API is not fully active before FF58
+  if (options.matchTheme && !beforeFF58) { // The API is not fully active before FF58
 	matchtheme = MatchThemeInput.checked = true;
 	fetchTheme(); // Get current colors and set other fields appropriately
   }
@@ -664,23 +682,23 @@ function restoreOptions () {
   }
 
   let setcolors = false;
-  if (setColors_option_file) {
+  if (options.setColors) {
 	setcolors = SetColorsInput.checked = true;
   }
   SetColorsInput.disabled = matchtheme;
 
-  if (textColor_option_file != undefined) {
-	TextColorInput.title = TextColorInput.value = textColor_option_file;
-	TextColorSpan.textContent = colorLabel(textColor_option_file);
+  if (options.textColor != undefined) {
+	TextColorInput.title = TextColorInput.value = options.textColor;
+	TextColorSpan.textContent = colorLabel(options.textColor);
   }
   else {
 	TextColorInput.title = TextColorInput.value = DfltTextColor;
 	TextColorSpan.textContent = colorLabel(DfltTextColor);
   }
 
-  if (bckgndColor_option_file != undefined) {
-	BckgndColorInput.title = BckgndColorInput.value = bckgndColor_option_file;
-	BckgndColorSpan.textContent = colorLabel(bckgndColor_option_file);
+  if (options.bckgndColor != undefined) {
+	BckgndColorInput.title = BckgndColorInput.value = options.bckgndColor;
+	BckgndColorSpan.textContent = colorLabel(options.bckgndColor);
   }
   else {
 	BckgndColorInput.title = BckgndColorInput.value = DfltBckgndColor;
@@ -689,29 +707,29 @@ function restoreOptions () {
   BckgndColorInput.disabled = TextColorInput.disabled = !setcolors || matchtheme;
 
   let useAltFldrDisabled = true;
-  if (altFldrImg_option_file != undefined) {
-	AltFldrImg.src = altFldrImg_option_file;
+  if (options.altFldrImg != undefined) {
+	AltFldrImg.src = options.altFldrImg;
 	useAltFldrDisabled = UseAltFldrInput.disabled = false;
   }
-  if (useAltFldr_option_file != undefined) {
+  if (options.useAltFldr != undefined) {
 	if (!useAltFldrDisabled) {
-	  UseAltFldrInput.checked = useAltFldr_option_file;
+	  UseAltFldrInput.checked = options.useAltFldr;
 	}
   }
 
   let useAltNoFavDisabled = true;
-  if (altNoFavImg_option_file != undefined) {
-	AltNoFavImg.src = altNoFavImg_option_file;
+  if (options.altNoFavImg != undefined) {
+	AltNoFavImg.src = options.altNoFavImg;
 	useAltNoFavDisabled = UseAltNoFavInput.disabled = false;
   }
-  if (useAltNoFav_option_file != undefined) {
+  if (options.useAltNoFav != undefined) {
 	if (!useAltNoFavDisabled) {
-	  UseAltNoFavInput.checked = useAltNoFav_option_file;
+	  UseAltNoFavInput.checked = options.useAltNoFav;
 	}
   }
 
-  if (sidebarCommand_option_file != undefined) {
-	sidebarCommand = sidebarCommand_option_file;
+  if (options.sidebarCommand != undefined) {
+	sidebarCommand = options.sidebarCommand;
 	if (!beforeFF60) {
 	  browser.commands.update(
 		{name: "_execute_sidebar_action",
@@ -740,36 +758,100 @@ function restoreOptions () {
 	Command3Select.disabled = true;
 	ResetCommandButton.disabled = true;
   }
-  
+
+  if (!options.appendAtFldrEnd) {
+	AddAtFldrStartInput.checked = true;
+  }
+
   let trashEnabled = true;
-  if (trashEnabled_option_file != undefined) {
-	trashEnabled = TrashEnabledInput.checked = trashEnabled_option_file;
+  if (options.trashEnabled != undefined) {
+	trashEnabled = TrashEnabledInput.checked = options.trashEnabled;
   }
   else {
 	TrashEnabledInput.checked = true;
   }
 
-  if (trashVisible_option_file != undefined) {
-	TrashVisibleInput.checked = trashVisible_option_file;
+  if (options.trashVisible != undefined) {
+	TrashVisibleInput.checked = options.trashVisible;
   }
   else {
 	TrashVisibleInput.checked = false;
   }
   TrashVisibleInput.disabled = !trashEnabled;
 
-  if (historyRetention_option_file != undefined) {
-	HistoryRetentionInput.value = historyRetention_option_file;
+  if (options.historyRetention != undefined) {
+	HistoryRetentionInput.value = options.historyRetention;
   }
   else {
 	HistoryRetentionInput.value = DfltHistoryRetention;
   }
 
-  if (traceEnabled_option_file) {
+  if (options.traceEnabled) {
 	TraceEnabledInput.checked = true;
   }
 
   if (structureVersion.includes(VersionImg16)) {
 	ResetMigr16x16Button.disabled = false;
+  }
+}
+
+/*
+ * Creates a JSON text of the options object, export it as a file blob URL to be downloaded on the UI
+ * through a link download dialog  
+ */
+function exportOptions () {
+  let contents = JSON.stringify(options, null, 2);
+  ExportSettingsLink.href = URL.createObjectURL(new Blob([contents], {type: 'application/json'}));
+  ExportSettingsLink.click();
+}
+
+/*
+ * Gets the ImportSettingsInput file contents set options from it, and save options to the local store
+ * replacing the previous ones.
+ */
+async function importOptions () {
+console.log("here");
+  let files = ImportSettingsInput.files;
+  if (files.length == 1) {
+	let file = files.item(0);
+	let contents = await file.text();
+	// Get new options, and verify them
+	let newOptions = JSON.parse(contents);
+
+	// Verify it, and if all ok, set options, display them, save them and send signal to everybody to reload options
+	if ((newOptions != undefined) && ((typeof newOptions) == "object")) {
+	  let valid = true;
+	  // First, check that all properties are valid options (if non existent option, ignore it by deleting it)
+	  for (let o in newOptions) {
+		if (Object.hasOwn(newOptions, o)) {
+		  if (!Object.hasOwn(OptionsList, o)) { // Not an existing option !
+			delete newOptions.o;
+		  }
+		  else if (!OptionsList[o].verifyValue(newOptions[o])) { // Invalid option type or value !
+			valid = false;
+			break;
+		  }
+		}
+	  }
+	  if (valid) { // Then make sure newOptions has all options in it, or set a default value for missing ones
+		for (let o in OptionsList) {
+		  if (Object.hasOwn(OptionsList, o)) {
+			if (!Object.hasOwn(newOptions, o)) { // Existing option is missing !
+			  newOptions[o] = OptionsList[o].getDefault();
+			}
+		  }
+		}
+
+		// All correct now, accept options, display the new values on UI and an OK message, and save options
+		options = newOptions;
+		restoreOptions();
+		ImportOkSpan.hidden = false;
+		saveOptions(undefined);
+	  }
+	  else { // Display an error notification
+		ImportErrorSpan.hidden = false;
+	  }
+	}
   }
 }
 
@@ -1196,7 +1278,12 @@ function initialize2 () {
 	countOddities = backgroundPage.countOddities;
 	displayStats();
   }
-  
+
+  // Watch for export / import buttons
+  ExportSettingsButton.addEventListener("click", exportOptions);
+  ImportSettingsButton.addEventListener("click", function () {ImportOkSpan.hidden = ImportErrorSpan.hidden = true; ImportSettingsInput.click();});
+  ImportSettingsInput.addEventListener("input", importOptions);
+
   // When there is an update to an option, save the new value
   ActiveFaviconsInput.addEventListener("click", saveOptions);
   PauseFaviconsInput.addEventListener("click", saveOptions);
@@ -1236,6 +1323,8 @@ function initialize2 () {
   Command2Select.addEventListener("change", changeSidebarCommand);
   Command3Select.addEventListener("change", changeSidebarCommand);
   ResetCommandButton.addEventListener("click", resetSidebarCommand);
+  AddAtFldrEndInput.addEventListener("click", saveOptions);
+  AddAtFldrStartInput.addEventListener("click", saveOptions);
   TrashEnabledInput.addEventListener("click", saveOptions);
   TrashVisibleInput.addEventListener("click", saveOptions);
   HistoryRetentionInput.addEventListener("change", changeHistoryRetention);

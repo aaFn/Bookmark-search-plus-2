@@ -498,7 +498,7 @@ let isSlowSave;
  * force (optional) = if true, force putting trace in box even if not activated (for later display)
  */
 function trace (text, force = false) {
-  if (traceEnabled_option || force) {
+  if (options.traceEnabled || force) {
     TracePlace.textContent += text + "\r\n";
   }
 }
@@ -531,8 +531,8 @@ function saveFldrOpen () {
 function appendResult (BN) {
 //trace("Displaying <<"+BN.id+">><<"+BN.title+">><<"+BN.type+">><<"+BN.url+">>");
   let type = BN.type;
-  if (((searchFilter_option == "fldr") && (type == "bookmark"))
-	  || ((searchFilter_option == "bkmk") && (type == "folder"))
+  if (((options.searchFilter == "fldr") && (type == "bookmark"))
+	  || ((options.searchFilter == "bkmk") && (type == "folder"))
 	 ) { // Filter out the result, but continue with next ones
 	return;
   }
@@ -591,7 +591,7 @@ function appendResult (BN) {
 	let p = pathspan.textContent = BN_path(BN.parentId);
 //	pathspan.draggable = false;
 
-	if (showPath_option) {
+	if (options.showPath) {
 	  div2.title = p;
 	}
 	else {
@@ -629,7 +629,7 @@ function appendResult (BN) {
 	if (!url.startsWith("place:")) {
 	  anchor.href = url;
 	}
-	if (showPath_option) {
+	if (options.showPath) {
 	  anchor.title = BN_path(BN.parentId);
 	  if (title == "") {
 		title = suggestDisplayTitle(url);
@@ -963,7 +963,7 @@ function displayResults (a_BTN) {
 			sendAddonMessage("reloadFFAPI_auto");
 			break; // Break loop in case of error
 		  }
-		  if ((trashEnabled_option && trashVisible_option) || (BN.inBSP2Trash != true)) { // Don't display BSP2 trash folder results except on debug
+		  if ((options.trashEnabled && options.trashVisible) || (BN.inBSP2Trash != true)) { // Don't display BSP2 trash folder results except on debug
 			appendResult(BN);
 		  }
 		}
@@ -1065,8 +1065,8 @@ function updateSearch () {
 
 	// Look for bookmarks matching the search text in their contents (title, url .. etc ..)
 	let searching;
-	if (!noffapisearch_option
-		&& (searchField_option == "both") && (searchScope_option == "all") && (searchMatch_option == "words")) {
+	if (!options.noffapisearch
+		&& (options.searchField == "both") && (options.searchScope == "all") && (options.searchMatch == "words")) {
 //console.log("Using FF Search API");
 	  // It seems that parameters can make the search API fail and return 0 results sometimes, so strip them out,
 	  // there will be too much result maybe, but at least some results !
@@ -1089,10 +1089,10 @@ function updateSearch () {
 		  let isRegExp, isTitleSearch, isUrlSearch;
 		  let a_BN;
 
-		  if (searchField_option == "both") {
+		  if (options.searchField == "both") {
 			isTitleSearch = isUrlSearch = true;
 		  }
-		  else if (searchField_option == "title") {
+		  else if (options.searchField == "title") {
 			isTitleSearch = true;
 			isUrlSearch = false;
 		  }
@@ -1101,7 +1101,7 @@ function updateSearch () {
 			isUrlSearch = true;
 		  }
 
-		  if (searchMatch_option == "words") { // Build array of words to match
+		  if (options.searchMatch == "words") { // Build array of words to match
 			isRegExp = false;
 			a_matchStr = strLowerNormalize(value).split(" "); // Ignore case and diacritics
 		  }
@@ -1116,7 +1116,7 @@ function updateSearch () {
 		  }
 
 		  if (a_BN == undefined) { // No error detected, execute search
-			if (searchScope_option == "all") { // Use the List form
+			if (options.searchScope == "all") { // Use the List form
 			  a_BN = searchCurBNList(a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch);
 			}
 			else { // Use the recursive form
@@ -1132,7 +1132,7 @@ function updateSearch () {
 				}
 			  }
 			  a_BN = searchBNRecur(BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch,
-								   (searchScope_option == "subfolder") // Go down to subfolders, or only current folder ?
+								   (options.searchScope == "subfolder") // Go down to subfolders, or only current folder ?
 								  );
 			}
 		  }
@@ -1224,7 +1224,7 @@ function manageSearchTextHandler () {
    * - 1 or more character(s) = set the cancel image, enable the button
    */
   if (value.length > 0) {
-	if (!searchOnEnter_option) { // Auto trigger search when no more key typed in
+	if (!options.searchOnEnter) { // Auto trigger search when no more key typed in
 	  // Set timeout before triggering / updating search mode
 	  inputTimeout = setTimeout(updateSearch, InputKeyDelay);
 	}
@@ -1238,9 +1238,9 @@ function manageSearchTextHandler () {
 	if (sh != "") { // The search result pane size is different
 	  				// from its default value set in the CSS
 	  				// which is 20% (as seen in Computed Style)
-	  if (rememberSizes_option) {
-		if (searchHeight_option != sh) { // Save only if different from already saved
-		  searchHeight_option = sh;
+	  if (options.rememberSizes) {
+		if (options.searchHeight != sh) { // Save only if different from already saved
+		  options.searchHeight = sh;
 		  browser.storage.local.set({
 			searchheight_option: sh
 		  })
@@ -1313,20 +1313,20 @@ function cancelSearchTextHandler () {
 function setSearchOptions () {
   let cn;
   let buttonTitleFields, buttonTitleScope, buttonTitleMatch, buttonTitleFilter;
-  if (searchMatch_option == "regexp") {
-	cn = "sr" + searchField_option;
+  if (options.searchMatch == "regexp") {
+	cn = "sr" + options.searchField;
 	SMatchRegexpInput.checked = true;
 	buttonTitleMatch = "Use regex";
   }
   else {
-	cn = "sw" + searchField_option;
+	cn = "sw" + options.searchField;
 	SMatchWordsInput.checked = true;
   }
-  if (searchFilter_option == "all") {
+  if (options.searchFilter == "all") {
 	SFilterAllInput.checked = true;
 	SFieldUrlOnlyInput.disabled = SFieldUrlOnlyLabel.disabled = false;
   }
-  else if (searchFilter_option == "fldr") {
+  else if (options.searchFilter == "fldr") {
 	SFilterFldrOnlyInput.checked = true;
 	SFieldUrlOnlyInput.disabled = true; // Disable search on URL
 	buttonTitleFilter = SFieldUrlOnlyInput.nextSibling.nextSibling.textContent;
@@ -1336,13 +1336,13 @@ function setSearchOptions () {
 	SFieldUrlOnlyInput.disabled = SFieldUrlOnlyLabel.disabled = false;
 	buttonTitleFilter = SFieldUrlOnlyInput.nextSibling.nextSibling.textContent;
   }
-  cn +=  " sfilter"+searchFilter_option;
+  cn +=  " sfilter"+options.searchFilter;
   SearchButtonInput.className = cn;
-  if (searchScope_option == "all") {
+  if (options.searchScope == "all") {
 	MGlassImgStyle.backgroundImage = 'url("/icons/search.png"';
 	SScopeAllInput.checked = true;
   }
-  else if (searchScope_option == "subfolder") {
+  else if (options.searchScope == "subfolder") {
 	MGlassImgStyle.backgroundImage = 'url("/icons/searchsub.png"';
 	SScopeSubfolderInput.checked = true;
 	buttonTitleScope = SScopeSubfolderInput.nextSibling.nextSibling.textContent;
@@ -1353,10 +1353,10 @@ function setSearchOptions () {
 	buttonTitleScope = SScopeFolderonlyInput.nextSibling.nextSibling.textContent;
   }
 
-  if (searchField_option == "both") {
+  if (options.searchField == "both") {
 	SFieldTitleUrlInput.checked = true;
   }
-  else if (searchField_option == "title") {
+  else if (options.searchField == "title") {
 	SFieldTitleOnlyInput.checked = true;
 	buttonTitleFields = SFieldTitleOnlyInput.nextSibling.nextSibling.textContent;
   }
@@ -1411,15 +1411,11 @@ function setSearchOptions () {
 }
 
 function saveSearchOptions () {
-  searchField_option_file = searchField_option;
-  searchScope_option_file = searchScope_option;
-  searchMatch_option_file = searchMatch_option;
-  searchFilter_option_file = searchFilter_option;
   browser.storage.local.set({
-	 searchfield_option: searchField_option,
-	 searchscope_option: searchScope_option,
-	 searchmatch_option: searchMatch_option,
-	 searchfilter_option: searchFilter_option
+	searchfield_option: options.searchField,
+	searchscope_option: options.searchScope,
+	searchmatch_option: options.searchMatch,
+	searchfilter_option: options.searchFilter
   })
   .then(
 	function () {
@@ -1430,66 +1426,66 @@ function saveSearchOptions () {
 }
 
 function resetSearchHandler () {
-  searchField_option = "both";
-  searchScope_option = "all";
-  searchMatch_option = "words";
-  searchFilter_option = "all";
+  options.searchField  = "both";
+  options.searchScope  = "all";
+  options.searchMatch  = "words";
+  options.searchFilter = "all";
   saveSearchOptions();
 }
 
 function setSFieldTitleUrlHandler () {
-  searchField_option = "both";
+  options.searchField = "both";
   saveSearchOptions();
 }
 
 function setSFieldTitleOnlyHandler () {
-  searchField_option = "title";
+  options.searchField = "title";
   saveSearchOptions();
 }
 
 function setSFieldUrlOnlyHandler () {
-  searchField_option = "url";
+  options.searchField = "url";
   saveSearchOptions();
 }
 
 function setSScopeAllHandler () {
-  searchScope_option = "all";
+  options.searchScope = "all";
   saveSearchOptions();
 }
 
 function setSScopeSubfolderHandler () {
-  searchScope_option = "subfolder";
+  options.searchScope = "subfolder";
   saveSearchOptions();
 }
 
 function setSScopeFolderonlyHandler () {
-  searchScope_option = "folderonly";
+  options.searchScope = "folderonly";
   saveSearchOptions();
 }
 
 function setSMatchWordsHandler () {
-  searchMatch_option = "words";
+  options.searchMatch = "words";
   saveSearchOptions();
 }
 
 function setSMatchRegexpHandler () {
-  searchMatch_option = "regexp";
+  options.searchMatch = "regexp";
   saveSearchOptions();
 }
 
 function setSFilterAllHandler () {
-  searchFilter_option = "all";
+  options.searchFilter = "all";
   saveSearchOptions();
 }
 
 function setSFilterFldrOnlyHandler () {
-  searchFilter_option = "fldr";
-  searchField_option = "title"; // Force title, searchng on URL for a folder makes no sense
+  options.searchFilter = "fldr";
+  options.searchField  = "title"; // Force title, searchng on URL for a folder makes no sense
   saveSearchOptions();
 }
 
 function setSFilterBkmkOnlyHandler () {
-  searchFilter_option = "bkmk";
+  options.searchFilter = "bkmk";
   saveSearchOptions();
 }
 
@@ -1543,7 +1539,7 @@ function migr16x16OnLoad () {
  *
  * BN = BookmarkNode
  * index (optional) = insert position, or append at end if -1
- * children (optional) = used only in delayload_option mode, where we already looked at children
+ * children (optional) = used only in options.delayload mode, where we already looked at children
  *
  * Returns: the inserted row (an HTMLTableRowElement).
  *
@@ -1626,7 +1622,7 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
 	  span.style.fontStyle = "italic";
 	}
 	// Look at children to set the twistie
-//	if (!delayLoad_option)
+//	if (!options.delayLoad)
 	  children = BN.children;
 	if ((children == undefined) || (children.length == 0))
 	  twistie.classList.add("twistiena");
@@ -1667,7 +1663,7 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
 		img.onload = migr16x16OnLoad;
 		span = img.nextElementSibling;
 	  }
-	  if (immediateFavDisplay_option
+	  if (options.immediateFavDisplay
 		  || isDisplayComplete			// Do not defer once initial load/display is complete
 		 ) {
 		if (img == undefined) {
@@ -1720,7 +1716,7 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
  */
 let insertRowIndex;
 function insertBkmks (BN, parentRow, parentLevel = undefined, parentOpen = undefined) {
-  if ((trashEnabled_option && trashVisible_option) || (BN.inBSP2Trash != true)) { // Don't display BNs in BSP2 trash, except on debug
+  if ((options.trashEnabled && options.trashVisible) || (BN.inBSP2Trash != true)) { // Don't display BNs in BSP2 trash, except on debug
 	// Retrieve parent in the bookmarks table if not supplied
 	if (parentLevel == undefined) { // Retrieve infos
 	  // There must be a parent .. root is never created
@@ -1831,7 +1827,7 @@ function bkmkCreated (BN, index) {
 		 // Note that in such multi operations, things have been all processed in background first for the copy,
 		 //       so the BN tree is not anymore in sync with display.
 	let previousSibblingBN = children[index-1];
-	if (previousSibblingBN.inBSP2Trash && !trashVisible_option) { // Protect against inserting just after BSP2 trash when not visible
+	if (previousSibblingBN.inBSP2Trash && !options.trashVisible) { // Protect against inserting just after BSP2 trash when not visible
 	  if (index < 2) {
 		insertRowIndex = parentRow.rowIndex + 1;
 	  }
@@ -2084,20 +2080,20 @@ function bkmkMoved (bnId, curParentId, targetParentId, targetIndex) {
 	// as this is only a move.
 	BN_delete(BN, curParentId, false);
 	// Then insert it at new place, again not touching the list
-	if (trashEnabled_option) { // Maintain inBSP2Trash and trashDate fields
+	if (options.trashEnabled) { // Maintain inBSP2Trash and trashDate fields
 	  BN_markTrash(BN, tgtInBSP2Trash);
 	}
 	BN_insert(BN, targetParentBN, targetIndex, false);
   }
 
   // Get move description in current (= old) reference
-  if ((tgtInBSP2Trash == true) && !trashVisible_option) { // Simply remove source row, there is no visible target where to insert
+  if ((tgtInBSP2Trash == true) && !options.trashVisible) { // Simply remove source row, there is no visible target where to insert
 	if (curInBSP2Trash != true) { // If source is also in trash, nothing wisible to do ..
 	  let movedRow = curRowList[bnId];
 	  removeBkmks(movedRow, true); // remove from cur lists, as there is no visible targets
 	}
   }
-  else if ((curInBSP2Trash == true) && !trashVisible_option) { // Simply insert tartget row, there is no wisible source to remove from
+  else if ((curInBSP2Trash == true) && !options.trashVisible) { // Simply insert tartget row, there is no wisible source to remove from
 	let targetParentRow = curRowList[targetParentId];
 
 	// Find insertion point, in current (= old) reference
@@ -2115,7 +2111,7 @@ function bkmkMoved (bnId, curParentId, targetParentId, targetIndex) {
 		   // Note that in such multi operations, things have been all processed in background first or the copy,
 		   //       so the BN tree is not any more in sync with display.
 	  let previousSibblingBN = children[targetIndex-1];
-	  if (previousSibblingBN.inBSP2Trash && !trashVisible_option) { // Protect against inserting just after BSP2 trash when not visible
+	  if (previousSibblingBN.inBSP2Trash && !options.trashVisible) { // Protect against inserting just after BSP2 trash when not visible
 		if (targetIndex < 2) {
 		  targetRow = targetParentRow.nextElementSibling; // Can be null if we move at end
 		}
@@ -2161,7 +2157,7 @@ function bkmkMoved (bnId, curParentId, targetParentId, targetIndex) {
 		   // Note that in such multi operations, things have been all processed in background first or the copy,
 		   //       so the BN tree is not any more in sync with display.
 	  let previousSibblingBN = children[targetIndex-1];
-	  if (previousSibblingBN.inBSP2Trash && !trashVisible_option) { // Protect against inserting just after BSP2 trash when not visible
+	  if (previousSibblingBN.inBSP2Trash && !options.trashVisible) { // Protect against inserting just after BSP2 trash when not visible
 		if (targetIndex <= children.length) { // Remember that the child was already added in the BN tree in the background task
 		  targetCurRowIndex = targetParentRow.rowIndex + 1;
 		  targetRow = targetParentRow.nextElementSibling; // Can be null if we move at end
@@ -2213,7 +2209,7 @@ function bkmkMoved (bnId, curParentId, targetParentId, targetIndex) {
   // State of parent folders may change, so save folder open state
   saveFldrOpen();
 
-  if (showPath_option || trashEnabled_option) {
+  if (options.showPath || options.trashEnabled) {
 	// Trigger an update as results can change, if there is a search active
 	triggerUpdate();
   }
@@ -2268,7 +2264,7 @@ function bkmkReordered (bnId, reorderInfo) {
 
   // No folder state changed, so nothing to save
 
-  if (showPath_option) {
+  if (options.showPath) {
 	// Trigger an update as results can change, if there is a search active
 	triggerUpdate();
   }
@@ -2340,10 +2336,10 @@ function showRow (srcBnId, srcRow) {
   let srcHidden = srcRow.hidden;
   if (srcHidden) {
 	// Start from first unhidden ancestor already visible
-	// Open it if openTree_option is active
+	// Open it if options.openTree is active
 	let BN_id;
 	let twistie;
-	if (openTree_option) { // Set it to open state
+	if (options.openTree) { // Set it to open state
 	  twistie = firstUnhiddenParentRow.firstElementChild.firstElementChild.firstElementChild;
 	  // First unhidden means all under it is hidden so it is necessarily closed => Open twistie
 	  twistie.classList.replace("twistieac", "twistieao");
@@ -2373,7 +2369,7 @@ function showRow (srcBnId, srcRow) {
 		  }
 		}
 		else { // It is on path to srcBnId, we need to unhide its children
-		  if (openTree_option) { // If option is true, set it to open state
+		  if (options.openTree) { // If option is true, set it to open state
 			twistie = row.firstElementChild.firstElementChild.firstElementChild;
 			twistie.classList.replace("twistieac", "twistieao");
 			BN_id = row.dataset.id;
@@ -2390,7 +2386,7 @@ function showRow (srcBnId, srcRow) {
 //  setCellHighlight(cursor, lastSelOp, srcRow.firstElementChild, selection.selectIds);
   addCellCursorSelection(srcRow.firstElementChild, cursor, selection);
   // Get row into view
-  // BUG: "smooth" has a bug when the viewport content is modified, it points at the origin position before modification
+  // Bug: "smooth" has a bug when the viewport content is modified, it points at the origin position before modification
   // See https://bugzilla.mozilla.org/show_bug.cgi?id=1139745
   // So using "auto" instead of "smooth", which appears to work all time .. even if less nice
   //
@@ -2442,9 +2438,9 @@ function goParent (row) {
   let parentRow = curRowList[parentBN_id]; // Get parent row
   let wasRowVisible = showRow(parentBN_id, parentRow);
   if (!wasRowVisible) {
-	// If we have the openTree_option active, then we necessarily changed some folder state
+	// If we have the options.openTree active, then we necessarily changed some folder state
 	// => save it.
-	if (openTree_option) {
+	if (options.openTree) {
 	  saveFldrOpen();
 	}
 	else { // Else show special action on context menu
@@ -2580,7 +2576,7 @@ function openResParents (row) {
 
 /*
  * Handle clicks on results = show source row in bookmarks tree, and special menu to open
- * parents if openTree_option is not set.
+ * parents if options.openTree is not set.
  *
  * resultBN_id is the id of the bookmark item to show
  */
@@ -2592,15 +2588,15 @@ function handleResultClick (resultBN_id) {
 	// Make the source row of result visible if hidden
 	// Verify the current visiblity of the row before potentially modifying its parent state.
 	// If it is hidden (one of its parents is closed), we'll need to display the special
-	// "Open parents" action on context menu (only if openTree_option is not set).
+	// "Open parents" action on context menu (only if options.openTree is not set).
 	// Be careful that srcHidden is not reliable .. in case we already showed a result under
 	// same parent, then the row is already set to visible with that attribute, so have to check
 	// curFldrOpenList[] instead, which is done by showRow().
 	let wasRowVisible = showRow(resultBN_id, srcRow);
 	if (!wasRowVisible) {
-	  // If we have the openTree_option active, then we necessarily changed some folder state
+	  // If we have the options.openTree active, then we necessarily changed some folder state
 	  // => save it.
-	  if (openTree_option) {
+	  if (options.openTree) {
 		saveFldrOpen();
 	  }
 	  else { // Else show special action on context menu
@@ -2649,7 +2645,7 @@ function handleFolderClick (twistie) {
 	let prev_twistie;
 	let is_open;
 	let bnId;
-	if (closeSibblingFolders_option) {
+	if (options.closeSibblingFolders) {
 	  while ((prev_row = prev_row.previousElementSibling) != null) {
 		prev_level = parseInt(prev_row.dataset.level, 10);
 		if (prev_level < level) { // Reached parent, stop
@@ -2703,7 +2699,7 @@ function handleFolderClick (twistie) {
 	}
 
 	// If option set, go until end or lower level to close all other open folders at same level
-	if (closeSibblingFolders_option && (row != null) && (cur_level == level)) { // There are sibbling rows
+	if (options.closeSibblingFolders && (row != null) && (cur_level == level)) { // There are sibbling rows
 	  // Check if current row is an open folder
 	  twistie = row.firstElementChild.firstElementChild.firstElementChild;
 	  is_open = twistie.classList.contains("twistieao");
@@ -2797,7 +2793,7 @@ function resultsMouseHandler (e) {
 	let row;
 	if (className.includes("fav") || className.startsWith("rtwistie")) {
       // Go to .bkmkitem_x when advanced or Alt key, else go to .brow
-	  if (advancedClick_option || e.altKey) {
+	  if (options.advancedClick || e.altKey) {
 		row = (target = target.parentElement).parentElement.parentElement;
 	  }
 	  else { // Go to .brow
@@ -2809,7 +2805,7 @@ function resultsMouseHandler (e) {
 	  let cell;
 	  row = (cell = target.parentElement).parentElement;
 	  // If Alt key or advanced, open in current tab (remain on current target), else show => go to .brow
-	  if (!advancedClick_option && !e.altKey) {
+	  if (!options.advancedClick && !e.altKey) {
 		target = cell;
 		className = target.className;
 	  }
@@ -2869,7 +2865,7 @@ function resultsMouseHandler (e) {
 	  handleResultClick(resultBN_id);
 
 	  // If close search option is set, close search pane now
-	  if (closeSearch_option) {
+	  if (options.closeSearch) {
 		clearSearchTextHandler();
 	  }
 	}
@@ -3003,7 +2999,7 @@ function bkmkMouseHandler (e) {
 	}
 	// If folder bkmkitem with active twistie, handle folder click
 	else if (className == "bkmkitem_f") {
-	  if (traceEnabled_option && e.altKey) {
+	  if (options.traceEnabled && e.altKey) {
 		let bnId = cell.parentElement.dataset.id;
 		if ((bnId == mostVisitedBNId) || (bnId == recentTagBNId) || (bnId == recentBkmkBNId)) {
 		  // Special trick .. if traces are enabled, authorize this .. with href = "" or SelfURL, it will
@@ -3300,7 +3296,7 @@ function resultsContextHandler (e) {
   // If there is a previous menu, clear it
   clearMenu();
 
-  let isShowBkmkMenu = !advancedClick_option; // If not advanced, always "Show bookmark" by default
+  let isShowBkmkMenu = !options.advancedClick; // If not advanced, always "Show bookmark" by default
   let className = target.className;
   if ((className != undefined)
 	  && (target.className.length > 0)) {
@@ -3315,7 +3311,7 @@ function resultsContextHandler (e) {
 	}
 	else { // .brow
 	  row = (cell = target).parentElement;
-	  if (advancedClick_option)
+	  if (options.advancedClick)
 		isShowBkmkMenu = true;
 	}
 
@@ -3485,7 +3481,7 @@ function bkmkContextHandler (e) {
 		}
 		else { // Non protected row
 		  // Check if we are on an highlighted result row which is hidden
-		  if (!openTree_option && row.firstElementChild.classList.contains(Reshidden)) {
+		  if (!options.openTree && row.firstElementChild.classList.contains(Reshidden)) {
 			menu = MyBResBkmkMenu;
 			if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)) {
 			  if (MyBResBkmkMenuPaste.className == "menudisabled")
@@ -3495,7 +3491,7 @@ function bkmkContextHandler (e) {
 			  if (MyBResBkmkMenuPaste.className == "menupaste")
 				MyBResBkmkMenuPaste.className = "menudisabled";
 			}
-			if (disableFavicons_option) {
+			if (options.disableFavicons) {
 			  MyBResBkmkMenuFavicon.className = "menudisabled";
 			}
 			else {
@@ -3513,7 +3509,7 @@ function bkmkContextHandler (e) {
 			  if (MyBBkmkMenuPaste.className == "menupaste")
 				MyBBkmkMenuPaste.className = "menudisabled";
 			}
-			if (disableFavicons_option) {
+			if (options.disableFavicons) {
 			  MyBBkmkMenuFavicon.className = "menudisabled";
 			}
 			else {
@@ -3542,7 +3538,7 @@ function bkmkContextHandler (e) {
 		}
 		else { // Non protected row
 		  // Check if we are on an highlighted result row which is hidden
-		  if (!openTree_option && row.firstElementChild.classList.contains(Reshidden)) {
+		  if (!options.openTree && row.firstElementChild.classList.contains(Reshidden)) {
 			menu = MyBResFldrMenu;
 			if ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex)) {
 			  if (MyBResFldrMenuPaste.className == "menudisabled")
@@ -3609,7 +3605,7 @@ function bkmkContextHandler (e) {
 		else { // Non protected row
 		  pasteEnabled = ((bkmkClipboard.length > 0) && !noPasteZone.isInZone(rowIndex));
 		  // Check if we are on an highlighted result row which is hidden
-		  if (!openTree_option && row.firstElementChild.classList.contains(Reshidden)) {
+		  if (!options.openTree && row.firstElementChild.classList.contains(Reshidden)) {
 			menu = Menu_bresbkmk;
 		  }
 		  else {
@@ -3633,7 +3629,7 @@ function bkmkContextHandler (e) {
 		}
 		else { // Non protected row
 		  // Check if we are on an highlighted result row which is hidden
-		  if (!openTree_option && row.firstElementChild.classList.contains(Reshidden)) {
+		  if (!options.openTree && row.firstElementChild.classList.contains(Reshidden)) {
 			menu = Menu_bresfldr;
 		  }
 		  else {
@@ -3653,7 +3649,7 @@ function bkmkContextHandler (e) {
 	  }
 
 	  if (menu != undefined) {
-		updateBSP2ContextMenu(menu, pasteEnabled, (selection.selectIds.length > 1), !disableFavicons_option, sortVisible);
+		updateBSP2ContextMenu(menu, pasteEnabled, (selection.selectIds.length > 1), !options.disableFavicons, sortVisible);
 		myMenu_open = true; // Remember that this instance opened the menu when processing the onClicked event
 		// Open menu
 		browser.menus.overrideContext({
@@ -5156,7 +5152,12 @@ console.log("dt.types        : "+dt.types);
 	  let BN = curBNList[BN_id];
 	  let is_infolder = (insertPos == 0);
 	  let bnIndex;
-	  if (!is_infolder) { // If not drop to a folder, insert before or after BN
+	  if (is_infolder) { // If drop to a folder, apply the option of insert at start or append at end
+		if (!options.appendAtFldrEnd) {
+		  bnIndex = 0; // At start)
+		}  
+	  }
+	  else  { // If not drop to a folder, insert before or after BN
 		bnIndex = BN_getIndex(BN);
 		if (insertPos == 1) { // Create just after target row
 		  bnIndex++;
@@ -5568,7 +5569,7 @@ async function delBkmk (a_id, a_BN) {
   let len = a_BN.length;
   // Fecord a multiple operation if more than one item in the array
   if (len > 1) {
-	await recordHistoryMulti((trashEnabled_option ? "remove_tt" : "remove"), a_id);
+	await recordHistoryMulti((options.trashEnabled ? "remove_tt" : "remove"), a_id);
   }
 
   let BN;
@@ -5577,7 +5578,7 @@ async function delBkmk (a_id, a_BN) {
 //trace("Remove BN id: "+BN.id);
 	// If BSP2 trash enabled, move the bookmark item to trash instead (except when already in trash, where we really delete it)
 	let bnId = BN.id;
-	if (trashEnabled_option && !BN.inBSP2Trash) { // Move at end of trash
+	if (options.trashEnabled && !BN.inBSP2Trash) { // Move at end of trash
 	  await browser.bookmarks.move(
 		bnId,
 		{parentId: bsp2TrashFldrBNId
@@ -6176,7 +6177,7 @@ function menuShow (resultBN_id) {
   handleResultClick(resultBN_id);
 
   // If close search option is set, close search pane now
-  if (closeSearch_option) {
+  if (options.closeSearch) {
 	clearSearchTextHandler();
   }
 }
@@ -6303,26 +6304,26 @@ function menuNewBkmkItem (tgtBN_id, bkmkType, is_openProp = true) {
 	switch (bkmkType) {
 	  case NEWB:
 		if (tgtBN_type == "folder") {
-		  createBkmkItem (tgtBN_id, undefined, "New bookmark", "about:blank", "bookmark", is_openProp);
+		  createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), "New bookmark", "about:blank", "bookmark", is_openProp);
 		}
 		else {
-		  createBkmkItem (tgtBN.parentId, BN_getIndex(tgtBN), "New bookmark", "about:blank", "bookmark", is_openProp);
+		  createBkmkItem(tgtBN.parentId, BN_getIndex(tgtBN), "New bookmark", "about:blank", "bookmark", is_openProp);
 		}
 		break;
 	  case NEWF:
 		if (tgtBN_type == "folder") {
-		  createBkmkItem (tgtBN_id, undefined, "New folder", undefined, "folder", is_openProp);
+		  createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), "New folder", undefined, "folder", is_openProp);
 		}
 		else {
-		  createBkmkItem (tgtBN.parentId, BN_getIndex(tgtBN), "New folder", undefined, "folder", is_openProp);
+		  createBkmkItem(tgtBN.parentId, BN_getIndex(tgtBN), "New folder", undefined, "folder", is_openProp);
 		}
 		break;
 	  case NEWS:
 		if (tgtBN_type == "folder") {
-		  createBkmkItem (tgtBN_id, undefined, undefined, undefined, "separator", false);
+		  createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), undefined, undefined, "separator", false);
 		}
 		else {
-		  createBkmkItem (tgtBN.parentId, BN_getIndex(tgtBN), undefined, undefined, "separator", false);
+		  createBkmkItem(tgtBN.parentId, BN_getIndex(tgtBN), undefined, undefined, "separator", false);
 		}
 		break;
 	  case NEWBCURTAB:
@@ -6332,10 +6333,10 @@ function menuNewBkmkItem (tgtBN_id, bkmkType, is_openProp = true) {
 			let tab = a_tabs[0];
 //console.log(tab.title+" - "+tab.url);
 			if (tgtBN_type == "folder") {
-			  createBkmkItem (tgtBN_id, undefined, tab.title, tab.url, "bookmark", is_openProp);
+			  createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), tab.title, tab.url, "bookmark", is_openProp);
 			}
 			else {
-			  createBkmkItem (tgtBN.parentId, BN_getIndex(tgtBN), tab.title, tab.url, "bookmark", is_openProp);
+			  createBkmkItem(tgtBN.parentId, BN_getIndex(tgtBN), tab.title, tab.url, "bookmark", is_openProp);
 			}
 		  }
 		);
@@ -6462,7 +6463,12 @@ function menuCopyBkmkItem (selection) {
 function menuPasteBkmkItem (BN_id, is_pasteInto) {
   let BN = curBNList[BN_id];
   let bnIndex;
-  if (!is_pasteInto) { // If not paste to a folder, insert before BN
+  if (is_pasteInto) { // If paste to a folder, apply the option of insert at start or append at end
+	if (!options.appendAtFldrEnd) {
+	  bnIndex = 0; // At start)
+	}  
+  }
+  else { // If not paste to a folder, insert before BN
 	bnIndex = BN_getIndex(BN);
   }
 
@@ -6534,8 +6540,8 @@ function menuRefreshFav (BN_id) {
 	  && !url.startsWith("file:")	  // file: has no favicon => no fetch
 	  && !url.startsWith("about:")) { // about: is protected - security error .. => no fetch
    	// This is a bookmark, so here no need for cloneBN(), there is no tree below
-//    faviconWorker.postMessage(["get2", BN_id, url, enableCookies_option]);
-	let postMsg = ["get2", BN_id, url, enableCookies_option];
+//    faviconWorker.postMessage(["get2", BN_id, url, options.enableCookies]);
+	let postMsg = ["get2", BN_id, url, options.enableCookies];
 	if (backgroundPage == undefined) {
 	  sendAddonMsgGetFavicon(postMsg);
 	}
@@ -6567,7 +6573,7 @@ function menuProp (BN_id) {
  *   => use this for clearing menus when appropriate)
  *
  * Use global variable mousedownTarget to detect a bug in Linux on contextmenu events resulting
- * in the click event target always equal to body ..
+ * in the click event target always equal to Body ..
  * 
  */
 let mousedownTarget;
@@ -6952,12 +6958,12 @@ function resetFiltersButtonHandler (e) {
 function searchButtonSwitchMode (e) {
 //console.log("searchButtonHandler event: "+e.type+" button: "+e.button+" phase: "+e.eventPhase);
   if (e.button == 1) {
-	switch (searchFilter_option) {
+	switch (options.searchFilter) {
 	  case "all":
 		setSFilterFldrOnlyHandler();
 	    break;
 	  case "fldr":
-		searchField_option = "both"; // Reset which parts a search is made on to title + url
+		options.searchField = "both"; // Reset which parts a search is made on to title + url
 		setSFilterBkmkOnlyHandler();
 		break;
 	  case "bkmk":
@@ -7030,7 +7036,7 @@ function handleMsgResponse (message) {
   // Is always called, even if destination didn't specifically reply (then message is undefined)
   if (message != undefined) {
 	let msg = message.content;
-if (traceEnabled_option) {
+if (options.traceEnabled) {
   console.log("Background sent a response: <<"+msg+">> received in sidebar:"+myWindowId);
 }
 	if (msg == "savedCurBnId") { // Restore last saved cursor position
@@ -7054,7 +7060,7 @@ if (traceEnabled_option) {
 	else if (msg == "Ready") {
 	  backgroundReady = true; // Signal background ready for private windows for asking curBNList
 	  if (waitingInitBckgnd) { // We were waiting for it to continue
-if (traceEnabled_option) {
+if (options.traceEnabled) {
   console.log("Background is Ready 3");
 }
 		f_initializeNext();
@@ -7111,7 +7117,7 @@ function sendAddonMsgMigr16x16 (migr16x16ConvertList, migr16x16Len) {
 /*
  * Send a fetch favicon command to Background (when we are a private window)
  * 
- * a_msg = an array ["<cmd>", bnId, url, enableCookies_option]
+ * a_msg = an array ["<cmd>", bnId, url, options.enableCookies]
  */
 function sendAddonMsgGetFavicon (a_msg) {
   browser.runtime.sendMessage(
@@ -7164,7 +7170,7 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  // When coming from sidebar:
 	  //   sender.url: moz-extension://28a2a188-53d6-4f91-8974-07cd0d612f9e/sidebar/panel.html
 	  let msg = request.content;
-if (traceEnabled_option) {
+if (options.traceEnabled) {
   console.log("Got message <<"+msg+">> from "+request.source+" in "+myWindowId);
   console.log("  sender.tab: "+sender.tab);
   console.log("  sender.frameId: "+sender.frameId);
@@ -7176,7 +7182,7 @@ if (traceEnabled_option) {
 	  if (msg == "Ready") { // Background initialization is ready
 		backgroundReady = true; // Signal background ready for private windows for asking curBNList
 		if (waitingInitBckgnd) { // We were waiting for it to continue
-if (traceEnabled_option) {
+if (options.traceEnabled) {
   console.log("Background is Ready 2");
 }
 		  f_initializeNext();
@@ -7184,52 +7190,52 @@ if (traceEnabled_option) {
 	  }
 	  else if (msg.startsWith("savedOptions")) { // Option page changed something to options, reload them
 		// Look at what changed
-//		let enableCookies_option_old = enableCookies_option;
-//		let enableFlipFlop_option_old = enableFlipFlop_option;
-		let advancedClick_option_old = advancedClick_option;
-		let showPath_option_old = showPath_option;
-//		let closeSearch_option_old = closeSearch_option;
-//		let noffapisearch_option_old = noffapisearch_option;
-		let reversePath_option_old = reversePath_option;
-		let rememberSizes_option_old = rememberSizes_option;
-		let searchHeight_option_old = searchHeight_option;
-//		let openTree_option_old = openTree_option;
-		let matchTheme_option_old = matchTheme_option;
-		let setColors_option_old = setColors_option;
-		let textColor_option_old = textColor_option;
-		let bckgndColor_option_old = bckgndColor_option;
-//		let closeSibblingFolders_option_old = closeSibblingFolders_option;
-		let altFldrImg_option_old = altFldrImg_option;
-		let useAltFldr_option_old = useAltFldr_option;
-		let altNoFavImg_option_old = altNoFavImg_option;
-		let useAltNoFav_option_old = useAltNoFav_option;
-		let trashVisible_option_old = trashVisible_option;
-		let traceEnabled_option_old = traceEnabled_option;
+//		let enableCookies_option_old = options.enableCookies;
+//		let enableFlipFlop_option_old = options.enableFlipFlop;
+		let advancedClick_option_old = options.advancedClick;
+		let showPath_option_old = options.showPath;
+//		let closeSearch_option_old = options.closeSearch;
+//		let noffapisearch_option_old = options.noffapisearch;
+		let reversePath_option_old = options.reversePath;
+		let rememberSizes_option_old = options.rememberSizes;
+		let searchHeight_option_old = options.searchHeight;
+//		let openTree_option_old = options.openTree;
+		let matchTheme_option_old = options.matchTheme;
+		let setColors_option_old = options.setColors;
+		let textColor_option_old = options.textColorn;
+		let bckgndColor_option_old = options.bckgndColor;
+//		let closeSibblingFolders_option_old = options.closeSibblingFolders;
+		let altFldrImg_option_old = options.altFldrImg;
+		let useAltFldr_option_old = options.useAltFldr;
+		let altNoFavImg_option_old = options.altNoFavImg;
+		let useAltNoFav_option_old = options.useAltNoFav;
+		let trashVisible_option_old = options.trashVisible;
+		let traceEnabled_option_old = options.traceEnabled;
 
 		// Function to process option changes
 		function changedOptions () {
 		  // If advanced click option changed, update rbkmitem_b class cursor
-		  if (advancedClick_option_old != advancedClick_option) {
-			setRBkmkItemBCursor(advancedClick_option);
+		  if (advancedClick_option_old != options.advancedClick) {
+			setRBkmkItemBCursor(options.advancedClick);
 		  }
 		  // If a show path option changed, update any open search result 
-		  if ((showPath_option_old != showPath_option)
-			  || (reversePath_option_old != reversePath_option)
+		  if ((showPath_option_old != options.showPath)
+			  || (reversePath_option_old != options.reversePath)
 			 ) {
 			// Trigger an update as results can change, if there is a search active
 			triggerUpdate();
 		  }
-		  if ((rememberSizes_option_old != rememberSizes_option)
-			  && (rememberSizes_option == false)) {
+		  if ((rememberSizes_option_old != options.rememberSizes)
+			  && (options.rememberSizes == false)) {
 			// To reset the height to CSS default ("20%"), just set
 			SearchResult.style.height = "";
 		  }
-		  if (searchHeight_option_old != searchHeight_option) {
-			SearchResult.style.height = searchHeight_option; 
+		  if (searchHeight_option_old != options.searchHeight) {
+			SearchResult.style.height = options.searchHeight; 
 		  }
 		  // If match FF theme option changed
-		  if (matchTheme_option_old != matchTheme_option) {
-			if (matchTheme_option) {
+		  if (matchTheme_option_old != options.matchTheme) {
+			if (options.matchTheme) {
 			  // Align colors with window theme 
 			  browser.theme.getCurrent(myWindowId)
 			  .then(setPanelColors);
@@ -7245,35 +7251,35 @@ if (traceEnabled_option) {
 			}
 		  }
 		  // If set colors option changed, or if one of the colors changed while that option is set
-		  if (setColors_option_old != setColors_option
-			  || (setColors_option && ((textColor_option_old != textColor_option)
-									   || (bckgndColor_option_old != bckgndColor_option)
+		  if (setColors_option_old != options.setColors
+			  || (options.setColors && ((textColor_option_old != options.textColor)
+									   || (bckgndColor_option_old != options.bckgndColor)
 				 					  )
 				 )
 			 ) {
-			if (setColors_option) {
+			if (options.setColors) {
 			  // Align colors with chosen ones 
-			  setPanelColorsTB(textColor_option, bckgndColor_option);
+			  setPanelColorsTB(options.textColor, options.bckgndColor);
 			}
 			else { // Cannot change while machTheme option is set, so no theme to match, reset ..
 			  resetPanelColors();
 			}
 		  }
 		  // If folder image options changed
-		  if ((useAltFldr_option && (altFldrImg_option_old != altFldrImg_option))
-			  || (useAltFldr_option_old != useAltFldr_option)
+		  if ((options.useAltFldr && (altFldrImg_option_old != options.altFldrImg))
+			  || (useAltFldr_option_old != options.useAltFldr)
 			 ) {
-			setPanelFolderImg(useAltFldr_option, altFldrImg_option);
+			setPanelFolderImg(options.useAltFldr, options.altFldrImg);
 		  }
 		  // If no-favicon image options changed
-		  if ((useAltNoFav_option && (altNoFavImg_option_old != altNoFavImg_option))
-			  || (useAltNoFav_option_old != useAltNoFav_option)
+		  if ((options.useAltNoFav && (altNoFavImg_option_old != options.altNoFavImg))
+			  || (useAltNoFav_option_old != options.useAltNoFav)
 			 ) {
-			setPanelNoFaviconImg(useAltNoFav_option, altNoFavImg_option);
+			setPanelNoFaviconImg(options.useAltNoFav, options.altNoFavImg);
 		  }
 		  // If BSP2 trash folder visibility changed
-		  if (trashVisible_option_old != trashVisible_option) {
-			if (trashVisible_option) { // Insert BSP2 trash foder and all its children, with handling of parent twistie
+		  if (trashVisible_option_old != options.trashVisible) {
+			if (options.trashVisible) { // Insert BSP2 trash foder and all its children, with handling of parent twistie
 			  // Get parent of BSP2 Trash folder BN
 			  let BN = curBNList[bsp2TrashFldrBNId];
 			  let parentId = BN.parentId;
@@ -7305,8 +7311,8 @@ if (traceEnabled_option) {
 			triggerUpdate();
 		  }
 		  // If trace option changed
-		  if (traceEnabled_option_old != traceEnabled_option) {
-			TracePlace.hidden = !traceEnabled_option;
+		  if (traceEnabled_option_old != options.traceEnabled) {
+			TracePlace.hidden = !options.traceEnabled;
 		  }
 		}
 
@@ -7428,9 +7434,9 @@ console.log("Received message in "+wId+" to show "+bnId+" for tab "+tabId);
 		  let row = curRowList[bnId];
 		  let wasRowVisible = showRow(bnId, row);
 		  if (!wasRowVisible) {
-			// If we have the openTree_option active, then we necessarily changed some folder state
+			// If we have the options.openTree active, then we necessarily changed some folder state
 			// => save it.
-			if (openTree_option) {
+			if (options.openTree) {
 			  saveFldrOpen();
 			}
 			else { // Else show special action on context menu
@@ -7668,14 +7674,14 @@ function completeDisplay () {
   savedFldrOpenList = undefined;
   isDisplayComplete = true;
   WaitingImg.hidden = true; // Stop displaying the waiting glass
-//  if (delayLoad_option)
+//  if (options.delayLoad)
 //	Bookmarks.appendChild(docFragment); // Display the table of bookmarks + reflow
   endDisplayTime = (new Date ()).getTime();
   trace("Display duration: "+(endDisplayTime - endGetTreetime)+" ms", true);
   trace("Total duration: "+(endDisplayTime - startTime)+" ms", true);
 
   // Finish displaying favicons asynchronously
-  if (!disableFavicons_option && !immediateFavDisplay_option) {
+  if (!options.disableFavicons && !options.immediateFavDisplay) {
 	setTimeout(completeFavicons, 0);
   }
 
@@ -7792,7 +7798,7 @@ function completeDisplay () {
  * BN = BookmarkNode
  */
 function displayTreeBN (BN) {
-  if ((trashEnabled_option && trashVisible_option)
+  if ((options.trashEnabled && options.trashVisible)
 	  || (BN.inBSP2Trash != true)
 	 ) { // Don't display BNs in BSP2 trash, except on debug
 	insertBookmarkBN(BN);
@@ -8181,12 +8187,12 @@ function setPanelNoFaviconImg (useAltNoFav_option, altNoFavImg_option) {
  */
 function setupUI () {
   // Set pointer on result bookmark items according to Click mode setting
-  setRBkmkItemBCursor(advancedClick_option);
+  setRBkmkItemBCursor(options.advancedClick);
 
   // Set font size, and menus size accordingly
   let fs;
-  if (setFontSize_option && (fontSize_option != undefined)) {
-	fs = fontSize_option;
+  if (options.setFontSize && (options.fontSize != undefined)) {
+	fs = options.fontSize;
   }
   else {
 	fs = DfltFontSize;
@@ -8232,13 +8238,13 @@ function setupUI () {
   }
 
   // Set bold fonts if optoin is set
-  if (setFontBold_option) {
+  if (options.setFontBold) {
 	setPageFontWeight(true);
   }
 
   // Set spacing between bookmark items
-  if (setSpaceSize_option && (spaceSize_option != undefined)) {
-	let padding = spaceSize_option / 2;
+  if (options.setSpaceSize && (options.spaceSize != undefined)) {
+	let padding = options.spaceSize / 2;
 
 	// Retrieve the CSS rules to modify
 	let a_ss = document.styleSheets;
@@ -8269,7 +8275,7 @@ function setupUI () {
   }
 
   // Align colors with window theme
-  if (matchTheme_option) {
+  if (options.matchTheme) {
 	browser.theme.getCurrent(myWindowId)
 	.then(setPanelColors);
 
@@ -8277,20 +8283,20 @@ function setupUI () {
 	browser.theme.onUpdated.addListener(themeRefreshedHandler);
   }
   else { // If set colors option is set, align colors with specified values
-	if (setColors_option) {
+	if (options.setColors) {
 	  // Align colors with chosen ones 
-	  setPanelColorsTB(textColor_option, bckgndColor_option);
+	  setPanelColorsTB(options.textColor, options.bckgndColor);
 	}
   }
 
   // Set folder image as per options
-  if (useAltFldr_option) {
-	setPanelFolderImg(true, altFldrImg_option);
+  if (options.useAltFldr) {
+	setPanelFolderImg(true, options.altFldrImg);
   }
 
   // Set no-favicon image as per options
-  if (useAltNoFav_option) {
-	setPanelNoFaviconImg(true, altNoFavImg_option);
+  if (options.useAltNoFav) {
+	setPanelNoFaviconImg(true, options.altNoFavImg);
   }
 }
 
@@ -8336,7 +8342,7 @@ function initialize2 () {
 
 	// Get options and curBNList / rootBN
 	refreshOptionsBgnd(backgroundPage);
-	TracePlace.hidden = !traceEnabled_option;
+	TracePlace.hidden = !options.traceEnabled;
 
 	curBNList = backgroundPage.curBNList;
 	rootBN = backgroundPage.rootBN;
@@ -8348,8 +8354,8 @@ function initialize2 () {
   setupUI();
   setSearchOptions();
 
-  if (searchHeight_option != undefined) { // Set current saved size 
-	SearchResult.style.height = searchHeight_option; 
+  if (options.searchHeight != undefined) { // Set current saved size 
+	SearchResult.style.height = options.searchHeight; 
 	// Note: to reset the height to CSS default ("20%"), just set
 	//  SearchResult.style.height = "";
 	//  let computedStyle = window.getComputedStyle(SearchResult, null);
@@ -8362,8 +8368,8 @@ function initialize2 () {
 //	}
 
   trace("structureVersion: "+structureVersion, true);
-  trace("disableFavicons_option: "+disableFavicons_option, true);
-  trace("pauseFavicons_option: "+pauseFavicons_option, true);
+  trace("options.disableFavicons: "+options.disableFavicons, true);
+  trace("options.pauseFavicons: "+options.pauseFavicons, true);
   if (!structureVersion.includes(VersionImg16)) {
 	// Remember to trigger img16 migration later
 	migration_img16 = true;
@@ -8467,17 +8473,17 @@ function initialize () {
 		// Process read values from Store (they are already in Global variables from libstore.js)
 		endLoadTime = (new Date ()).getTime();
 		trace("Load local store duration (full): "+(loadDuration = (endLoadTime - startTime))+" ms", true);
-		TracePlace.hidden = !traceEnabled_option;
+		TracePlace.hidden = !options.traceEnabled;
 
 		if (backgroundReady) {
-if (traceEnabled_option) {
+if (options.traceEnabled) {
   console.log("Background is Ready 2");
 }
 		  initializePriv();
 		  WaitMsg.textContent = "Load from background..";
 		}
 		else {
-if (traceEnabled_option) {
+if (options.traceEnabled) {
   console.log("Waiting on Background 2");
 }
 		  f_initializeNext = initializePriv;
@@ -8512,13 +8518,13 @@ if (traceEnabled_option) {
 		trace("Load local store duration (folders only): "+(loadDuration = (endLoadTime - startTime))+" ms", true);
 
 		if (backgroundPage.ready) {
-if (traceEnabled_option) {
+if (options.traceEnabled) {
   console.log("Background is Ready 1");
 }
 		  initialize2();
 		}
 		else { // Wait for Background to complete initialization
-if (traceEnabled_option) {
+if (options.traceEnabled) {
   console.log("Waiting on Background 1");
 }
 		  f_initializeNext = initialize2;
