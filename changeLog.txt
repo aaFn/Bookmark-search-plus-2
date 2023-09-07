@@ -1,6 +1,85 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.117 08/09/2023 Bugs and Improvements
+ 	- Added undo/redo support.
+    - Added support for multiple create when copying a list of bookmarks or copying a folder with children,
+      so that they group as one operation in history, and can be undone/redone in one go - until now, they were
+      created as individual actions, not grouped.
+      This required serious workaround work due to the fact that the FF API does not permit to set the id on
+      bookmark creation, and does not have any room to pass some correlation id to recognize which creation
+      corresponds to which history record.
+    - Added support and handling of twisties in multiple records and undo/redo lists in the hisotry window, to hide
+      or show rows below the twistie depending on its closed or open state.
+    - Added capability to delete bookmarks from within the search result pane (both by keyboard and context menu)
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/273
+    - Added handling of multiple selected bookmarks for "open in tab" action and its derivatives (new window,
+      private window) in the context menu. Note: the menu entry will not be enabled if there is at least 1 folder
+      in the selection.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/277
+    - Corrected a bug where "Cut", "Copy" or "Del" were possible on a multiple selection containing protected
+      bookmark items, violating their protection.
+    - Added an option to deactivate the suggestions drop down on the search box.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/278
+    - Relaxed a bit the filtering condition on favicon refreshes from tab updates, which was too stringent
+      since 2.0.113 and was missing some valid cases.
+    - Reworked the internal history structure to better handle operations of multiple bookmarks. Indexing
+      is now showing the sequence number of the bookmark inside the multi operation relative to the parent
+      multiple bookmarks record. 
+    - Added handling for deprecated options, removing them from local store when they still exist.
+    - Improved history to record the target parent folder and index, in case of a multiple move or remove to trash,
+      or in case of a create from trash by drag & drop or cut & paste (there can be always only 1 target in such
+      multi move cases).
+    - Improved history to contain the JSON of nodes moved to trash, like already done for removed nodes, to cover
+      the case of later removal by disabling BSP2 trash, and then still be able to recreate them.
+    - Added recording in history of actions on special folders, in "inactive branch" mode to show them but to
+      prevent any undo/redo on them. 
+    - Changed the "redo" symbol in the history icons to a clockwise arrow ("undo" remains anti-clockwise).
+    - Added display of undo/redo cursor as a top arrow at beginning of history list, pointing at no record but
+      showing up, when there is no active record in history.
+    - Protect code against exceptions on multiple BSP2 trashes (just take the first one) - apparently can happen in
+      some odd cases involving multiple BSP2 instances with different versions.
+    - Cleaned up internal messaging between add-on windows.
+    - Just discovered that the add-on sidebar code is running even in windows which do not show any sidebar, like
+      popups !!
+      Added code to not continue, but toterminate the BSP2 sidebar code in such cases, to avoid unnecessary cpu usage.
+    - Also noticed that since FF 66, there is a function in the add-on management panel, under the cogwheel menu, to
+      manage add-on shortcut keys. So disabled in the options page the management of BSP2 shortcut key when running on
+      FF versions under 60 or above 65 - only kept it modifiable for version 60 to 65. For other versions, it is only a
+      read only set of fields showing the currently configured value.
+      However, kept the Reset button active, as there is no reset to default button on the FF panel to manage add-on
+      shortcut keys.
+    - Deprecated the sidebarcommand_option option - new BSP2 is only using the value configured in FF, and is not
+      additionally storing that in its set of options.
+    - Corrected a bug where an incomplete multi bookmarks history record was not showing as red.
+    - Corrected a bug where a multi bookmarks move to/from the BSP2 trash (when visible) would not be qualified
+      as a "remove to trash" or "create from trash" in the history.
+    - Corrected a bug where a multi bookmarks move to/from the BSP2 trash (when visible) would not be properly
+      matched with the parent multi move record in the history.
+    - Corrected a bug where an exception was occurring on some internal messages, preventing to display the BSP2 trash
+      under specific conditions.
+    - Corrected a bug where some BSP2 actions were not recorded in history when there was no special folder existing.
+    - Corrected a bug where an exception was occurring on selecting a row under some conditions in the history
+      window.
+    - Corrected a bug where displaying an incomplete multiple or reversion node in history was making all next
+      displayed nodes shown as incomplete also.
+    - Corrected a bug where clicking on the text of the "Link undo/redo" or "Raw list" radio buttons in the history
+      window was not triggering any action.
+    - Corrected a bug where pressing Alt key on drag of URL shortcuts from the OS file explorer to BSP2 panel was not
+      opening the edit properties window.
+    - Corrected a bug where an action modifying search results (e.g. Delete bookmark) was unduly updating the list of
+      suggested search terms, and was refocusing the keyboard input on the search box after search list timeout.
+    - Corrected an exception on String.replaceAll() function, not available below FF77.
+- 2.0.116 11/05/2023 Bugs
+    - Corrected a bug introduced in 2.0.114 where the setFontSize option was ignored due to a bad object property name
+      (I really hate Javascript and all these non-typed languages which make people believe they go faster while in fact
+       they just are allowed to introduce bugs by typos and get slower !).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/275
+- 2.0.115 11/05/2023 Bugs
+    - Reverted to the use of hasOwnProperty() instead of the recommended Object.hasOwn(), since the latter is only
+      supported as of FF 92.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/274
+    - Corrected a bug where the search filters were not set to default values on new BSP2 installations.
 - 2.0.114 10/05/2023 Bugs and Improvements
     - Made the explanation text for "Advanced click" more understandable in the BSP2 options page.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/272
