@@ -27,28 +27,33 @@ class OptionDesc {
   // Constructor:
   //-------------
   // storeName: String, the name by which the option is stored in the local store
-  // type: Strin, "Boolean", "Integer", "String", "DOMString"
+  // type: String, "Boolean", "Integer", "String", "DOMString"
   // dflt: default value for the option
-  constructor (storeName, type, dflt) {
+  // deprecated: Boolean, to signal a past option which is no more used and should be deleted now
+  constructor (storeName, type, dflt, deprecated = false) {
 	this.storeName = storeName;
 	this.type = type;
 	this.dflt = dflt;
+	this.deprecated = deprecated;
   }
 
   // Method: read option value from result received from the local store, according to its type and default
+  //-------------
   // res: result received from local store
   readValue (res) {
 	let v = res[this.storeName];
-	return(v == undefined ? this.dflt : v);
+	return((!this.deprecated && (v == undefined)) ? this.dflt : v); // Keep undefined if deprecated
   }
 
   // Method: get default value
+  //-------------
   // Returns the default value
   getDefault () {
 	return(this.dflt);
   }
 
   // Method: verify the value against its type (Boolean, Integer, DOMString, DataURI, String)
+  //-------------
   // v: value / object to check against verification rules
   // Returns true or false if verification is ok or ko.
   verifyValue (v) {
@@ -69,6 +74,13 @@ class OptionDesc {
 		break;
 	}
 	return(valid);
+  }
+
+  // Method: get the deprecation status
+  //-------------
+  // Returns the deprecation value
+  isDeprecated () {
+	return(this.deprecated);
   }
 }
 

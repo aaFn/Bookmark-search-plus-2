@@ -447,7 +447,12 @@ function htmldecode (str) {
   return(txt.value);
 */
   let newStr;
-  newStr = str.replaceAll("&amp;", "&");
+  if (beforeFF77) { // String.replaceAll() is not available before FF77
+	newStr = str.replace(/&amp/g, "&");
+  }
+  else {
+	newStr = str.replaceAll("&amp;", "&");
+  }
   return(newStr);
 }
 

@@ -21,6 +21,8 @@ let beforeFF60;
 let beforeFF62;
 let beforeFF63;
 let beforeFF64;
+let beforeFF66;
+let beforeFF77;
 browser.runtime.getBrowserInfo()
 .then(function (info) {
   let ffversion = parseFloat(info.version);
@@ -30,6 +32,8 @@ browser.runtime.getBrowserInfo()
   beforeFF62 = (ffversion < 62.0);
   beforeFF63 = (ffversion < 63.0);
   beforeFF64 = (ffversion < 64.0);
+  beforeFF66 = (ffversion < 66.0);
+  beforeFF77 = (ffversion < 77.0);
 });
 
 const SaveMinHysteresis = 2000; // Space saves to lower memory consumption
@@ -96,6 +100,7 @@ var loadDuration, treeLoadDuration, treeBuildDuration, saveDuration;
 var isSlowSave = false;
 var curBNList = {}; // Current list of BookmarkNode - Saved in storage at each modification
 var curHNList; // Current history of HistoryNode - Saved in storage at each modification
+var curCreateHistQueue = new CreateHistQueue (); // Current queue of creations waiting resolution
 var bypassedFFAPI = false;
 var rootBN; // Type is BookmarkNode. This is curBNList[0]
 
@@ -148,7 +153,7 @@ function traceBTN (BTN) {
 }
 
 /*
- * Save curBNList (serialized) including full tree structure at entry 0
+ * Save curBNList as well as HistoryList (serialized), including full tree structure at entry 0
  * Includes an hysteresis mechanism to space saves when they are frequent
  *   (typically during favicon fetching).
  * Returns a promise to signal save completion
@@ -848,21 +853,76 @@ async function sortFolder (bnId) {
 }
 
 /*
- * Record a multiple operation in History
+ * Record a multiple operation in History (called from sidebar or from history window)
  * 
- * op = String, nature of the operation ("create", "move", "remove" or "remove_tt")
- *   note: "create" is unused today, because we cannot create a folder with all its children (recursive) in one go
- *         Also, we do not know in advance the id of a bookmark to create, and cannot pass the id of the copied one
- *         in a created bookmark, for relating to the is_multi record.
- * id_list = Array of String identifying the bookmark Ids subject to the multiple action
+ * action = String, nature of the operation ("create", "create_ft", move", "remove" or "remove_tt")
+ *   note: multi "create" is in fact a copy of a list of bookmarks with ids which will be known later.
+ * 
+ * id_list = Array of String identifying the bookmark Ids subject to the multiple action, undefined in the case
+ *           of a multi create
+ * newParentId = String, Id of new parent to move into, not meaningful in case of "remove"
+ * newIndex = integer position in parent (undefined if at end), not meaningful in case of "remove"
+ * 
+ * Returns the newly created HistoryNode 
  */
-function recordHistoryMulti (op, id_list) {
-  let action;
-  if (op == "move")  action = HNACTION_BKMKMOVE;
-  else if (op == "remove")  action = HNACTION_BKMKREMOVE;
-  else if (op == "remove_tt")  action = HNACTION_BKMKREMOVETOTRASH;
-//  else if (op == "create")  action = HNACTION_BKMKCREATE;
-  historyListAdd(curHNList, action, true, id_list);
+function recordHistoryMulti (action, id_list, newParentId = undefined, newIndex = undefined) {
+  let hn = historyListAdd(curHNList, action,
+						  true, id_list, undefined, undefined, undefined, undefined, undefined,
+						  undefined, undefined, undefined, undefined, undefined,
+						  (newParentId == undefined) ? undefined : BN_aPath(newParentId), newParentId, newIndex
+						 );
+  return(hn);
+}
+
+/*
+ * Trigger an undo operation if possible (called from sidebar or from history window)
+ */
+function triggerUndo () {
+  executeUndo(curHNList);
+}
+
+/*
+ * Trigger a redo operation if possible (called from sidebar or from history window)
+ */
+function triggerRedo () {
+  executeRedo(curHNList);
+}
+
+/*
+ * Copy bookmark contents at the designated place (called from sidebar or from history window)
+ * 
+ * a_id = array of Strings (bookmark ids)
+ * a_BN = array of BookmarkNodes to paste (copy)
+ * parentId = String, Id of new parent to paste into
+ * index = integer position in parent (undefined if at end)
+ */
+async function copyBkmk (a_id, a_BN, parentId, index = undefined) {
+  // Record a multiple operation if more than one item is in the array
+  let len = a_id.length;
+  let bn, children;
+  let is_multi = (len > 1)
+  				 || (((bn = a_BN[0]).type == "folder") && ((children = bn.children) != undefined)
+  					 && (children.length > 0)
+  					)
+  				 ;
+  let hn;
+  if (is_multi) { // Multiple bookmarks will be created
+	// Note: id_list of new bookmarks is still unknown at this stage of creation, see below
+	hn = historyListAdd(curHNList, HNACTION_BKMKCREATE,
+						true, [], undefined, undefined, undefined, undefined, undefined,
+						undefined, undefined, undefined, undefined, undefined,
+						BN_aPath(parentId), parentId, index
+					   );
+	hn.id_list_len = len;
+  }
+  // Use as source a copy of the source list of BookmarNodes to paste, because in case we are copying inside source,
+  // we need to avoid an infinite loop due to the source list being itself modified by the paste. 
+  let id_list = await util_copyBkmk(uniqueListCopy(a_BN), parentId, index, hn); // Recursive call on folders
+
+  // Update the (top) created id-list in the HistoryNode, if created
+  if (hn != undefined) {
+	hn.id_list = id_list;
+  }
 }
 
 /*
@@ -945,11 +1005,13 @@ function removeBSP2TrashFolder () {
 
 /*
  * Handle responses or errors when talking with sidebars
+ * Note that all sidebars (and also the History and the Options page) will receive messages from background,
+ * but only the first received response will be handled, and others are ignored.
  */
 function handleMsgResponse (message) {
   // Is always called, even if destination didn't specifically reply (then message is undefined)
   if (options.traceEnabled) {
-	console.log("Sidebar sent a response: <<"+message.content+">> received in background");
+	console.log("Background received a response: <<"+((message != undefined) ? message.content : message)+">>");
   }
 }
 
@@ -1059,6 +1121,7 @@ if (options.traceEnabled) {
 	  let openTree_option_old = options.openTree;
 	  let noffapisearch_option_old = options.noffapisearch;
 	  let searchOnEnter_option_old = options.searchOnEnter;
+	  let deactivateSearchList_option_old = options.deactivateSearchList;
 	  let reversePath_option_old = options.reversePath;
 	  let closeSibblingFolders_option_old = options.closeSibblingFolders;
 	  let rememberSizes_option_old = options.rememberSizes;
@@ -1157,6 +1220,7 @@ if (options.traceEnabled) {
 			  	   || (openTree_option_old != options.openTree)
 				   || (noffapisearch_option_old != options.noffapisearch)
 			   	   || (searchOnEnter_option_old != options.searchOnEnter)
+			   	   || (deactivateSearchList_option_old != options.deactivateSearchList)
 			  	   || (reversePath_option_old != options.reversePath)
 			  	   || (closeSibblingFolders_option_old != options.closeSibblingFolders)
 			  	   || (rememberSizes_option_old != options.rememberSizes)
@@ -1257,10 +1321,26 @@ if (options.traceEnabled) {
 	  // Save new current info
 	  saveBNList();
 	}
-	else if (msg.startsWith("recordHistoryMulti")) { // Record a multipple operation in hitory
-	  recordHistoryMulti(request.operation, request.id_list);
+	else if (msg.startsWith("saveBNList")) { // Demand from the history window to save curHNList
+	  saveBNList();
 	}
- 
+	else if (msg.startsWith("triggerUndo")) { // Trigger an undo operation if possible
+	  triggerUndo();
+	}
+	else if (msg.startsWith("triggerRedo")) { // Trigger a redo operation if possible
+	  triggerRedo();
+	}
+	else if (msg.startsWith("copyBkmk")) { // Create copies of a list of bookmarks
+	  // Rebuild a_BN from a_id
+	  let a_id = request.a_id; // An array of Strings is ok in messages
+	  let a_BN = [];
+	  let len = a_id.length;
+	  for (let i=0 ; i<len ; i++) {
+		a_BN.push(curBNList[a_id[i]]);
+	  }
+	  copyBkmk(a_id, a_BN, request.parentId, request.index);
+	}
+
 	// Answer
 	if (msg.startsWith("New:")) { // New private window sidebar opening - Register it
 	  let windowId = parseInt(msg.slice(4), 10);
@@ -1322,7 +1402,15 @@ if (options.traceEnabled) {
 		}
 	  );
 	}
-	else {
+	else if (msg.startsWith("recordHistoryMulti")) { // Record a multiple operation in hitory
+	  let hn = recordHistoryMulti(request.operation, request.id_list, request.newParentId, request.newIndex);
+	  sendResponse(
+		{content: "recordHistoryMulti",
+		 hnId: hn.id
+		}
+	  );
+	}
+	else { // Default response
 	  sendResponse(
 		{content: "Background response to "+request.source		
 		}
@@ -1989,16 +2077,24 @@ function bkmkCreatedHandler (id, BTN) {
   let BN = buildTree(BTN, parentBN.level+1, inBSP2Trash);
   BN_insert(BN, parentBN, index);
 
-  // Record action
+  // Create a new HistoryNode for it, and pass it to the CreateHistQueue mechanism for recognition (or not)
+  // and proper addition to the HistoryList
+/*
   historyListAdd(curHNList, HNACTION_BKMKCREATE,
 	  			 false, undefined, id, BTN.type, BN_aPath(parentId), parentId, index,
 	  			 BTN.title, BN.faviconUri, BTN.url, inBSP2Trash);
+*/
+  let HN = new HistoryNode(HNACTION_BKMKCREATE,
+  						   false, undefined, id, BTN.type, BN_aPath(parentId), parentId, index,
+  						   BTN.title, BN.faviconUri, BTN.url, inBSP2Trash);
+  curCreateHistQueue.receivedCreateEvent(id, BN, HN);
+   
   // Save new current info
   saveBNList();
   // Refresh BSP2 toolbar icon in active tabs
   refreshActiveTabs(BN, false);
 
-  // If we receive creation of the BSP2 trash folder, then rebuild pointer
+  // If we received the creation of the BSP2 trash folder, then rebuild pointer
   // and tell open sidebars before they are notified of its creation, to recognize it
   if (id == bsp2TrashFldrBNId) {
 	bsp2TrashFldrBN = BN;
@@ -2084,11 +2180,14 @@ function bkmkRemovedHandler (id, removeInfo) {
   if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
 	// Record action sent to us at source of detecting the problem
 	let btn = removeInfo.node;
+	// Try to rebuild some other info
+	let parentBN = curBNList[parentId];
+	let is_inBSP2Trash = ((parentBN == undefined) ? false : parentBN.inBSP2Trash); // Imperfect ..
 	historyListAdd(curHNList, HNACTION_BKMKREMOVE_DESYNC,
-				   false, undefined, id, btn.type, BN_aPath(parentId), parentId, removeInfo.index,
+				   false, undefined, id, btn.type,
+				   (parentBN == undefined) ? undefined : BN_aPath(parentId), parentId, removeInfo.index,
 				   btn.title,
-				   historyListSearchFaviconUri(curHNList, id, btn),
-				   btn.url);
+				   historyListSearchFaviconUri(curHNList, id, btn), btn.url, is_inBSP2Trash);
 	reloadFFAPI(true);
   }
   else {
@@ -2145,13 +2244,17 @@ function bkmkChangedHandler (id, changeInfo) {
 		// Record action sent to us at source of detecting the problem
 		let BTN = a_BTN[0];
 		let parentId = BTN.parentId;
+		// Try to rebuild some info
+		let parentBN = curBNList[parentId];
+		let is_inBSP2Trash = ((parentBN == undefined) ? false : parentBN.inBSP2Trash); // Imperfect ..
 		historyListAdd(curHNList, HNACTION_BKMKCHANGE_DESYNC,
-					   false, undefined, id, BTN.type, BN_aPath(parentId), parentId, BTN.index,
+					   false, undefined, id, BTN.type,
+					   (parentBN == undefined) ? undefined : BN_aPath(parentId), parentId, BTN.index,
 					   // Can't know the old title and url values !!! Hopefully, they will be sooner in the past history
 					   historyListSearchTitle(curHNList, id),
 					   historyListSearchFaviconUri(curHNList, id, BTN),
 					   historyListSearchUrl(curHNList, id),
-					   undefined,
+					   is_inBSP2Trash,
 					   undefined,
 					   undefined, undefined, undefined, cTitle, cUrl);
 		reloadFFAPI(true);
@@ -2245,19 +2348,23 @@ function bkmkMovedHandler (id, moveInfo) {
 	  function (a_BTN) {
 		// Record action sent to us at source of detecting the problem
 		let BTN = a_BTN[0];
+		// Try to rebuild some info
+		let curParentBN = curBNList[curParentId];
+		let was_inNSP2Trash = ((curParentBN == undefined) ? false : curParentBN.inBSP2Trash); // Imperfect ..
+		let targetParentBN = curBNList[targetParentId];
+		let is_inBSP2Trash = ((targetParentBN == undefined) ? false : targetParentBN.inBSP2Trash); // Imperfect ..
 		historyListAdd(curHNList,
-					   (options.trashEnabled && (targetParentId == bsp2TrashFldrBNId) // Imperfect, but not daring a double error by fetching possibly non existing parent
+					   ((is_inBSP2Trash && !was_inNSP2Trash)
 						? HNACTION_BKMKREMOVETOTRASH_DESYNC
-						: (options.trashEnabled && (curParentId == bsp2TrashFldrBNId) // Same ..
+						: ((was_inNSP2Trash && !is_inBSP2Trash)
 						   ? HNACTION_BKMKCREATEFROMTRASH_DESYNC
-						   : HNACTION_BKMKMOVE_DESYNC
+						   : HNACTION_BKMKMOVE_DESYNC // Note: a move inside trash is a move, not moveto/createfrom rtash
 						  )
 					   ),
-					   false, undefined, id, BTN.type, BN_aPath(curParentId), curParentId, moveInfo.oldIndex,
-					   BTN.title,
-					   historyListSearchFaviconUri(curHNList, id, BTN),
-					   BTN.url, undefined, undefined,
-					   BN_aPath(targetParentId), targetParentId, targetIndex
+					   false, undefined, id, BTN.type,
+					   (curParentBN == undefined) ? undefined : BN_aPath(curParentId), curParentId, moveInfo.oldIndex,
+					   BTN.title, historyListSearchFaviconUri(curHNList, id, BTN), BTN.url, is_inBSP2Trash, undefined,
+					   (targetParentBN == undefined) ? undefined : BN_aPath(targetParentId), targetParentId, targetIndex
 					  );
 		reloadFFAPI(true);
 	  }
@@ -2270,31 +2377,31 @@ function bkmkMovedHandler (id, moveInfo) {
 	// as this is only a move.
 	BN_delete(BN, curParentId, false);
 	// Then insert it at new place, again not touching the list
-	let curInBSP2Trash = BN.inBSP2Trash; // Remember current trash state
-	let tgtInBSP2Trash;
-	if (options.trashEnabled) { // Maintain inBSP2Trash and trashDate fields
-	  BN_markTrash(BN, tgtInBSP2Trash = targetParentBN.inBSP2Trash);
-	}
+	let is_curInBSP2Trash = (BN.inBSP2Trash == true); // Remember current trash state
+	let is_tgtInBSP2Trash = (targetParentBN.inBSP2Trash == true);
+	// Maintain inBSP2Trash and trashDate fields
+	BN_markTrash(BN, is_tgtInBSP2Trash);
 	BN_insert(BN, targetParentBN, targetIndex, false);
 
 	// Record action
 	let type = BN.type;
-	historyListAdd(curHNList,
-				   ((tgtInBSP2Trash == true)
-					? HNACTION_BKMKREMOVETOTRASH
-					: ((options.trashEnabled && curInBSP2Trash)
-					   ? HNACTION_BKMKCREATEFROMTRASH
-					   : HNACTION_BKMKMOVE
-					  )
-				   ),
+	let action = ((is_tgtInBSP2Trash && !is_curInBSP2Trash)
+				  ? HNACTION_BKMKREMOVETOTRASH
+				  : ((is_curInBSP2Trash && !is_tgtInBSP2Trash)
+					? HNACTION_BKMKCREATEFROMTRASH
+					: HNACTION_BKMKMOVE // Note: a move inside trash is a move, not moveto/createfrom rtash
+				  )
+				 );
+	historyListAdd(curHNList, action,
 				   false, undefined, id, type, BN_aPath(curParentId), curParentId, moveInfo.oldIndex,
-				   BN.title, BN.faviconUri, BN.url, BN.inBSP2Trash, undefined, // To increase chances to find last title or url in case of desynchro
+				   BN.title, BN.faviconUri, BN.url, BN.inBSP2Trash,  // To increase chances to find last title or url in case of desynchro
+				   is_tgtInBSP2Trash ? BN_serialize(BN) : undefined, // In case of later disappearance through BSP2 trash removal ..
 				   BN_aPath(targetParentId), targetParentId, targetIndex, undefined, undefined,
 				   (type == "folder") ? BN_childIds(BN) : undefined // To increase chances to find childIds in case of desynchro
 				  );
 	// Save new values
 	saveBNList();
-	if (tgtInBSP2Trash) {
+	if (is_tgtInBSP2Trash) {
 	  // Refresh BSP2 toolbar icon in active tabs
 	  refreshActiveTabs(BN, true);
 	}
@@ -2338,11 +2445,15 @@ function bkmkReorderedHandler (id, reorderInfo, recHistory = true) {
 		  // Record action sent to us at source of detecting the problem
 		  let BTN = a_BTN[0];
 		  let parentId = BTN.parentId;
+		  // Try to rebuild some info
+		  let parentBN = curBNList[parentId];
+		  let is_inBSP2Trash = ((parentBN == undefined) ? false : parentBN.inBSP2Trash); // Imperfect ..
 		  historyListAdd(curHNList, HNACTION_BKMKMOVE_DESYNC,
-			  			 false, undefined, id, "folder", BN_aPath(parentId), parentId, BTN.index,
+			  			 false, undefined, id, "folder",
+			  			 (parentBN == undefined) ? undefined : BN_aPath(parentId), parentId, BTN.index,
 			  			 BTN.title,
 			  			 historyListSearchFaviconUri(curHNList, id, BTN),
-			  			 undefined, undefined, undefined, // This is a folder => no URL
+			  			 undefined, is_inBSP2Trash, undefined, // This is a folder => no URL
 			  			 undefined, undefined, undefined, undefined, undefined,
 			  			 // Can't know the old childIds value !!! Hopefully, it will be sooner in the past history
 			  			 historyListSearchChildIds(curHNList, id),
@@ -2371,7 +2482,7 @@ function bkmkReorderedHandler (id, reorderInfo, recHistory = true) {
 		let parentId = folderBN.parentId;
 		historyListAdd(curHNList, HNACTION_BKMKREORDER,
 					   false, undefined, id, "folder", BN_aPath(parentId), parentId, BN_getIndex(folderBN),
-					   folderBN.title, folderBN.faviconUri, undefined, undefined, undefined, // To increase chances to find last title and favicon in history when searching for it
+					   folderBN.title, folderBN.faviconUri, undefined, BN.inBSP2Trash, undefined, // To increase chances to find last title and favicon in history when searching for it
 					   undefined, undefined, undefined, undefined, undefined,
 					   BN_childIds(folderBN), childIds
 					  );
@@ -2693,7 +2804,7 @@ function tabSwitched (activeInfo) {
 function tabModified (tabId, changeInfo, tabInfo) {
   let winId = tabInfo.windowId;
 /*
-  trace('-------------------------------------');
+  trace("-------------------------------------");
   trace("A tab was updated.\r\n"
 	   +"tabId: "+tabId+"\r\n"
 	   +"changeInfo.favIconUrl: "+changeInfo.favIconUrl+"\r\n"
@@ -2708,11 +2819,12 @@ function tabModified (tabId, changeInfo, tabInfo) {
 	   +"winId: "+winId+"\r\n"
 	  );
 */
-//  if (tabInfo.status == "complete") {
-  if ((tabInfo.status == "complete") && (changeInfo.status == "complete")) {
+  if (tabInfo.status == "complete") { // Sometomes we will get one or even two extra message(s) complete/undefined with favicon
+									  // after a complete/complete with no favicon ..
+//  if ((tabInfo.status == "complete") && (changeInfo.status == "complete")) {
 	let tabUrl = tabInfo.url;
 //console.log("A tab was updated 1 - tabUrl: "+tabUrl);
-	// Verify this is a searchable url - If not, we get exception:
+	// Verify this is a searchable url - If not, we would get the exception:
 	//   Type error for parameter query (Value must either: be a string value, or .url must match the format "url")
 	if ((tabUrl != undefined)
 		&& (!tabUrl.startsWith("view-source:"))
@@ -2741,11 +2853,10 @@ function tabModified (tabId, changeInfo, tabInfo) {
 		  function (a_BTN) { // An array of BookmarkTreeNode
 			let len = a_BTN.length;
 /*
-console.log('-------------------------------------');
+console.log("-------------------------------------");
 console.log("A tab was updated 2 - tabUrl: "+tabUrl);
 console.log("Results: "+len);
-console.log("A tab was updated.\r\n"
-			+"tabId: "+tabId+"\r\n"
+console.log("tabId: "+tabId+"\r\n"
 			+"changeInfo.favIconUrl: "+changeInfo.favIconUrl+"\r\n"
 			+"changeInfo.status: "+changeInfo.status+"\r\n"
 			+"changeInfo.title: "+changeInfo.title+"\r\n"
@@ -2760,8 +2871,8 @@ console.log("A tab was updated.\r\n"
 */
 			if (len > 0) { // This could be a bookmarked tab
 			  // If there is a favicon and we are collecting them, refresh all coorresponding BookmarkNodes with it
-			  let tabFaviconUrl = tabInfo.favIconUrl;
-			  let chgFaviconUrl = changeInfo.favIconUrl;
+			  let tabFaviconUrl = tabInfo.favIconUrl;		  
+//			  let chgFaviconUrl = changeInfo.favIconUrl;
 //			  let chgStatus = changeInfo.status;
 			  let is_refreshFav = !options.disableFavicons		  // Ignore if options.disableFavicons is set
 /*								  && !options.pauseFavicons		  // Ignore if options.pauseFavicons is set */
@@ -3305,29 +3416,33 @@ startTime = (new Date ()).getTime();
 readFullLStore(false, trace)
 .then(
   function () {
-	// Set shortcut if different from default
-	trace("options.sidebarCommand: "+options.sidebarCommand, true);
-	if (options.sidebarCommand == undefined) {
-	  // Workaround the fact that manifest.json "suggested_key" in "commands" cannot contain "Alt" before FF63
-	  // Indeed, default key for Linux is "Ctrl+Alt+B", but this fails the add-on load for FF < 63, so default
-	  // in manifest is set to "Ctrl+Shift+B" in Linux, which conflicts with FF reserved combinations later on.
-	  if (!beforeFF63 && isLinux) {
-		browser.commands.update(
-		  {name: "_execute_sidebar_action",
-		   shortcut: "Ctrl+Alt+B"
+	// Shortcut workaround on Linux + set shortcut if different from default and if we are on FF 60 to 65
+	browser.commands.getAll()
+	.then(
+	  function (commands) {
+		let len = commands.length;
+		let command, shortcut;
+		for (let i=0 ; i<len ; i++) {
+		  command = commands[i];
+		  if (command.name == "_execute_sidebar_action") {
+			shortcut = command.shortcut;
+			trace("_execute_sidebar_action: "+shortcut, true);
+			if (!beforeFF63 && isLinux && (shortcut == "Ctrl+Shift+B")) {
+			  // Work around the fact that manifest.json "suggested_key" in "commands" cannot contain "Alt" before FF63
+			  // Indeed, default key for Linux is "Ctrl+Alt+B", but this fails on add-on load for FF < 63, so default
+			  // in manifest is set to "Ctrl+Shift+B" in Linux.
+			  // However, as it conflicts with FF reserved combinations later on, we modify it to "Ctrl+Alt+B" in such cases. 
+			  browser.commands.update(
+				{name: "_execute_sidebar_action",
+				 shortcut: (shortcut = "Ctrl+Alt+B")
+				}
+			  );
+			  trace("Linux => adjusted to: "+shortcut, true);
+			}
 		  }
-	    );
-	  }
-	}
-	else {
-	  if (!beforeFF60) {
-		browser.commands.update(
-		  {name: "_execute_sidebar_action",
-		   shortcut: options.sidebarCommand
-		  }
-		);
-	  }
-	}
+		}
+	  }	
+	)
 
 	// If we got savedBNList, rebuild it
 	if (savedBNList != undefined) {

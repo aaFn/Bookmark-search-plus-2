@@ -87,6 +87,9 @@
     <input type="checkbox" id="searchonenter">
     <label for="searchonenter">Wait for "Enter" in search box to launch search (no trigger on key typing inactivity timeout)</label>
     <br/>
+    <input type="checkbox" id="deactivatesearchlist">
+    <label for="deactivatesearchlist">Deactivate the suggestion drop down on search box</label>
+    <br/>
     <input type="checkbox" id="reversepath">
     <label for="reversepath">Reverse folder hierarchy in paths</label>
     <br/>
@@ -134,7 +137,7 @@
     <span> and background color to </span>
     <input type="color" id="bckgndcolor"><span id="bcstring"> (#FFFFFF)</span>
     <br/>
-    <label for="command1">&nbsp;&nbsp;&bull;&nbsp;&nbsp;Sidebar shortcut (FF >= 60):</label>
+    <label for="command1">&nbsp;&nbsp;&bull;&nbsp;&nbsp;Sidebar shortcut (FF >= 60 and < 66):</label>
 	<select id="command1">
       <option value="Ctrl">Ctrl</option>
       <option value="Alt">Alt</option>
@@ -195,6 +198,8 @@
 	</select>
 	<span>Reset to default: </span>
     <button type="button" id="resetcommand">Reset</button>
+    <br>
+    <span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;use the FF cogwheel menu above from FF66 to change add-on shortcut keys</span>
   </p>
   <p>
     <b>Bookmark handling:</b><br/>

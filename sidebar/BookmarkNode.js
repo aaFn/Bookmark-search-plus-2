@@ -58,7 +58,7 @@ var bsp2TrashFldrBNId, bsp2TrashFldrBN;
 //    A number representing the creation date of the node in milliseconds since the epoch.
 // protect Optional
 //    A boolean representing the protected (true) or not (false) state of the object on UI.
-//    Protected cannot be modified, dragged .. etc ..
+//    Protected items cannot be modified, dragged, undone, redone .. etc ..
 //    Defaults to false.
 // title Optional
 //    A string which contains the text displayed for the node in menus and lists of bookmarks.
@@ -591,7 +591,9 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 	  uri = "/icons/bsp2trash.png";
 	  protect = inBSP2Trash = true;
 	  fetchedUri = true;
-	  bsp2TrashFldrBNId = BTN_id;
+	  if (bsp2TrashFldrBNId == undefined) {
+		bsp2TrashFldrBNId = BTN_id;
+	  }
 	}
 	else {
 	  uri = "/icons/folder.png";
@@ -1142,7 +1144,7 @@ function scanBNTree (BN, faviconWorker, doStats = true) {
 							  // they are to be counted as bookmarks
 		if (doStats)
 		  countFolders++;
-		if (BN.title == BSP2TrashName) {
+		if ((bsp2TrashFldrBNId == undefined) && (BN.title == BSP2TrashName)) {
 		  bsp2TrashFldrBNId = bnId;
 		  bsp2TrashFldrBN = BN;
 		}

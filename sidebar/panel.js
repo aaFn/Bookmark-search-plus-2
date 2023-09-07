@@ -132,8 +132,15 @@ const MyRFldrMenuStyle = MyRFldrMenu.style;
 const MyRFldrMenuGoParent = document.querySelector("#myrfldrmenugoparent");
 const MyRFldrMenuCut = document.querySelector("#myrfldrmenucut");
 const MyRFldrMenuCopy = document.querySelector("#myrfldrmenucopy");
+const MyRFldrMenuDel = document.querySelector("#myrfldrmenudel");
 const MyRMultMenu = document.querySelector("#myrmultmenu");
 const MyRMultMenuStyle = MyRMultMenu.style;
+const MyRMultMenuOpenTab = document.querySelector("#myrmultmenuopentab");
+const MyRMultMenuOpenWin = document.querySelector("#myrmultmenuopenwin");
+const MyRMultMenuOpenPriv = document.querySelector("#myrmultmenuopenpriv");
+const MyRMultMenuCut = document.querySelector("#myrmultmenucut");
+const MyRMultMenuCopy = document.querySelector("#myrmultmenucopy");
+const MyRMultMenuDel = document.querySelector("#myrmultmenudel");
 const MyBBkmkMenu = document.querySelector("#mybbkmkmenu");
 const MyBBkmkMenuStyle = MyBBkmkMenu.style;
 const MyBBkmkMenuPaste = document.querySelector("#mybbkmkmenupaste");
@@ -155,6 +162,12 @@ const MyBSepMenuStyle = MyBSepMenu.style;
 const MyBSepMenuPaste = document.querySelector("#mybsepmenupaste");
 const MyBMultMenu = document.querySelector("#mybmultmenu");
 const MyBMultMenuStyle = MyBMultMenu.style;
+const MyBMultMenuOpenTab = document.querySelector("#mybmultmenuopentab");
+const MyBMultMenuOpenWin = document.querySelector("#mybmultmenuopenwin");
+const MyBMultMenuOpenPriv = document.querySelector("#mybmultmenuopenpriv");
+const MyBMultMenuCut = document.querySelector("#mybmultmenucut");
+const MyBMultMenuCopy = document.querySelector("#mybmultmenucopy");
+const MyBMultMenuDel = document.querySelector("#mybmultmenudel");
 const MyBProtMenu = document.querySelector("#mybprotmenu");
 const MyBProtMenuStyle = MyBProtMenu.style;
 const MyBProtFMenu = document.querySelector("#mybprotfmenu");
@@ -412,7 +425,8 @@ let openBookmarksInNewTabs_option = false; // Boolean
 let openSearchResultsInNewTabs_option = false; // Boolean
 // Declared in libstore.js
 //var savedFldrOpenList; // Used to receive the open state saved in storage - Will be deleted at end
-let curRowList = {}; // Current map between BN.id and row for each bookmark item
+let curRowList = {}; // Current map between HN index in history list and its row for display
+					 // Index is the entry number when normal node, or the string "entry+pos" for a node inside a multi record
 let curResultRowList = {}; // Current map between BTN.id and row for each result item
 let curBNList; // Current list of BookmarkNode - Saved in storage at each modification
 let rootBN; // Type is BookmarkNode. This is curBNList[0]
@@ -796,6 +810,55 @@ function addCellCursorSelection (cell, cursor, selection, is_click = true, is_ke
 }
 
 /*
+ * Verify if a selection contains one or more folders
+ * 
+ * selection = Object describing the selection to check
+ * 
+ * Returns true if yes, else false.
+ */
+function checkFolderInSelection (selection) {
+  let containsFolder = false;
+
+  let cells = selection.selectCells;
+  let len = cells.length;
+  let type;
+  for (let i=0 ; i<len ; i++) {
+	type = cells[i].parentElement.dataset.type;
+	if (type == "folder") {
+	  containsFolder = true;
+	  break;
+	}
+  }
+
+  return(containsFolder);
+}
+
+/*
+ * Verify if a selection contains one or more protected bookmark or folders
+ * 
+ * selection = Object describing the selection to check
+ * 
+ * Returns true if yes, else false.
+ */
+function checkProtectedInSelection (selection) {
+  let containsProtected = false;
+
+  let ids = selection.selectIds;
+  let len = ids.length;
+  let BN, is_protected;
+  for (let i=0 ; i<len ; i++) {
+	BN = curBNList[ids[i]];
+	is_protected = BN.protect;
+	if (is_protected) {
+	  containsProtected = true;
+	  break;
+	}
+  }
+
+  return(containsProtected);
+}
+
+/*
  * Call to refresh cut status of bookmark rows in a bookmark search, if there is one active
  * 
  * a_bnId = list of BookmarkNodes Ids on which to modify cut status
@@ -941,7 +1004,8 @@ function displayResults (a_BTN) {
 
   let len = a_BTN.length;
 //trace("Results: "+len);
-  if ((len <= 3) && (searchlistTimeoutId != undefined)) { // Close search history immediately when there are too few results
+  // Close search history immediately when there are too few results, as it is hiding them
+  if ((len <= 3) && (searchlistTimeoutId != undefined)) {
 	clearTimeout(searchlistTimeoutId);
 	closeSearchList();
   }
@@ -989,17 +1053,17 @@ function closeSearchList () {
 
 /*
  * Update search history list - Keep only last SearchListMax searches, ordered by most recent.
- * Merge entries to most specific ones to not keep a flurry of things liek e, ee, eee (so keep only eee).
+ * Merge entries to most specific ones to not keep a flurry of things like e, ee, eee (so keep only eee).
  */
 function updateSearchList (text) {
-  let options = SearchDatalist.options;
-  let len = options.length;
+  let searchOpt = SearchDatalist.options;
+  let len = searchOpt.length;
   // Find if text is already in history
   let i;
   let option;
   let value;
   for (i=0 ; i<len ; i++) {
-	if (text.includes(value = (option = options[i]).value)
+	if (text.includes(value = (option = searchOpt[i]).value)
 		|| value.includes(text))
 	  break;
   }
@@ -1010,10 +1074,10 @@ function updateSearchList (text) {
 	  SearchDatalist.prepend(option);
 	}
 	else { // Shift values down to make room at top
-	  option = options[SearchListMax-1];
+	  option = searchOpt[SearchListMax-1];
 	  let prev;
 	  for (i=SearchListMax-2 ; i>=0 ; i--) {
-		option.value = (prev = options[i]).value;
+		option.value = (prev = searchOpt[i]).value;
 		option = prev;
 	  }
 	  option.value = text;
@@ -1024,13 +1088,16 @@ function updateSearchList (text) {
 	  option.value = text;
 	}
   }
+  // Program the search list (suggestion dropdown) closure
   searchlistTimeoutId = setTimeout(closeSearchList, 3000);
 }
 
 /*
  * Execute / update a bookmark search and display result
+ * 
+ * is_updateSearchList = Boolean, if true, provoke an update of the search list of terms
  */
-function updateSearch () {
+function updateSearch (is_updateSearchList = false) {
   // Triggered by timeout (or Enter key), so now clear the id
   inputTimeout = null;
 
@@ -1045,8 +1112,10 @@ function updateSearch () {
 	if (sboxState != SBoxExecuted) {
 	  enableCancelSearch();
 	}
-	// Update search history list
-	updateSearchList(value);
+	// Update search history list if demanded, and if not disabled
+	if (!options.deactivateSearchList && is_updateSearchList) {
+	  updateSearchList(value);
+	}
 
 	// Discard previous results table if there is one
 	if (resultsTable != null) {
@@ -1156,8 +1225,10 @@ function updateSearch () {
 
 /*
  * Call to update a bookmark search and display result, if there is one active
+ * 
+ * is_updateSearchList = Boolean, if true, provoke an update of the search list of terms
  */
-function triggerUpdate () {
+function triggerUpdate (is_updateSearchList = false) {
   if (SearchTextInput.value.length > 0) { // Refresh only if a search is active
 	// Clear input timeout if there was one active, to replace it by new (maybe faster) one
 	// This allows to integrate together multiple events without intermediate displays,
@@ -1166,7 +1237,7 @@ function triggerUpdate () {
 	  clearTimeout(inputTimeout);
 	}
 	// Schedule a new one
-	inputTimeout = setTimeout(updateSearch, UpdateSearchDelay);
+	inputTimeout = setTimeout(updateSearch, UpdateSearchDelay, is_updateSearchList);
   }
 }
 
@@ -1226,7 +1297,7 @@ function manageSearchTextHandler () {
   if (value.length > 0) {
 	if (!options.searchOnEnter) { // Auto trigger search when no more key typed in
 	  // Set timeout before triggering / updating search mode
-	  inputTimeout = setTimeout(updateSearch, InputKeyDelay);
+	  inputTimeout = setTimeout(updateSearch, InputKeyDelay, true);
 	}
 	enableExecuteSearch();
   }
@@ -3256,39 +3327,6 @@ function clearMenu () {
  * 
  * e is of type MouseEvent (contextmenu)
  */
-/*
-const MyRShowBkmkMenu = document.querySelector("#myrshowbkmkmenu");
-const MyRShowBkmkMenuStyle = MyRShowBkmkMenu.style;
-const MyRFldrMenu = document.querySelector("#myrfldrmenu");
-const MyRFldrMenuStyle = MyRFldrMenu.style;
-const MyRFldrMenuGoParent = document.querySelector("#myrfldrmenugoparent");
-const MyRFldrMenuCut = document.querySelector("#myrfldrmenugoparent");
-const MyRFldrMenuCopy = document.querySelector("#myrfldrmenucut");
-const MyBBkmkMenu = document.querySelector("#myrfldrmenucopy");
-const MyBBkmkMenuStyle = MyBBkmkMenu.style;
-const MyBBkmkMenuPaste = document.querySelector("#mybbkmkmenupaste");
-const MyBBkmkMenuFavicon = document.querySelector("#mybbkmkmenufavicon");
-const MyBResBkmkMenu = document.querySelector("#mybresbkmkmenu");
-const MyBResBkmkMenuStyle = MyBResBkmkMenu.style;
-const MyBResBkmkMenuPaste = document.querySelector("#mybresbkmkmenupaste");
-const MyBResBkmkMenuFavicon = document.querySelector("#mybresbkmkmenufavicon");
-const MyBFldrMenu = document.querySelector("#mybfldrmenu");
-const MyBFldrMenuStyle = MyBFldrMenu.style;
-const MyBFldrMenuPaste = document.querySelector("#mybfldrmenupaste");
-const MyBFldrMenuPasteInto = document.querySelector("#mybfldrmenupasteinto");
-const MyBResFldrMenu = document.querySelector("#mybresfldrmenu");
-const MyBResFldrMenuStyle = MyBResFldrMenu.style;
-const MyBResFldrMenuPaste = document.querySelector("#mybresfldrmenupaste");
-const MyBResFldrMenuPasteInto = document.querySelector("#mybresfldrmenupasteinto");
-const MyBSepMenu = document.querySelector("#mybsepmenu");
-const MyBSepMenuStyle = MyBSepMenu.style;
-const MyBSepMenuPaste = document.querySelector("#mybsepmenupaste");
-const MyBProtMenu = document.querySelector("#mybprotmenu");
-const MyBProtMenuStyle = MyBProtMenu.style;
-const MyBProtFMenu = document.querySelector("#mybprotfmenu");
-const MyBProtFMenuStyle = MyBProtFMenu.style;
-const MyBProtFMenuPasteInto = document.querySelector("#mybprotfmenupasteinto");
-*/
 function resultsContextHandler (e) {
   let target = e.target; // Type depends ..
 //console.log("Result context event: "+e.type+" target: "+target+" class: "+target.classList);
@@ -3312,7 +3350,7 @@ function resultsContextHandler (e) {
 	else { // .brow
 	  row = (cell = target).parentElement;
 	  if (options.advancedClick)
-		isShowBkmkMenu = true;
+		isShowBkmkMenu = true; // When clicking outside the span, alway show the simple mode menu--
 	}
 
 /*
@@ -3332,6 +3370,38 @@ function resultsContextHandler (e) {
 //trace("Row: "+row+" rowIndex: "+rowIndex+" type: "+type);
 	if (beforeFF64) { // Use our built-in menus
 	  if (rselection.selectIds.length > 1) { // Menu for multiple selection
+		if (checkFolderInSelection(rselection)) {
+		  if (MyRMultMenuOpenTab.className == "menuopentab")
+			MyRMultMenuOpenTab.className = "menudisabled";
+		  if (MyRMultMenuOpenWin.className == "menuopenwin")
+			MyRMultMenuOpenWin.className = "menudisabled";
+		  if (MyRMultMenuOpenPriv.className == "menuopenpriv")
+			MyRMultMenuOpenPriv.className = "menudisabled";
+		}
+		else {
+		  if (MyRMultMenuOpenTab.className == "menudisabled")
+			MyRMultMenuOpenTab.className = "menuopentab";
+		  if (MyRMultMenuOpenWin.className == "menudisabled")
+			MyRMultMenuOpenWin.className = "menuopenwin";
+		  if (MyRMultMenuOpenPriv.className == "menudisabled")
+			MyRMultMenuOpenPriv.className = "menuopenpriv";
+		}
+		if (checkProtectedInSelection(rselection)) {
+		  if (MyRMultMenuCut.className == "menucut")
+			MyRMultMenuCut.className = "menudisabled";
+		  if (MyRMultMenuCopy.className == "menucopy")
+			MyRMultMenuCopy.className = "menudisabled";
+		  if (MyRMultMenuDel.className == "menudel")
+			MyRMultMenuDel.className = "menudisabled";
+		}
+		else {
+		  if (MyRMultMenuCut.className == "menudisabled")
+			MyRMultMenuCut.className = "menucut";
+		  if (MyRMultMenuCopy.className == "menudisabled")
+			MyRMultMenuCopy.className = "menucopy";
+		  if (MyRMultMenuDel.className == "menudisabled")
+			MyRMultMenuDel.className = "menudel";
+		}
 		myMenu_open = isResultMenu = myRMultMenu_open = true;
 		menu = MyRMultMenu;
 	  }
@@ -3358,6 +3428,8 @@ function resultsContextHandler (e) {
 			MyRFldrMenuCut.className = "menudisabled";
 		  if (MyRFldrMenuCopy.className == "menucopy")
 			MyRFldrMenuCopy.className = "menudisabled";
+		  if (MyRFldrMenuDel.className == "menudel")
+			MyRFldrMenuDel.className = "menudisabled";
 		}
 		else {
 		  if (MyRFldrMenuGoParent.className == "menudisabled")
@@ -3366,6 +3438,8 @@ function resultsContextHandler (e) {
 			MyRFldrMenuCut.className = "menucut";
 		  if (MyRFldrMenuCopy.className == "menudisabled")
 			MyRFldrMenuCopy.className = "menucopy";
+		  if (MyRFldrMenuDel.className == "menudisabled")
+			MyRFldrMenuDel.className = "menudel";
 		}
 	  }
 
@@ -3395,7 +3469,8 @@ function resultsContextHandler (e) {
 		}
 	  }
 
-	  updateBSP2ContextMenu(menu, false, (rselection.selectIds.length > 1));
+	  updateBSP2ContextMenu(menu, false, (rselection.selectIds.length > 1), checkFolderInSelection(rselection),
+							checkProtectedInSelection(rselection));
 	  myMenu_open = isResultMenu = true; // Remember that this instance opened the menu when processing the onClicked event
 	  browser.menus.overrideContext({
 		context: "bookmark",
@@ -3471,6 +3546,38 @@ function bkmkContextHandler (e) {
 //trace("Row: "+row+" rowIndex: "+rowIndex+" type: "+type);
 	if (beforeFF64) { // Use our built-in menus
 	  if (selection.selectIds.length > 1) { // Menu for multiple selection
+		if (checkFolderInSelection(selection)) {
+		  if (MyBMultMenuOpenTab.className == "menuopentab")
+			MyBMultMenuOpenTab.className = "menudisabled";
+		  if (MyBMultMenuOpenWin.className == "menuopenwin")
+			MyBMultMenuOpenWin.className = "menudisabled";
+		  if (MyBMultMenuOpenPriv.className == "menuopenpriv")
+			MyBMultMenuOpenPriv.className = "menudisabled";
+		}
+		else {
+		  if (MyBMultMenuOpenTab.className == "menudisabled")
+			MyBMultMenuOpenTab.className = "menuopentab";
+		  if (MyBMultMenuOpenWin.className == "menudisabled")
+			MyBMultMenuOpenWin.className = "menuopenwin";
+		  if (MyBMultMenuOpenPriv.className == "menudisabled")
+			MyBMultMenuOpenPriv.className = "menuopenpriv";
+		}
+		if (checkProtectedInSelection(selection)) {
+		  if (MyBMultMenuCut.className == "menucut")
+			MyBMultMenuCut.className = "menudisabled";
+		  if (MyBMultMenuCopy.className == "menucopy")
+			MyBMultMenuCopy.className = "menudisabled";
+		  if (MyBMultMenuDel.className == "menudel")
+			MyBMultMenuDel.className = "menudisabled";
+		}
+		else {
+		  if (MyBMultMenuCut.className == "menudisabled")
+			MyBMultMenuCut.className = "menucut";
+		  if (MyBMultMenuCopy.className == "menudisabled")
+			MyBMultMenuCopy.className = "menucopy";
+		  if (MyBMultMenuDel.className == "menudisabled")
+			MyBMultMenuDel.className = "menudel";
+		}
 		myMenu_open = myBMultMenu_open = true;
 		menu = MyBMultMenu;
 	  }
@@ -3492,10 +3599,12 @@ function bkmkContextHandler (e) {
 				MyBResBkmkMenuPaste.className = "menudisabled";
 			}
 			if (options.disableFavicons) {
-			  MyBResBkmkMenuFavicon.className = "menudisabled";
+			  if (MyBResBkmkMenuFavicon.className == "menurefreshfav")
+				MyBResBkmkMenuFavicon.className = "menudisabled";
 			}
 			else {
-			  MyBResBkmkMenuFavicon.className = "menurefreshfav";
+			  if (MyBResBkmkMenuFavicon.className == "menudisabled")
+				MyBResBkmkMenuFavicon.className = "menurefreshfav";
 			}
 			myMenu_open = myBResBkmkMenu_open = true;
 		  }
@@ -3510,10 +3619,12 @@ function bkmkContextHandler (e) {
 				MyBBkmkMenuPaste.className = "menudisabled";
 			}
 			if (options.disableFavicons) {
-			  MyBBkmkMenuFavicon.className = "menudisabled";
+			  if (MyBBkmkMenuFavicon.className == "menurefreshfav")
+				MyBBkmkMenuFavicon.className = "menudisabled";
 			}
 			else {
-			  MyBBkmkMenuFavicon.className = "menurefreshfav";
+			  if (MyBBkmkMenuFavicon.className == "menudisabled")
+				MyBBkmkMenuFavicon.className = "menurefreshfav";
 			}
 			myMenu_open = myBBkmkMenu_open = true;
 		  }
@@ -3649,7 +3760,8 @@ function bkmkContextHandler (e) {
 	  }
 
 	  if (menu != undefined) {
-		updateBSP2ContextMenu(menu, pasteEnabled, (selection.selectIds.length > 1), !options.disableFavicons, sortVisible);
+		updateBSP2ContextMenu(menu, pasteEnabled, (selection.selectIds.length > 1), checkFolderInSelection(selection),
+							  checkProtectedInSelection(selection), !options.disableFavicons, sortVisible);
 		myMenu_open = true; // Remember that this instance opened the menu when processing the onClicked event
 		// Open menu
 		browser.menus.overrideContext({
@@ -4953,156 +5065,6 @@ function createFolder (BTN) {
 }
 
 /*
- * Handle FF API call for bookmark creation
- * 
- * parentId = String identifying the folder inside which to insert
- * insertIndex = position in parent folder where to insert (undefined if append at end)
- * title = String, title of created bookmark
- * url = String, URL of created bookmark (undefined if folder)
- * type = String, "bookmark", "folder" or "separator"
- * is_openProperties = Boolean, if true, open a property window after creation to edit new bookmark item
- */
-function createBkmkItem (parentId, insertIndex, title, url, type, is_openProperties = false) {
-  let creating;
-  if (insertIndex == undefined) { // Create in a folder, at end
-	if (beforeFF57) {
-	  if (type == "separator") { // Cannot create separators in FF 56
-		creating = new Promise (
-		  (resolve, reject) => {
-			resolve(); // Send promise for anybody waiting ..
-		  }
-		);
-	  }
-	  else {
-		creating = browser.bookmarks.create(
-		  {parentId: parentId,
-		   title: title,
-		   url: url
-		  }
-		);
-	  }
-	}
-	else {
-	  creating = browser.bookmarks.create(
-		{parentId: parentId,
-		 title: title,
-		 type: type,
-		 url: url
-		}
-	  );
-	}
-  }
-  else { // Create before or after a bookmark item
-	if (beforeFF57) {
-	  if (type == "separator") { // Cannot create separators in FF 56
-		creating = new Promise (
-		  (resolve, reject) => {
-			resolve(); // Send promise for anybody waiting ..
-		  }
-		);
-	  }
-	  else {
-		creating = browser.bookmarks.create(
-		  {index: insertIndex,
-		   parentId: parentId,
-		   title: title,
-		   url: url
-		  }
-		);
-	  }
-	}
-	else {
-	  creating = browser.bookmarks.create(
-		{index: insertIndex,
-		 parentId: parentId,
-		 title: title,
-		 type: type,
-		 url: url
-		}
-	  );
-	}
-  }
-  if (is_openProperties) { // Open the Properties window
-	creating.then((type == "bookmark") ? createBookmark : createFolder);
-  }
-}
-
-/*
- * Handle FF API call for bookmark creation - async function
- * 
- * parentId = String identifying the folder inside which to insert
- * insertIndex = position in parent folder where to insert (undefined if append at end)
- * title = String, title of created bookmarkf
- * url = String, URL of created bookmark (undefined if folder)
- * type = String, "bookmark", "folder" or "separator"
- *
- * Returns created BTN
- */
-async function createBkmkItem_async (parentId, insertIndex, title, url, type) {
-  let creating;
-  if (insertIndex == undefined) { // Create in a folder, at end
-	if (beforeFF57) {
-	  if (type == "separator") { // Cannot create separators in FF 56
-		creating = new Promise (
-		  (resolve, reject) => {
-			resolve(); // Send promise for anybody waiting ..
-		  }
-		);
-	  }
-	  else {
-		creating = browser.bookmarks.create(
-		  {parentId: parentId,
-		   title: title,
-		   url: url
-		  }
-		);
-	  }
-	}
-	else {
-	  creating = browser.bookmarks.create(
-		{parentId: parentId,
-		 title: title,
-		 type: type,
-		 url: url
-		}
-	  );
-	}
-  }
-  else { // Create before or after a bookmark item
-	if (beforeFF57) {
-	  if (type == "separator") { // Cannot create separators in FF 56
-		creating = new Promise (
-		  (resolve, reject) => {
-			resolve(); // Send promise for anybody waiting ..
-		  }
-		);
-	  }
-	  else {
-		creating = browser.bookmarks.create(
-		  {index: insertIndex,
-		   parentId: parentId,
-		   title: title,
-		   url: url
-		  }
-		);
-	  }
-	}
-	else {
-	  creating = browser.bookmarks.create(
-		{index: insertIndex,
-		 parentId: parentId,
-		 title: title,
-		 type: type,
-		 url: url
-		}
-	  );
-	}
-  }
-  let newBTN = await creating; // Created BookmarkTreeNode
-  return(newBTN);
-}
-
-/*
  * Drag drop event handler
  * 
  * e = DragEvent
@@ -5175,6 +5137,7 @@ console.log("dt.types        : "+dt.types);
 	  //   dt.types        : text/x-moz-url,text/x-moz-url-data,text/x-moz-url-desc,text/uri-list,text/_moz_htmlcontext,text/_moz_htmlinfo,text/html,text/plain
 	  let types = dt.types;
 	  let type;
+	  let is_altKey = e.altKey;
 	  if (types.includes(type = "application/x-bookmark")	// Move or copy the dragged bookmark
 		  || types.includes(type = "text/x-moz-place")		// Dragging a native Bookmark to us, or an FF History entry
 		 ) {
@@ -5182,10 +5145,14 @@ console.log("dt.types        : "+dt.types);
 		  let tgtBN_id = (is_infolder ? BN_id : BN.parentId);
 		  let len = bkmkDrag.length;
 		  let j;
+		  let creating;
 		  for (let i=0 ; i<len ; i++) {
 			// Create new bookmark item and open properties if Alt key is pressed at same time than drop
 			j = bkmkDrag[i];
-			createBkmkItem(tgtBN_id, bnIndex, j.title, j.url, "bookmark", e.altKey);
+			creating = createBkmkItem(tgtBN_id, bnIndex, j.title, j.url, "bookmark");
+			if (is_altKey) { // Open the Properties window after creation to edit new bookmark item
+			  creating.then(createBookmark);
+			}
 		  }
 		}
 		else { // BSP2 bookmark or FF native sideba bookmark drag
@@ -5219,7 +5186,10 @@ console.log("dt.types        : "+dt.types);
 			  let title = droppedTab.title;
 			  let url = droppedTab.url;
 			  // Create new bookmark item and open properties if Alt key is pressed at same time than drop
-			  createBkmkItem(tgtBN_id, bnIndex, title, url, "bookmark", e.altKey);
+			  let creating = createBkmkItem(tgtBN_id, bnIndex, title, url, "bookmark");
+			  if (is_altKey) { // Open the Properties window after creation to edit new bookmark item
+				creating.then(createBookmark);
+			  }
 			}
 		  }
 		);
@@ -5302,6 +5272,7 @@ console.log("tabs length: "+len);
 		//       to the API, this is transforming to the last known index in folder at time of queueing (bug ?)
 		let len = files.length;
 //console.log("...... files.length = "+len);
+		let BTN;
 		for (let i=0 ; i<len ; i++) { // We will use await to guarantee order of creation
 		  file = files.item(i);
 		  if (file != null) {
@@ -5327,10 +5298,13 @@ console.log("tabs length: "+len);
 //console.log("...... URL address = "+url);
 				// Create new bookmark item and open properties if Alt key is pressed at same time than drop
 				if (bnIndex == undefined) {
-				  await createBkmkItem_async(tgtBN_id, undefined, title, url, "bookmark", e.altKey);
+				  BTN = await createBkmkItem_async(tgtBN_id, undefined, title, url, "bookmark");
 				}
 				else {
-				  await createBkmkItem_async(tgtBN_id, bnIndex++, title, url, "bookmark", e.altKey);
+				  BTN = await createBkmkItem_async(tgtBN_id, bnIndex++, title, url, "bookmark");
+				}
+				if (is_altKey) { // Open the Properties window after creation to edit new bookmark item
+				  createBookmark(BTN);
 				}
 			  }
 			}
@@ -5352,10 +5326,13 @@ console.log("tabs length: "+len);
 //console.log("...... URL address = "+url);
 				  // Create new bookmark item and open properties if Alt key is pressed at same time than drop
 				  if (bnIndex == undefined) {
-					await createBkmkItem_async(tgtBN_id, undefined, title, url, "bookmark", e.altKey);
+					BTN = await createBkmkItem_async(tgtBN_id, undefined, title, url, "bookmark");
 				  }
 				  else {
-					await createBkmkItem_async(tgtBN_id, bnIndex++, title, url, "bookmark", e.altKey);
+					BTN = await createBkmkItem_async(tgtBN_id, bnIndex++, title, url, "bookmark");
+				  }
+				  if (is_altKey) { // Open the Properties window after creation to edit new bookmark item
+					createBookmark(BTN);
 				  }
 				}
 			  }
@@ -5375,10 +5352,13 @@ console.log("tabs length: "+len);
 //console.log("...... URL address = "+url);
 				// Create new bookmark item and open properties if Alt key is pressed at same time than drop
 				if (bnIndex == undefined) {
-				  await createBkmkItem_async(tgtBN_id, undefined, title, url, "bookmark", e.altKey);
+				  BTN = await createBkmkItem_async(tgtBN_id, undefined, title, url, "bookmark");
 				}
 				else {
-				  await createBkmkItem_async(tgtBN_id, bnIndex++, title, url, "bookmark", e.altKey);
+				  BTN = await createBkmkItem_async(tgtBN_id, bnIndex++, title, url, "bookmark");
+				}
+				if (is_altKey) { // Open the Properties window after creation to edit new bookmark item
+				  createBookmark(BTN);
 				}
 			  }
 			}
@@ -5426,7 +5406,10 @@ console.log("tabs length: "+len);
 		  title = title.slice(splitIndex+1);
 		}
 		// Create new bookmark item and open properties if Alt key is pressed at same time than drop
-		createBkmkItem((is_infolder ? BN_id : BN.parentId), bnIndex, title, url, "bookmark", e.altKey);
+		let creating = createBkmkItem((is_infolder ? BN_id : BN.parentId), bnIndex, title, url, "bookmark");
+		if (is_altKey) { // Open the Properties window after creation to edit new bookmark item
+		  creating.then(createBookmark);
+		}
 	  }
 	  e.preventDefault(); // We accepted the drop
 	}
@@ -5440,42 +5423,6 @@ console.log("tabs length: "+len);
 }
 
 /*
- * Paste (create as copy) bookmark contents (recursively because can only create one by one) at the
- * designated place.
- * 
- * a_BN = array of BookmarkNodes to paste (copy)
- * parentId = String, Id of new parent to paste into
- * index = integer position in parent (undefined if at end)
- */
-async function pasteBkmk (a_BN, parentId, index = undefined) {
-//let t1 = (new Date ()).getTime();
-//trace(t1+" Paste BN: "+BN+" Parent: "+parentBN+" index: "+index+" recur: "+recurLevel);
-  let len = a_BN.length;
-  let BN;
-  for (let i=0 ; i<len ; i++) { // Go through list of BookmarkNodes
-	BN = a_BN[i];
-	if (!BN.protect) {
-	  let newBTN;
-	  // If index is undefined, we are pasting into a folder => at end
-	  if (index == undefined) {
-		// Create BTN at end of parent folder
-		newBTN = await createBkmkItem_async(parentId, undefined, BN.title, BN.url, BN.type);
-	  }
-	  else {
-		newBTN = await createBkmkItem_async(parentId, index++, BN.title, BN.url, BN.type);
-	  }
-//let t2 = (new Date ()).getTime();
-//trace(t2+" Paste node creation delay: "+(t2.getTime() - t1.getTime()));
-	  let children = BN.children;
-	  if ((children != undefined) && (children.length > 0)) { // There are children to copy ...
-		// Recursively call pasteBkmk on children
-		await pasteBkmk(children, newBTN.id);
-	  }
-	}
-  }
-}
-
-/*
  * Copy bookmark contents at the designated place.
  * 
  * a_id = array of Strings (bookmark ids)
@@ -5484,20 +5431,25 @@ async function pasteBkmk (a_BN, parentId, index = undefined) {
  * index = integer position in parent (undefined if at end)
  */
 async function copyBkmk (a_id, a_BN, parentId, index = undefined) {
-  // Create a copy of the source list of BookmarNodes to paste, in case we are copying inside source,
-  // to avoid an infinite loop because of the source list being itself modified by the paste 
-  // Fecord a multiple operation if more than one item in the array
-  //   note: "create" is unused today, because we cannot create a folder with all its children (recursive) in one go
-  //         and so a_id does not list all ids of bookmarks to create as copies
-  //         Also, we do not know in advance the id of a bookmark to create, and cannot pass the id of the copied one
-  //         in a created bookmark, for relating to the is_multi record.
-/*
-  let len = a_id.length;
-  if (len > 1) {
-	await recordHistoryMulti("create", a_id);
+  if (backgroundPage == undefined) {
+	try {
+	  let message = await browser.runtime.sendMessage(
+			{source: "sidebar:"+myWindowId,
+			 content: "copyBkmk",
+			 a_id: a_id, // Only send a_HN, a_µBN will be rebuilt on the background side
+			 parentId: parentId,
+			 index: index
+			}
+		  );
+	  handleMsgResponse(message);
+	}
+	catch (error) {
+	  handleMsgError(error);
+	}
   }
-*/
-  await pasteBkmk(uniqueListCopy(a_BN), parentId, index); // Recursive call on folders
+  else {
+	await backgroundPage.copyBkmk(a_id, a_BN, parentId, index);
+  }
 }
 
 /*
@@ -5512,51 +5464,31 @@ async function copyBkmk (a_id, a_BN, parentId, index = undefined) {
  */
 async function moveBkmk (a_id, a_BN, newParentId, newIndex = undefined) {
   let len = a_BN.length;
-  // Fecord a multiple operation if more than one item in the array
+  // Record a multiple operation if more than one item is in the array
   if (len > 1) {
-	await recordHistoryMulti("move", a_id);
+	let newParentBN = curBNList[newParentId];
+	// Note if going to trash
+	let is_removetotrash = (newParentBN.inBSP2Trash == true);
+	// If trash is enabled, check if all moved items are from trash
+	let is_createFromTrash = options.trashEnabled;
+	let i = len - 1;
+	while (is_createFromTrash && (i >= 0)) {
+	  if (a_BN[i--].inBSP2Trash != true) {
+		is_createFromTrash = false;
+	  }
+	}
+	await recordHistoryMulti(((is_removetotrash && !is_createFromTrash)
+							  ? HNACTION_BKMKREMOVETOTRASH							// Moving to trash, even from trash
+							  : ((is_createFromTrash && !is_removetotrash)
+								 ? HNACTION_BKMKCREATEFROMTRASH
+								 : HNACTION_BKMKMOVE				// Moving outside of trash, from trash or from outside
+								)
+							 ),
+							 a_id, newParentId, newIndex
+							);
   }
 
-  if (newIndex == undefined) { // Cut and pasting into a folder, at end
-	let BN;
-	for (let i=0 ; i<len ; i++) {
-	  BN = a_BN[i];
-//trace("Move BN id: "+BN.id+" to Parent id: "+newParentId+" at index: "+newIndex);
-	  // Move BTN at end of folder. Do that synchronously to avoid mess when processing multiple BNs
-	  if (!BN.protect) {
-		await browser.bookmarks.move(
-		  BN.id,
-		  {parentId: newParentId
-		  }
-		);
-	  }
-	}
-  }
-  else {
-	let BN;
-	for (let i=0 ; i<len ; i++) {
-	  BN = a_BN[i];
-      // If designated place is under same parent and after, some special handling ..
-	  if (BN.parentId == newParentId) {
-		// If moved after, need to decrease index by 1 to represent position without moved item ..
-		// This is not documented properly on https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/bookmarks/move
-		let index = BN_getIndex(BN);
-		if (newIndex > index)   newIndex--;
-		if (newIndex == index) { // No move
-		  continue;
-		}
-	  }
-	  // Move BTN at designated place. Do that synchronously to avoid mess when processing multiple BNs
-	  if (!BN.protect) {
-		await browser.bookmarks.move(
-		  BN.id,
-		  {parentId: newParentId,
-		   index: newIndex++
-		  }
-		);
-	  }
-	}
-  }
+  await util_moveBkmk(a_BN, newParentId, newIndex);
 }
 
 /*
@@ -5567,28 +5499,26 @@ async function moveBkmk (a_id, a_BN, newParentId, newIndex = undefined) {
  */
 async function delBkmk (a_id, a_BN) {
   let len = a_BN.length;
-  // Fecord a multiple operation if more than one item in the array
+  // Record a multiple operation if more than one item is in the array
+  let is_trashEnabled = options.trashEnabled;
   if (len > 1) {
-	await recordHistoryMulti((options.trashEnabled ? "remove_tt" : "remove"), a_id);
+	// If trash is enabled, check if all removed items are from trash
+	let is_fullRemove = is_trashEnabled;
+	let i = len - 1;
+	while (is_fullRemove && (i >= 0)) {
+	  if (a_BN[i--].inBSP2Trash != true) {
+		is_fullRemove = false;
+	  }
+	}
+	if (is_trashEnabled && !is_fullRemove) {
+	  await recordHistoryMulti(HNACTION_BKMKREMOVETOTRASH, a_id, bsp2TrashFldrBNId); // Moving to trash
+	}
+	else {
+	  await recordHistoryMulti(HNACTION_BKMKREMOVE, a_id); // Full remove
+	}
   }
 
-  let BN;
-  for (let i=0 ; i<len ; i++) {
-	BN = a_BN[i];
-//trace("Remove BN id: "+BN.id);
-	// If BSP2 trash enabled, move the bookmark item to trash instead (except when already in trash, where we really delete it)
-	let bnId = BN.id;
-	if (options.trashEnabled && !BN.inBSP2Trash) { // Move at end of trash
-	  await browser.bookmarks.move(
-		bnId,
-		{parentId: bsp2TrashFldrBNId
-		}
-	  );
-	}
-	else { // Really delete the bookmark item
-	  await browser.bookmarks.removeTree(bnId);
-	}
-  }
+  await util_delBkmk(a_BN, is_trashEnabled);
 }
 
 /*
@@ -5674,7 +5604,7 @@ function keyHandler (e) {
   else if (target.id == "searchtext") {
 	if (key == "Enter") { // Enter in search input box should execute new search or go to first search result if any
 	  if (sboxState == SBoxChanging) { // If new content in search box, execute search in parallel
-		triggerUpdate();
+		triggerUpdate(true);
 	  }
 	  else if (resultsTable != undefined) {
 		// Get to first row if there is one
@@ -5966,7 +5896,7 @@ function keyHandler (e) {
 		keyProcessed = true;
 	  }
 	}
-	else if (!isResultRow && (key == "Delete")) {
+	else if (key == "Delete") {
 	  if (!myMenu_open
 		  && (row.dataset.protect != "true") // Non protected row
 		 ) {
@@ -5982,13 +5912,14 @@ function keyHandler (e) {
 		}
 
 		// Delete bookmark item(s) in selection, and highlight / select new row
-		menuDelBkmkItem(selection);
-		// Set cursor and selection in main panel
+		let sel = isResultRow ? rselection : selection;
+		menuDelBkmkItem(sel);
+		// Set cursor and selection
 		if (nextRow != null) { // We got one
 		  let cell = nextRow.firstElementChild;
-		  // Set cursor and selection in main panel
+		  // Set cursor and selection
 //		  setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
-		  addCellCursorSelection(cell, cursor, selection);
+		  addCellCursorSelection(cell, cursor, sel);
 		  cell.focus();
 		}
 		keyProcessed = true;
@@ -6044,23 +5975,13 @@ function keyHandler (e) {
 	}
 	else if ((key.toLowerCase() == "c") && is_ctrlKey) { // Copy
 	  if (!myMenu_open) {
-		if (isResultRow) { // A results table menu
-		  menuCopyBkmkItem(rselection);
-		}
-		else {
-		  menuCopyBkmkItem(selection);
-		}
+		menuCopyBkmkItem(isResultRow ? rselection : selection);
 		keyProcessed = true;
 	  }
 	}
 	else if ((key.toLowerCase() == "x") && is_ctrlKey) { // Cut
 	  if (!myMenu_open) {
-		if (isResultRow) { // A results table menu
-		  menuCutBkmkItem(rselection);
-		}
-		else {
-		  menuCutBkmkItem(selection);
-		}
+		menuCutBkmkItem(isResultRow ? rselection : selection);
 		keyProcessed = true;
 	  }
 	}
@@ -6074,6 +5995,18 @@ function keyHandler (e) {
 		  let type = row.dataset.type;
 		  menuPasteBkmkItem(BN_id, (type == "folder")); // If folder, paste into it
 		}
+		keyProcessed = true;
+	  }
+	}
+	else if ((key.toLowerCase() == "z") && is_ctrlKey) { // Undo
+	  if (!myMenu_open) {
+		triggerUndo();
+		keyProcessed = true;
+	  }
+	}
+	else if ((key.toLowerCase() == "y") && is_ctrlKey) { // Redo
+	  if (!myMenu_open) {
+		triggerRedo();
 		keyProcessed = true;
 	  }
 	}
@@ -6158,7 +6091,7 @@ console.log("span: "+span);
 	  keyProcessed = true;
 	}
 */
-	if (keyProcessed) { // We used up the key, don't pass it for further processing
+	if (keyProcessed) { // We used up the key, don't pass it to FF for further processing
 	  e.preventDefault();
 	}
   }
@@ -6185,44 +6118,73 @@ function menuShow (resultBN_id) {
 /*
  * Handle open action on context menu
  * 
- * row = HTMLTableRowElement in the bookmarks or results pane on which the context menu was open
+ * selection = selection Object
  * mode = integer, described by constants below
  */
 const INTAB = 0;
 const NEWTAB = 1;
 const NEWWIN = 2;
 const NEWPRIVWIN = 3;
-function menuOpen (row, mode) {
-  // Get anchor href
-  let href = row.firstElementChild.firstElementChild.href;
-  if ((href != undefined) && (href.length > 0)) {
-	switch (mode) {
-	  case INTAB:
-		browser.tabs.update({url: href});
-		break;
-	  case NEWTAB:
-		if (beforeFF57)
-		  browser.tabs.create({url: href});
-		else {
-		  // Get current active tab as opener id to come back to it when closing the new tab
-		  browser.tabs.query({windowId: myWindowId, active: true})
-		  .then (
-			function (a_tabs) {
-			  browser.tabs.create({url: href, openerTabId: a_tabs[0].id});
-			}
-		  );
+async function menuOpen (selection, mode) {
+  // Get the list of selected cells, and go through it
+  let cells = selection.selectCells;
+  let len = cells.length;
+  let href, a_url, l;
+  switch (mode) {
+	case INTAB:
+	  for (let i=0 ; i<len ; i++) {
+		// Get anchor href
+		href = cells[i].firstElementChild.href;
+		if ((href != undefined) && (href.length > 0)) {
+		  browser.tabs.update({url: href});
 		}
-		break;
-	  case NEWWIN:
-		// The second method disables any sidebar as it seems ... so can't use it
-		browser.windows.create({url: href});
-//		  window.open(href, "_blank", "menubar,toolbar,location,scrollbars");
-		break;
-	  case NEWPRIVWIN:
-		// The second method disables any sidebar as it seems ... so can't use it
-		browser.windows.create({url: href, incognito: true});
-		break;
-	}
+	  }
+	  break;
+	case NEWTAB:
+	  let openerTabId;
+	  if (!beforeFF57) {
+		// Get current active tab as opener id to come back to it when closing the new tab
+		let a_tabs = await browser.tabs.query({windowId: myWindowId, active: true});
+		openerTabId = a_tabs[0].id;
+	  }
+	  for (let i=0 ; i<len ; i++) {
+		// Get anchor href
+		href = cells[i].firstElementChild.href;
+		if ((href != undefined) && (href.length > 0)) {
+		  if (beforeFF57)
+			browser.tabs.create({url: href});
+		  else
+			browser.tabs.create({url: href, openerTabId: openerTabId});
+		}
+	  }
+	  break;
+	case NEWWIN:
+	  a_url = [];
+	  for (let i=0 ; i<len ; i++) {
+		// Get anchor href
+		href = cells[i].firstElementChild.href;
+		if ((href != undefined) && (href.length > 0)) {
+		  l = a_url.push(href);
+		}
+	  }
+	  // The second method disables any sidebar as it seems ... so can't use it
+	  if (l != undefined)
+		browser.windows.create({url: a_url});
+//	  window.open(href, "_blank", "menubar,toolbar,location,scrollbars");
+	  break;
+	case NEWPRIVWIN:
+	  a_url = [];
+	  for (let i=0 ; i<len ; i++) {
+		// Get anchor href
+		href = cells[i].firstElementChild.href;
+		if ((href != undefined) && (href.length > 0)) {
+		  l = a_url.push(href);
+		}
+	  }
+	  // The second method disables any sidebar as it seems ... so can't use it
+	  if (l != undefined)
+		browser.windows.create({url: a_url, incognito: true});
+	  break;
   }
 }
 
@@ -6301,29 +6263,36 @@ function menuNewBkmkItem (tgtBN_id, bkmkType, is_openProp = true) {
 	console.log(msg);
   }
   else {
+	let creating;
 	switch (bkmkType) {
 	  case NEWB:
 		if (tgtBN_type == "folder") {
-		  createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), "New bookmark", "about:blank", "bookmark", is_openProp);
+		  creating = createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), "New bookmark", "about:blank", "bookmark");
 		}
 		else {
-		  createBkmkItem(tgtBN.parentId, BN_getIndex(tgtBN), "New bookmark", "about:blank", "bookmark", is_openProp);
+		  creating = createBkmkItem(tgtBN.parentId, BN_getIndex(tgtBN), "New bookmark", "about:blank", "bookmark");
+		}
+		if (is_openProp) { // Open the Properties window after creation to edit new bookmark item
+		  creating.then(createBookmark);
 		}
 		break;
 	  case NEWF:
 		if (tgtBN_type == "folder") {
-		  createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), "New folder", undefined, "folder", is_openProp);
+		  creating = createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), "New folder", undefined, "folder");
 		}
 		else {
-		  createBkmkItem(tgtBN.parentId, BN_getIndex(tgtBN), "New folder", undefined, "folder", is_openProp);
+		  creating = createBkmkItem(tgtBN.parentId, BN_getIndex(tgtBN), "New folder", undefined, "folder");
+		}
+		if (is_openProp) { // Open the Properties window after creation to edit new bookmark item
+		  creating.then(createFolder);
 		}
 		break;
 	  case NEWS:
 		if (tgtBN_type == "folder") {
-		  createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), undefined, undefined, "separator", false);
+		  createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), undefined, undefined, "separator");
 		}
 		else {
-		  createBkmkItem(tgtBN.parentId, BN_getIndex(tgtBN), undefined, undefined, "separator", false);
+		  createBkmkItem(tgtBN.parentId, BN_getIndex(tgtBN), undefined, undefined, "separator");
 		}
 		break;
 	  case NEWBCURTAB:
@@ -6333,10 +6302,13 @@ function menuNewBkmkItem (tgtBN_id, bkmkType, is_openProp = true) {
 			let tab = a_tabs[0];
 //console.log(tab.title+" - "+tab.url);
 			if (tgtBN_type == "folder") {
-			  createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), tab.title, tab.url, "bookmark", is_openProp);
+			  creating = createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), tab.title, tab.url, "bookmark");
 			}
 			else {
-			  createBkmkItem(tgtBN.parentId, BN_getIndex(tgtBN), tab.title, tab.url, "bookmark", is_openProp);
+			  creating = createBkmkItem(tgtBN.parentId, BN_getIndex(tgtBN), tab.title, tab.url, "bookmark");
+			}
+			if (is_openProp) { // Open the Properties window after creation to edit new bookmark item
+			  creating.then(createBookmark);
 			}
 		  }
 		);
@@ -6603,22 +6575,22 @@ function clickHandler (e) {
 	else if (classList.contains("menuopen")) { // Open bookmark in active tab
 	  menuAction = true;
 	  // Retrieve parent context menu, the rowIndex and row on which it is
-	  menuOpen(getMenuRow(target), INTAB);
+	  menuOpen(isResultMenu ? rselection : selection, INTAB);
 	}
 	else if (classList.contains("menuopentab")) { // Open bookmark in a new tab
 	  menuAction = true;
 	  // Retrieve parent context menu, the rowIndex and row on which it is
-	  menuOpen(getMenuRow(target), NEWTAB);
+	  menuOpen(isResultMenu ? rselection : selection, NEWTAB);
 	}
 	else if (classList.contains("menuopenwin")) { // Open bookmark in a new Window
 	  menuAction = true;
 	  // Retrieve parent context menu, the rowIndex and row on which it is
-	  menuOpen(getMenuRow(target), NEWWIN);
+	  menuOpen(isResultMenu ? rselection : selection, NEWWIN);
 	}
 	else if (classList.contains("menuopenpriv")) { // Open bookmark in a new private Window
 	  menuAction = true;
 	  // Retrieve parent context menu, the rowIndex and row on which it is
-	  menuOpen(getMenuRow(target), NEWPRIVWIN);
+	  menuOpen(isResultMenu ? rselection : selection, NEWPRIVWIN);
 	}
 	else if (classList.contains("menuopenall")) { // Open all bookmark of a folder in new tabs
 	  menuAction = true;
@@ -6669,22 +6641,12 @@ function clickHandler (e) {
 	else if (classList.contains("menucut")) { // Cut a bookmark item into bkmkClipboard
 	  // Retrieve parent context menu, the rowIndex and row on which it is
 	  menuAction = true;
-	  if (isResultMenu) { // A results table menu
-		menuCutBkmkItem(rselection);
-	  }
-	  else {
-		menuCutBkmkItem(selection);
-	  }
+	  menuCutBkmkItem(isResultMenu ? rselection : selection);
 	}
 	else if (classList.contains("menucopy")) { // Copy a bookmark item into bkmkClipboard
 	  // Retrieve parent context menu, and the rowIndex on which it is
 	  menuAction = true;
-	  if (isResultMenu) { // A results table menu
-		menuCopyBkmkItem(rselection);
-	  }
-	  else {
-		menuCopyBkmkItem(selection);
-	  }
+	  menuCopyBkmkItem(isResultMenu ? rselection : selection);
 	}
 	else if (classList.contains("menupaste")) { // Paste bkmkClipboard contents before the row
 	  											// Clear bkmkClipboard after that, as we want
@@ -6708,7 +6670,7 @@ function clickHandler (e) {
 	  // Can only happen on bookmarks table row, retrieve the rowIndex from the menu
 	  menuAction = true;
 	  // Delete selected bookmark item(s)
-	  menuDelBkmkItem(selection);
+	  menuDelBkmkItem(isResultMenu ? rselection : selection);
 	}
 	else if (classList.contains("menusort")) { // Sort folder contents by name
 	  // Can only be on a folder and a bookmarks table row
@@ -6837,19 +6799,19 @@ function onClickedContextMenuHandler (info, tab) {
 		break;
 	  case "bsp2open":
 		// Open in tab
-		menuOpen(curRowList[bnId], INTAB);
+		menuOpen(isResultMenu ? rselection : selection, INTAB);
 		break;
 	  case "bsp2opentab":
 		// Open in new tab
-		menuOpen(curRowList[bnId], NEWTAB);
+		menuOpen(isResultMenu ? rselection : selection, NEWTAB);
 		break;
 	  case "bsp2openwin":
 		// Open in new window
-		menuOpen(curRowList[bnId], NEWWIN);
+		menuOpen(isResultMenu ? rselection : selection, NEWWIN);
 		break;
 	  case "bsp2openpriv":
 		// Open in private window
-		menuOpen(curRowList[bnId], NEWPRIVWIN);
+		menuOpen(isResultMenu ? rselection : selection, NEWPRIVWIN);
 		break;
 	  case "bsp2openall":
 		// Open all bookmarks in folder
@@ -6882,21 +6844,11 @@ function onClickedContextMenuHandler (info, tab) {
 		break;
 	  case "bsp2cut":
 		// Cut selection to clipboard
-		if (isResultMenu) { // A results table menu
-		  menuCutBkmkItem(rselection);
-		}
-		else {
-		  menuCutBkmkItem(selection);
-		}
+		menuCutBkmkItem(isResultMenu ? rselection : selection);
 		break;
 	  case "bsp2copy":
 		// Copy selection to clipboard
-		if (isResultMenu) { // A results table menu
-		  menuCopyBkmkItem(rselection);
-		}
-		else {
-		  menuCopyBkmkItem(selection);
-		}
+		menuCopyBkmkItem(isResultMenu ? rselection : selection);
 		break;
 	  case "bsp2paste":
 		// Paste clipboard before current bookmark
@@ -6908,7 +6860,7 @@ function onClickedContextMenuHandler (info, tab) {
 		break;
 	  case "bsp2del":
 		// Delete selected bookmark item(s)
-		menuDelBkmkItem(selection);
+		menuDelBkmkItem(isResultMenu ? rselection : selection);
 		break;
 	  case "bsp2sort":
 		// Sort folder content
@@ -7036,9 +6988,9 @@ function handleMsgResponse (message) {
   // Is always called, even if destination didn't specifically reply (then message is undefined)
   if (message != undefined) {
 	let msg = message.content;
-if (options.traceEnabled) {
-  console.log("Background sent a response: <<"+msg+">> received in sidebar:"+myWindowId);
-}
+	if (options.traceEnabled) {
+	  console.log("Sidebar "+myWindowId+" received a response: <<"+msg+">>");
+	}
 	if (msg == "savedCurBnId") { // Restore last saved cursor position
 	  goBkmkItem(message.bnId);
 	}
@@ -7129,22 +7081,56 @@ function sendAddonMsgGetFavicon (a_msg) {
 }
 
 /*
- * Send a multi operation record in history to Background (when we are a private window)
+ * Record a multi operation in history (going through Background messaging when we are a private window)
+ * Waits for the response (or error) before returning.
  * 
- * op = String, nature of the operation ("create", "move", "remove" or "remove_tt")
- *   note: "create" is unused today, because we cannot create a folder with all its children (recursive) in one go
- *         Also, we do not know in advance the id of a bookmark to create, and cannot pass the id of the copied one
- *         in a created bookmark, for relating to the is_multi record.
- * id_list = Array of String identifying the bookmark Ids subject to the multiple action
+ * op = String, nature of the operation ("create", "create_ft", "move", "remove" or "remove_tt")
+ *   note: multi "create" is in fact a copy of a list of bookmarks with ids which will be known later.
+ * 
+ * id_list = Array of String identifying the bookmark Ids subject to the multiple action, undefined in the case
+ *           of a multi create
+ * newParentId = String, Id of new parent to move into, not meaningful in case of "remove"
+ * newIndex = integer position in parent (undefined if at end), not meaningful in case of "remove"
+ * 
+ * Returns the id of the newly created HistoryNode 
  */
-async function recordHistoryMulti (op, id_list) {
+async function recordHistoryMulti (op, id_list, newParentId = undefined, newIndex = undefined) {
+  let hnId;
   if (backgroundPage == undefined) {
 	try {
 	  let message = await browser.runtime.sendMessage(
 			{source: "sidebar:"+myWindowId,
 			 content: "recordHistoryMulti",
 			 operation: op,
-			 id_list: id_list
+			 id_list: id_list,
+			 newParentId: newParentId,
+			 newIndex: newIndex
+			}
+		  );
+	  hnId = message.hnId;
+	  handleMsgResponse(message);
+	}
+	catch (error) {
+	  handleMsgError(error);
+	}
+  }
+  else {
+	let hn = backgroundPage.recordHistoryMulti(op, id_list, newParentId, newIndex);
+	hnId = hn.id;
+  }
+
+  return(hnId);
+}
+
+/*
+ * Trigger an undo operation if possible
+ */
+async function triggerUndo () {
+  if (backgroundPage == undefined) {
+	try {
+	  let message = await browser.runtime.sendMessage(
+			{source: "sidebar:"+myWindowId,
+			 content: "triggerUndo"
 			}
 		  );
 	  handleMsgResponse(message);
@@ -7154,7 +7140,29 @@ async function recordHistoryMulti (op, id_list) {
 	}
   }
   else {
-	backgroundPage.recordHistoryMulti(op, id_list);
+	backgroundPage.triggerUndo();
+  }
+}
+
+/*
+ * Trigger a redo operation if possible
+ */
+async function triggerRedo () {
+  if (backgroundPage == undefined) {
+	try {
+	  let message = await browser.runtime.sendMessage(
+			{source: "sidebar:"+myWindowId,
+			 content: "triggerRedo"
+			}
+		  );
+	  handleMsgResponse(message);
+	}
+	catch (error) {
+	  handleMsgError(error);
+	}
+  }
+  else {
+	backgroundPage.triggerRedo();
   }
 }
 
@@ -7170,21 +7178,21 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  // When coming from sidebar:
 	  //   sender.url: moz-extension://28a2a188-53d6-4f91-8974-07cd0d612f9e/sidebar/panel.html
 	  let msg = request.content;
-if (options.traceEnabled) {
-  console.log("Got message <<"+msg+">> from "+request.source+" in "+myWindowId);
-  console.log("  sender.tab: "+sender.tab);
-  console.log("  sender.frameId: "+sender.frameId);
-  console.log("  sender.id: "+sender.id);
-  console.log("  sender.url: "+sender.url);
-  console.log("  sender.tlsChannelId: "+sender.tlsChannelId);
-}
+	  if (options.traceEnabled) {
+		console.log("Got message <<"+msg+">> from "+request.source+" in Sidebar "+myWindowId);
+		console.log("  sender.tab: "+sender.tab);
+		console.log("  sender.frameId: "+sender.frameId);
+		console.log("  sender.id: "+sender.id);
+		console.log("  sender.url: "+sender.url);
+		console.log("  sender.tlsChannelId: "+sender.tlsChannelId);
+	  }
 
 	  if (msg == "Ready") { // Background initialization is ready
 		backgroundReady = true; // Signal background ready for private windows for asking curBNList
 		if (waitingInitBckgnd) { // We were waiting for it to continue
-if (options.traceEnabled) {
-  console.log("Background is Ready 2");
-}
+		  if (options.traceEnabled) {
+			console.log("Background is Ready 2");
+		  }
 		  f_initializeNext();
 		}
 	  }
@@ -8470,28 +8478,45 @@ function initialize () {
 		let windowInfo = a_values[0];
 		myWindowId = windowInfo.id;
 
-		// Process read values from Store (they are already in Global variables from libstore.js)
-		endLoadTime = (new Date ()).getTime();
-		trace("Load local store duration (full): "+(loadDuration = (endLoadTime - startTime))+" ms", true);
-		TracePlace.hidden = !options.traceEnabled;
-
-		if (backgroundReady) {
-if (options.traceEnabled) {
-  console.log("Background is Ready 2");
-}
-		  initializePriv();
-		  WaitMsg.textContent = "Load from background..";
+		// It appears that the sidebar is running even in popup windows where it is not visible !!
+		// So even in the Property popup and in the History popup ..
+		// If we are in something else than a "normal" window, let's not continue, but close ourselves instead
+		let winType = windowInfo.type;
+		if (winType != "normal") {
+		  // Well, we cannot close ourselves here, because "close()" can only be called in a user action context
+		  // So let "die" smoothly then ..
+//		  browser.sidebarAction.close()
+//		  .then(function () {console.log("closed")})
+//		  .catch(function (err) {console.log("Error name: "+err.name+" Error message: "+err.message);})
+//		  ;
+console.log("Terminating BSP2 sidebar execution in private window "+myWindowId+' windowInfo.type='+winType);
 		}
 		else {
-if (options.traceEnabled) {
-  console.log("Waiting on Background 2");
-}
-		  f_initializeNext = initializePriv;
-		  waitingInitBckgnd = true;
-		  WaitMsg.textContent = "Wait background load..";
-		  // In case Background is already ready, but we missed the signalling message because
-		  // we started after it was sent, provoke its resend ..
-		  sendAddonMessage("getBackground");
+console.log("sidebar is open in private window "+myWindowId+' windowInfo.type='+winType);
+
+		  // Process read values from Store (they are already in Global variables from libstore.js)
+		  endLoadTime = (new Date ()).getTime();
+		  trace("Load local store duration (full): "+(loadDuration = (endLoadTime - startTime))+" ms", true);
+		  TracePlace.hidden = !options.traceEnabled;
+
+		  if (backgroundReady) {
+			if (options.traceEnabled) {
+			  console.log("Background is Ready 2");
+			}
+			initializePriv();
+			WaitMsg.textContent = "Load from background..";
+		  }
+		  else {
+			if (options.traceEnabled) {
+			  console.log("Waiting on Background 2");
+			}
+			f_initializeNext = initializePriv;
+			waitingInitBckgnd = true;
+			WaitMsg.textContent = "Wait background load..";
+			// In case Background is already ready, but we missed the signalling message because
+		 	// we started after it was sent, provoke its resend ..
+			sendAddonMessage("getBackground");
+		  }
 		}
 	  }
 	)
@@ -8513,23 +8538,40 @@ if (options.traceEnabled) {
 		let windowInfo = a_values[0];
 		myWindowId = windowInfo.id;
 
-		// Process read values from Store (they are already in Global variables from libstore.js)
-		endLoadTime = (new Date ()).getTime();
-		trace("Load local store duration (folders only): "+(loadDuration = (endLoadTime - startTime))+" ms", true);
+		// It appears that the sidebar is running even in popup windows where it is not visible !!
+		// So even in the Property popup and in the History popup ..
+		// If we are in something else than a "normal" window, let's not continue, but close ourselves instead
+		let winType = windowInfo.type;
+		if (winType != "normal") {
+		  // Well, we cannot close ourselves here, because "close()" can only be called in a user action context
+		  // So let "die" smoothly then ..
+//		  browser.sidebarAction.close()
+//		  .then(function () {console.log("closed")})
+//		  .catch(function (err) {console.log("Error name: "+err.name+" Error message: "+err.message);})
+//		  ;
+//console.log("Terminating BSP2 sidebar execution in window "+myWindowId+' windowInfo.type='+winType);
+		}
+		else {
+//console.log("sidebar is open in window "+myWindowId+' windowInfo.type='+winType);
 
-		if (backgroundPage.ready) {
+		  // Process read values from Store (they are already in Global variables from libstore.js)
+		  endLoadTime = (new Date ()).getTime();
+		  trace("Load local store duration (folders only): "+(loadDuration = (endLoadTime - startTime))+" ms", true);
+
+		  if (backgroundPage.ready) {
 if (options.traceEnabled) {
   console.log("Background is Ready 1");
 }
-		  initialize2();
-		}
-		else { // Wait for Background to complete initialization
+			initialize2();
+		  }
+		  else { // Wait for Background to complete initialization
 if (options.traceEnabled) {
   console.log("Waiting on Background 1");
 }
-		  f_initializeNext = initialize2;
-		  waitingInitBckgnd = true;
-		  WaitMsg.textContent = "Wait background load..";
+			f_initializeNext = initialize2;
+			waitingInitBckgnd = true;
+			WaitMsg.textContent = "Wait background load..";
+		  }
 		}
 	  }
 	)
@@ -8571,7 +8613,7 @@ if (options.traceEnabled) {
 Promise.all([p_platform, p_background, p_ffversion, p_getTab])
 .then(
   function (a_values) { // An array of one value per Promise is returned
-	p_platform = p_background = p_ffversion = p_getTab = undefined;
+	p_platform = p_background = p_ffversion = p_getTab = undefined; // Free memory held by these global variables
 
 	// Rerieve values in the same order
 	platformOs = a_values[0].os; // info object

@@ -40,6 +40,7 @@ const ReloadFFAPIButton = document.querySelector("#reloadffapi");
 const NoFFAPISearchInput = document.querySelector("#noffapisearch");
 const DelayLoadInput = document.querySelector("#delayLoad");
 const SearchOnEnterInput = document.querySelector("#searchonenter");
+const DeactivateSearchListInput = document.querySelector("#deactivatesearchlist");
 const ReversePathInput = document.querySelector("#reversepath");
 const CloseSibblingFoldersInput = document.querySelector("#closesibblingfolders");
 const RememberSizesInput = document.querySelector("#remembersizes");
@@ -98,6 +99,7 @@ let beforeFF57;
 let beforeFF58;
 let beforeFF60;
 let beforeFF63;
+let beforeFF66;
 let ffversion;
 let myWindowId;
 let sidebarCommand;
@@ -134,9 +136,9 @@ function handleMsgResponse (message) {
   // Is always called, even is destination didn't specifically reply (then message is undefined)
   if (message != undefined) {
 	let msg = message.content;
-if (options.traceEnabled) {
-  console.log("Background sent a response: <<"+msg+">> received in options");
-}
+	if (options.traceEnabled) {
+	  console.log("Options received a response: <<"+msg+">>");
+	}
 	if (msg == "getStats") {
 	  countBookmarks = message.countBookmarks;
 	  countFetchFav = message.countFetchFav;
@@ -301,6 +303,7 @@ function saveOptions (e) {
 	,noffapisearch_option: (options.noffapisearch = NoFFAPISearchInput.checked)
 	,delayLoad_option: (options.delayLoad = DelayLoadInput.checked)
 	,searchonenter_option: (options.searchOnEnter = SearchOnEnterInput.checked)
+	,deactivatesearchlist_option: (options.deactivateSearchList = DeactivateSearchListInput.checked)
 	,reversepath_option: (options.reversePath = ReversePathInput.checked)
 	,closesibblingfolders_option: (options.closeSibblingFolders = CloseSibblingFoldersInput.checked)
 	,remembersizes_option: (options.rememberSizes = RememberSizesInput.checked)
@@ -317,7 +320,7 @@ function saveOptions (e) {
 	,usealtfldr_option: (options.useAltFldr = useAltFldr)
 	,altnofavimg_option: (options.altNoFavImg = altNoFavImgSrc)
 	,usealtnofav_option: (options.useAltNoFav = useAltNoFav)
-	,sidebarcommand_option: (options.sidebarCommand = sidebarCommand)
+//	,sidebarcommand_option: (options.sidebarCommand = sidebarCommand)
 	,appendatfldrend_option: (options.appendAtFldrEnd = AddAtFldrEndInput.checked)
 	,trashenabled_option: (options.trashEnabled = trashEnabled)
 	,trashvisible_option: (options.trashVisible = TrashVisibleInput.checked)
@@ -630,6 +633,10 @@ function restoreOptions () {
 	SearchOnEnterInput.checked = true;
   }
 
+  if (options.deactivateSearchList) {
+	DeactivateSearchListInput.checked = true;
+  }
+
   if (options.reversePath) {
 	ReversePathInput.checked = true;
   }
@@ -728,17 +735,8 @@ function restoreOptions () {
 	}
   }
 
-  if (options.sidebarCommand != undefined) {
-	sidebarCommand = options.sidebarCommand;
-	if (!beforeFF60) {
-	  browser.commands.update(
-		{name: "_execute_sidebar_action",
-		 shortcut: sidebarCommand
-		}
-	  );
-	}
-  }
-  if (platformOs == "mac") { // Add support for MacCtrl on Mac
+  // Prepare display of possible drop down values
+  if (platformOs == "mac") { // Add support for MacCtrl on Mac on Command1
 	let opt = document.createElement("option");
 	opt.value = opt.text = "MacCtrl";
 	Command1Select.add(opt);
@@ -746,17 +744,21 @@ function restoreOptions () {
   if (!beforeFF63) {
 	Command2Select.add(Opt2);
 	Command2Select.add(Opt3);
-	if (platformOs == "mac") { // Add support for MacCtrl on Mac
+	if (platformOs == "mac") { // Add support for MacCtrl on Mac on Command2
 	  Command2Select.add(Opt4);
 	}
   }
   displaySidebarCommand(sidebarCommand);
-  if (beforeFF60) { // Changing the sidebar command is only supported for FF >= 60
-	// Disable the corresponding Selects and Button below FF60 so that actions cannot trigger
+  // Changing the sidebar command is only supported for FF >= 60
+  // And from FF66, we dot not use the options page anymore, users should use the native FF panel
+  // in Manage add-ons -> cogwheel -> maange add-on shortcut keys
+  if (beforeFF60 || !beforeFF66) {
+	// Disable the corresponding Selects and Button below FF60 and above FF65 so that actions cannot trigger
+	// but keep the Reset button active as there is no reset to default on the FF shortcut keys management panel.
 	Command1Select.disabled = true;
 	Command2Select.disabled = true;
 	Command3Select.disabled = true;
-	ResetCommandButton.disabled = true;
+//	ResetCommandButton.disabled = true;
   }
 
   if (!options.appendAtFldrEnd) {
@@ -823,8 +825,8 @@ console.log("here");
 	  let valid = true;
 	  // First, check that all properties are valid options (if non existent option, ignore it by deleting it)
 	  for (let o in newOptions) {
-		if (Object.hasOwn(newOptions, o)) {
-		  if (!Object.hasOwn(OptionsList, o)) { // Not an existing option !
+		if (newOptions.hasOwnProperty(o)) {
+		  if (!OptionsList.hasOwnProperty(o)) { // Not an existing option !
 			delete newOptions.o;
 		  }
 		  else if (!OptionsList[o].verifyValue(newOptions[o])) { // Invalid option type or value !
@@ -835,8 +837,8 @@ console.log("here");
 	  }
 	  if (valid) { // Then make sure newOptions has all options in it, or set a default value for missing ones
 		for (let o in OptionsList) {
-		  if (Object.hasOwn(OptionsList, o)) {
-			if (!Object.hasOwn(newOptions, o)) { // Existing option is missing !
+		  if (OptionsList.hasOwnProperty(o)) {
+			if (!newOptions.hasOwnProperty(o)) { // Existing option is missing !
 			  newOptions[o] = OptionsList[o].getDefault();
 			}
 		  }
@@ -1302,6 +1304,7 @@ function initialize2 () {
   NoFFAPISearchInput.addEventListener("click", saveOptions);
   DelayLoadInput.addEventListener("click", saveOptions);
   SearchOnEnterInput.addEventListener("click", saveOptions);
+  DeactivateSearchListInput.addEventListener("click", saveOptions);
   ReversePathInput.addEventListener("click", saveOptions);
   CloseSibblingFoldersInput.addEventListener("click", saveOptions);
   RememberSizesInput.addEventListener("click", saveOptions);
@@ -1359,6 +1362,7 @@ function initialize () {
 	  beforeFF58 = (ffversion < 58.0);
 	  beforeFF60 = (ffversion < 60.0);
 	  beforeFF63 = (ffversion < 63.0);
+	  beforeFF66 = (ffversion < 66.0);
 
 	  // Handle myWindowId
 	  let windowInfo = a_values[3];

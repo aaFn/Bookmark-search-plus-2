@@ -28,7 +28,7 @@ const Menu_bprot = "-bpb"; // Menu identifier for Bookmark pane, on a protected 
 const Menu_bprotf = "-bpf"; // Menu identifier for Bookmark pane, on a protected folder item
 const Menu_bprots = "-bps"; // Menu identifier for Bookmark pane, on a protected separator item
 const Menu_rbkmk = "-rb"; // Menu identifier for Search pane, on a bookmark item (advanced mode)
-const Menu_rshowbkmk = "-rsb"; // Menu identifier for Search pane, on a bookmark item, with default being "Show"
+const Menu_rshowbkmk = "-rsb"; // Menu identifier for Search pane, on a bookmark item, with default being "Show" (simple mode, which is the default)
 const Menu_rfldr = "-rf"; // Menu identifier for Search pane, on a folder item
 const Menu_rprotf = "-rpf"; // Menu identifier for Search pane, on a protected folder item
 const ContextMenu = {};
@@ -52,19 +52,22 @@ ContextMenu["bsp2goparent"+Menu_rshowbkmk+Menu_rfldr] = {
 ContextMenu["bsp2sep0"+Menu_rshowbkmk+Menu_rfldr+Menu_rprotf] = {
 	type: "separator"
 };
-ContextMenu["bsp2open"+Menu_bbkmk+Menu_bresbkmk+Menu_bprot+Menu_rbkmk] = {
+ContextMenu["bsp2open"+Menu_bbkmk+Menu_bresbkmk+Menu_bprot+Menu_rbkmk+Menu_rshowbkmk] = {
 	title: "<Op&en>"
 };
-ContextMenu["bsp2open"+Menu_rshowbkmk] = {
-	title: "Op&en"
-};
 ContextMenu["bsp2opentab"+Menu_bbkmk+Menu_bresbkmk+Menu_bprot+Menu_rbkmk+Menu_rshowbkmk] = {
+	is_multi: true,
+	no_folder: true,
 	title: "Open in Ne&w Tab"
 };
 ContextMenu["bsp2openwin"+Menu_bbkmk+Menu_bresbkmk+Menu_bprot+Menu_rbkmk+Menu_rshowbkmk] = {
+	is_multi: true,
+	no_folder: true,
 	title: "Open in &New Window"
 };
 ContextMenu["bsp2openpriv"+Menu_bbkmk+Menu_bresbkmk+Menu_bprot+Menu_rbkmk+Menu_rshowbkmk] = {
+	is_multi: true,
+	no_folder: true,
 	title: "Open in Priv&ate Window"
 };
 ContextMenu["bsp2openall"+Menu_bfldr+Menu_bresfldr+Menu_bprotf+Menu_rfldr+Menu_rprotf] = {
@@ -105,10 +108,12 @@ ContextMenu["bsp2sep3"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bs
 };
 ContextMenu["bsp2cut"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_rbkmk+Menu_rshowbkmk+Menu_rfldr] = {
 	is_multi: true,
+	no_protected: true,
 	title: "Cu&t"
 };
 ContextMenu["bsp2copy"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_rbkmk+Menu_rshowbkmk+Menu_rfldr] = {
 	is_multi: true,
+	no_protected: true,
 	title: "&Copy"
 };
 ContextMenu["bsp2paste"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep] = {
@@ -120,11 +125,12 @@ ContextMenu["bsp2pasteinto"+Menu_bfldr+Menu_bresfldr+Menu_bprotf] = {
 	title: "P&aste Into"
 };
 //------------------------------------------------------------------
-ContextMenu["bsp2sep4"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep] = {
+ContextMenu["bsp2sep4"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_rbkmk+Menu_rshowbkmk+Menu_rfldr] = {
 	type: "separator"
 };
-ContextMenu["bsp2del"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep] = {
+ContextMenu["bsp2del"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_rbkmk+Menu_rshowbkmk+Menu_rfldr] = {
 	is_multi: true,
+	no_protected: true,
 	title: "&Delete"
 };
 //------------------------------------------------------------------
@@ -468,10 +474,13 @@ function createBSP2ContextMenu () {
  * menu = String to filter which elements are visible
  * pasteEnabled = Boolean to enable (true) or disable (false) the paste menu items
  * multiSelected = Boolean to signal a multi-selection of more than 1 bookmarkt (true), or a single one (false)
+ * containsFolder = Boolean to signal if the selection contains one or more folders, else false
+ * containsProtected = Boolean to signal if the selection contains one or more protected items, else false
  * refreshfavEnabled = Boolean to enable (true) or disable (false / undefined) the refresh favicon menu items
  * sortEnabled = Boolean to enable (true) or disable (false / undefined) the sort by name menu items
  */
-function updateBSP2ContextMenu (menu, pasteEnabled, multiSelected, refreshfavEnabled = false, sortVisible = false) {
+function updateBSP2ContextMenu (menu, pasteEnabled, multiSelected, containsFolder, containsProtected,
+								refreshfavEnabled = false, sortVisible = false) {
   let menuIds = Object.keys(ContextMenu);
   let menuItem;
   let id;
@@ -486,6 +495,8 @@ function updateBSP2ContextMenu (menu, pasteEnabled, multiSelected, refreshfavEna
 		id,
 		{enabled: (!menuItem.is_paste || pasteEnabled)
 				  && (menuItem.is_multi || !multiSelected)
+				  && ((menuItem.no_folder != true) || !containsFolder)
+				  && ((menuItem.no_protected != true) || !containsProtected)
 				  && (!menuItem.is_refreshfav || refreshfavEnabled),
 		 visible: true
 		}

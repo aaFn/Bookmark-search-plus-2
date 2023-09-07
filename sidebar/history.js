@@ -303,7 +303,7 @@ tmpElem2.classList.add("mfavicon");
 tmpElem2.draggable = false;
 MultiSelTempl.appendChild(tmpElem2);
 let tmpElem3 = document.createElement("div"); // Assuming it is an HTMLDivElement
-tmpElem3.classList.add("twistieao");
+//tmpElem3.classList.add("twistieao");
 tmpElem3.draggable = false; // False by default for <div>
 MultiSelTempl.appendChild(tmpElem3);
 tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
@@ -418,7 +418,7 @@ tmpElem2.classList.add("urfavicon");
 tmpElem2.draggable = false;
 URListTempl.appendChild(tmpElem2);
 tmpElem3 = document.createElement("div"); // Assuming it is an HTMLDivElement
-tmpElem3.classList.add("twistieac");
+//tmpElem3.classList.add("twistieao");
 tmpElem3.draggable = false; // False by default for <div>
 URListTempl.appendChild(tmpElem3);
 tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
@@ -437,7 +437,7 @@ tmpElem1.classList.add("seqnum");
 tmpElem1.draggable = false;
 UItemTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
-tmpElem1.classList.add("ufavicon");
+tmpElem1.classList.add("uritemicon", "undo");
 tmpElem1.draggable = false;
 UItemTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
@@ -448,14 +448,14 @@ UItemTempl.appendChild(tmpElem1);
  *******  Prepare Redo item structure for node cloning
  */
 const RItemTempl = document.createElement("div"); // Assuming it is an HTMLDivElement
-RItemTempl.classList.add("bkmkitem_u");
+RItemTempl.classList.add("bkmkitem_r");
 RItemTempl.draggable = false; // False by default for <div>
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
 tmpElem1.classList.add("seqnum");
 tmpElem1.draggable = false;
 RItemTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("div"); // Assuming it is an HTMLDivElement
-tmpElem1.classList.add("rfavicon");
+tmpElem1.classList.add("uritemicon", "redo");
 tmpElem1.draggable = false;
 RItemTempl.appendChild(tmpElem1);
 tmpElem1 = document.createElement("span"); // Assuming it is an HTMLSpanElement
@@ -556,7 +556,7 @@ function handleURListClick () {
 
 	// Go to and show the current active position (cursor)
 	goHNItem(curHNList.activeIndex);
-	lastActiveIndex = undefined; // Force redisplay of cursor
+	lastActiveIndex = null; // Force redisplay of cursor
 	setUndoRedoCursor();
   }
 }
@@ -586,7 +586,7 @@ function handleRawListClick () {
 
 	// Go to and show the current active position (cursor)
 	goHNItem(curHNList.activeIndex);
-	lastActiveIndex = undefined; // Force redisplay of cursor
+	lastActiveIndex = null; // Force redisplay of cursor
 	setUndoRedoCursor();
   }
 }
@@ -594,16 +594,28 @@ function handleRawListClick () {
 /*
  * Append a bookmark HistoryNode inside the "pane" table
  *
- * id = Integer, index of the record in the HN list
+ * hnId = Integer, index of the record in the HN list
  * HN = HistoryNode
+ * is_visible = Boolean, indicate if the row to insert is visible or hidden.
+ * pos_insideMulti = integer, position of HN inside a multi record, else undefined if a normal node
+ * forcedState = HNSTATE_ACTIVEBRANCH or HNSTATE_INACTIVEBRANCH to force a value, else undefined 
+ * insertPos = integer, if -1, append a tend, else insert at given position
  *
  * Returns: the inserted row (an HTMLTableRowElement).
  */
 let isDisplayComplete = false;
-function appendBookmarkHN (id, HN) {
+function appendBookmarkHN (hnId, HN, is_visible = true, pos_insideMulti = undefined, forcedState = undefined, insertPos = -1) {
   // Append new row inside the bookmarks table
-  let row = curRowList[id] = bookmarksTable.insertRow(-1);
-  row.dataset.id = id; // Keep unique id of HN in the data-id attribute
+  let index;
+  if (pos_insideMulti == undefined) { // normal row
+	index = hnId;
+  }
+  else { // Row for a node inside a multi node
+	index = hnId + "+" + pos_insideMulti; // String
+  }
+  let row = curRowList[index] = bookmarksTable.insertRow(insertPos);
+  row.dataset.id = index; // Keep unique id of HN in the data-id attribute
+  row.hidden = !is_visible;
 
   // Add bookmark HN in row
   let cell = row.insertCell();
@@ -621,20 +633,20 @@ function appendBookmarkHN (id, HN) {
 	row.dataset.type = type;
 	let div = MetaTempl.cloneNode(true);
 	let seqnum = div.firstElementChild;
-	seqnum.textContent = id;
+	seqnum.textContent = hnId;
 	let cursor = seqnum.nextElementSibling;
 	let histicon = cursor.nextElementSibling;
 	histicon.classList.add(map.nclass);
 	let span = histicon.nextElementSibling;
-	let text = span.textContent = map.title;
+	let text = span.title = span.textContent = map.title;
 	seqnum.title = cursor.title = histicon.title = text + "\n" + tStr;
 	cell.appendChild(div);
   }
   else {
-	type = row.dataset.type = HN.type;
 	let div, seqnum;
 	let revOp = HN.revOp; // If undefined, normal operation, else undo or redo
-	if ((revOp != undefined) && options.historyDispURList) { // Special display as URList item
+	if ((revOp != undefined) && (revOp != HNREVOP_NONE) && options.historyDispURList) { // Special display as URList item
+	  type = "uritem";
 	  let textOp;
 	  if (revOp == HNREVOP_ISUNDO) {
 		div = UItemTempl.cloneNode(true);
@@ -648,26 +660,34 @@ function appendBookmarkHN (id, HN) {
 	  let img = seqnum.nextElementSibling;
 	  let span = img.nextElementSibling;
 	  let op = map.title;
-	  seqnum.title = img.title = span.title = textOp + op + "\n" + tStr;
-	  span.textContent = textOp + op + tStr;
+	  seqnum.textContent = hnId;
+	  seqnum.title = img.title = textOp + op + "\n" + tStr;
+	  span.title = span.textContent = textOp + op;
+	  if (!HN.is_complete) { // Color text in red, as incomplete
+		span.classList.add("incompleteop");
+	  }
 	}
 	else {
-	  let cursor, histicon;
-	  if (HN.is_multi == true) {					// Multiple bookmarks action
+	  type = HN.type;
+	  let cursor, histicon, span;
+	  if (HN.is_multi == true) {				// Multiple bookmarks record
+		type = "multiple";
 		div = MultiSelTempl.cloneNode(true);
 		seqnum = div.firstElementChild;
 		cursor = seqnum.nextElementSibling;
 		histicon = cursor.nextElementSibling;
 		let img = histicon.nextElementSibling;
+		let twistie = img.nextElementSibling;
+		twistie.classList.add((HN.is_open == true) ? "twistieao" : "twistieac");
+		span = twistie.nextElementSibling;
 		if (!HN.is_complete) { // Color text in red, as incomplete
-		  let span = img.nextElementSibling;
 		  span.classList.add("incompleteop");
 		}
 	  }
 	  else if (type == "folder") {				// Folder
 		let img;
 		let uri = HN.faviconUri;
-		if (HN.multi_HNref) { // Item is part of a multi-selection operation
+		if (pos_insideMulti != undefined) { // Item is part of a multi-selection operation
 		  row.draggable = true; // Note: it is false by default for <tr>
 		  div = ItemFMultiSelTempl.cloneNode(true);
 		  seqnum = div.firstElementChild;
@@ -690,7 +710,7 @@ function appendBookmarkHN (id, HN) {
 		  histicon = cursor.nextElementSibling;
 		  img = histicon.nextElementSibling;
 		}
-		let span = img.nextElementSibling;
+		span = img.nextElementSibling;
 		if (HN.inBSP2Trash) { // Set to italics
 		  span.style.fontStyle = "italic";
 		}
@@ -702,7 +722,7 @@ function appendBookmarkHN (id, HN) {
 	  }
 	  else if (type == "separator") {				// Separator
 		row.draggable = true; // Note: it is false by default for <tr>
-		if (HN.multi_HNref) { // Item is part of a multi-selection operation
+		if (pos_insideMulti != undefined) { // Item is part of a multi-selection operation
 		  row.draggable = true; // Note: it is false by default for <tr>
 		  div = ItemSMultiSelTempl.cloneNode(true);
 		  seqnum = div.firstElementChild;
@@ -712,7 +732,7 @@ function appendBookmarkHN (id, HN) {
 		else {
 		  div = SeparatorTempl.cloneNode(true);
 		  seqnum = div.firstElementChild;
-		  seqnum.textContent = id;
+		  seqnum.textContent = (pos_insideMulti == undefined ? hnId : pos_insideMulti);
 		  cursor = seqnum.nextElementSibling;
 		  histicon = cursor.nextElementSibling;
 		}
@@ -722,7 +742,7 @@ function appendBookmarkHN (id, HN) {
 		let img;
 		let uri;
 		if (((uri = HN.faviconUri) == undefined) || (uri == "/icons/nofavicon.png")) { // Clone with nofavicon image background
-		  if (HN.multi_HNref) { // Item is part of a multi-selection operation
+		  if (pos_insideMulti != undefined) { // Item is part of a multi-selection operation
 			div = ItemNFBMultiSelTempl.cloneNode(true);
 			seqnum = div.firstElementChild;
 			let vbar = seqnum.nextElementSibling;
@@ -737,7 +757,7 @@ function appendBookmarkHN (id, HN) {
 		  }
 		}
 		else { // Clone normal one
-		  if (HN.multi_HNref) { // Item is part of a multi-selection operation
+		  if (pos_insideMulti != undefined) { // Item is part of a multi-selection operation
 			div = ItemBMultiSelTempl.cloneNode(true);
 			seqnum = div.firstElementChild;
 			let vbar = seqnum.nextElementSibling;
@@ -754,7 +774,7 @@ function appendBookmarkHN (id, HN) {
 			img.src = uri;
 		  }
 		}
-		let span = img.nextElementSibling;
+		span = img.nextElementSibling;
 		if (HN.inBSP2Trash) { // Set to italics
 		  span.style.fontStyle = "italic";
 		}
@@ -775,9 +795,9 @@ function appendBookmarkHN (id, HN) {
 		  span.textContent = toTitle;
 		}
 	  }
-	  seqnum.textContent = id;
+	  seqnum.textContent = (pos_insideMulti == undefined ? hnId : pos_insideMulti);
 	  let textOp;
-	  if (revOp == undefined) {
+	  if ((revOp == undefined) || (revOp == HNREVOP_NONE)) {
 		if (histicon != undefined) {
 		  histicon.classList.add(map.nclass);
 		}
@@ -787,13 +807,19 @@ function appendBookmarkHN (id, HN) {
 		if (histicon != undefined) {
 		  histicon.classList.add(map.uclass);
 		}
-	    textOp = "undo";
+		if ((span != undefined) && !HN.is_complete) {
+		  span.classList.add("incompleteop");
+		}
+	    textOp = "undo ";
 	  }
 	  else if (revOp == HNREVOP_ISREDO) {
 		if (histicon != undefined) {
 		  histicon.classList.add(map.rclass);
 		}
-	    textOp = "redo";
+		if ((span != undefined) && !HN.is_complete) {
+		  span.classList.add("incompleteop");
+		}
+	    textOp = "redo ";
 	  }
 	  let t = seqnum.title = textOp + map.title + "\n" + tStr;
 	  if (cursor != undefined) {
@@ -803,7 +829,8 @@ function appendBookmarkHN (id, HN) {
 		histicon.title = t;
 	  }
 	}
-	if (HN.state == HNSTATE_INACTIVEBRANCH) {
+	row.dataset.type = type;
+	if ((forcedState == HNSTATE_INACTIVEBRANCH) || (HN.state == HNSTATE_INACTIVEBRANCH)) {
 	  div.classList.add("inactive");
 	}
 	cell.appendChild(div);
@@ -813,49 +840,66 @@ function appendBookmarkHN (id, HN) {
 }
 
 /*
- * Refresh an existing bookmark HistoryNode inside the "pane" table.
+ * Refresh an existing bookmark HistoryNode inside the main "pane" table.
  * Only its state (-> become inactive), is_complete (-> become complete), reversion and revOp_HNref can change
  *
- * id = Integer, id of the record in the list
+ * hnId = Integer, index of the record in the history list
  * HN = HistoryNode
+ * pos_insideMulti = integer, position of HN inside a multi record, else undefined if a normal node
+ * forcedState = HNSTATE_ACTIVEBRANCH or HNSTATE_INACTIVEBRANCH to force a value, else undefined 
  *
- * Returns: the modified row (an HTMLTableRowElement).
+ * Returns: true if the modified row (an HTMLTableRowElement) had its state changed to inactive.
  */
-function refreshBookmarkHN (id, HN) {
+function refreshBookmarkHN (hnId, HN, pos_insideMulti = undefined, forcedState = undefined) {
+  let inactiveState = false;
   // Retrieve row inside the bookmarks table
-  let row = curRowList[id];
-  let cell = row.firstElementChild;
-  let div = cell.firstElementChild;
-
-  // Refresh content in the cell:
-  if ((HN.state == HNSTATE_INACTIVEBRANCH) && !div.classList.contains("inactive")) {
-	div.classList.add("inactive");
+  let index;
+  if (pos_insideMulti == undefined) { // normal row
+	index = hnId;
   }
-  if (HN.is_complete == true) {
-	let span = cell.lastElementChild;
-	if (div.classList.contains("incompleteop")) {
-	  span.classList.remove("incompleteop")
-	}
-  }	
+  else { // Row for a node inside a multi node
+	index = hnId + "+" + pos_insideMulti; // String
+  }
+  let row = curRowList[index];
+  if (row != undefined) { // Can be undefined in URList mode display, and the row is a reversion of a past purged history node 
+	let cell = row.firstElementChild;
+	let div = cell.firstElementChild;
 
-  // If row is in Node display, update it
-  if (cellHighlight == cell) {
-	if (row.dataset.type != "urlist") {
-	  displayHN(id);
+	// Refresh content in the cell:
+	if (((forcedState == HNSTATE_INACTIVEBRANCH) || (HN.state == HNSTATE_INACTIVEBRANCH))
+		&& !div.classList.contains("inactive")
+	   ) {
+	  div.classList.add("inactive");
+	  inactiveState = true;
+	}
+	if (HN.is_complete == true) {
+	  let span = div.lastElementChild;
+	  if (span.classList.contains("incompleteop")) {
+		span.classList.remove("incompleteop");
+	  }
+	}	
+
+	// If row is the highlighted one, also update the detailed Node display panel
+	if (cellHighlight == cell) {
+	  displayHN(row.dataset.type, index);
 	}
   }
-
-  return(row);
+  return(inactiveState);
 }
 
 /*
  * Append an undo / redo list inside the "pane" table
  *
+ * hnid = Integer, id of parent HistoryNode 
+ * is_open = Boolean, if true set twistie as open, else set as closed
+ * insertPos = integer, if -1, append a tend, else insert at given position
+ *
  * Returns: the inserted row (an HTMLTableRowElement).
  */
-function appendURList () {
+function appendURList (hnid, is_open, insertPos = -1) {
   // Append new row inside the bookmarks table
-  let row = bookmarksTable.insertRow(-1);
+  let row = bookmarksTable.insertRow(insertPos);
+  row.dataset.id = hnid; // Keep unique id of HN in the data-id attribute, to retrieve it later in twistie clicks
   row.draggable = false; // True by default for <tr>
 
   // Add UR List template in row
@@ -867,34 +911,141 @@ function appendURList () {
   // Append UR List contents to the cell:
   row.dataset.type = "urlist";
   let div = URListTempl.cloneNode(true);
+  let twistie = div.firstElementChild.nextElementSibling.nextElementSibling.nextElementSibling;
+  twistie.classList.add((is_open == true) ? "twistieao" : "twistieac");
   cell.appendChild(div);
 
   return(row);
 }
 
 /*
+ * Handle clicks on multiple record twistie - Change twistie and visibility of children
+ *
+ * row is a HTMLRowElement
+ * twistie is an HTLMDivElement
+ */
+function handleMultipleTwistieClick (row, twistie) {
+  // Retrieve the HistoryNode
+  let hnid = row.dataset.id;
+  let HN = curHNList.hnList[hnid];
+
+  if (twistie.classList.contains("twistieao")) { // Hide all multiple record children
+	// Close twistie
+	HN.is_open = false;
+	twistie.classList.replace("twistieao", "twistieac");
+
+    // Hide all bkmkitem_m? rows
+	let bkmkitem;
+	while ((row = row.nextElementSibling) != null) {
+	  bkmkitem = row.firstElementChild.firstElementChild;
+	  if (!bkmkitem.className.startsWith("bkmkitem_m"))
+		break; // Stop when we encounter something else thatn a multiple item
+	  row.hidden = true;
+	}
+  }
+  else { // Show all multiple record children
+	// Open twistie
+	HN.is_open = true;
+	twistie.classList.replace("twistieac", "twistieao");
+
+	// Unhide all bkmkitem_m? rows
+	let bkmkitem;
+	while ((row = row.nextElementSibling) != null) {
+	  bkmkitem = row.firstElementChild.firstElementChild;
+	  if (!bkmkitem.className.startsWith("bkmkitem_m"))
+		break; // Stop when we encounter something else thatn a multiple item
+	  row.hidden = false;
+	}
+  }
+
+  // Save new current history info
+  saveBNList();
+}
+
+/*
+ * Handle clicks on URList twistie - Change twistie and visibility of children
+ *
+ * row is a HTMLRowElement
+ * twistie is an HTLMDivElement
+ */
+function handleURListTwistieClick (row, twistie) {
+  // Retrieve the HistoryNode
+  let hnid = row.dataset.id;
+  let HN = curHNList.hnList[hnid];
+
+  if (twistie.classList.contains("twistieao")) { // Hide all uritem children
+	// Close twistie
+	HN.is_urlistOpen = false;
+	twistie.classList.replace("twistieao", "twistieac");
+
+    // Hide all uritem rows
+	let type;
+	while ((row = row.nextElementSibling) != null) {
+	  type = row.dataset.type;
+	  if (type != "uritem")
+		break; // Stop when we encounter something else thatn a multiple item
+	  row.hidden = true;
+	}
+  }
+  else { // Show all uritem children
+	// Open twistie
+	HN.is_urlistOpen = true;
+	twistie.classList.replace("twistieac", "twistieao");
+
+	// Unhide all uritem rows
+	let type;
+	while ((row = row.nextElementSibling) != null) {
+	  type = row.dataset.type;
+	  if (type != "uritem")
+		break; // Stop when we encounter something else thatn a multiple item
+	  row.hidden = false;
+	}
+  }
+
+  // Save new current history info
+  saveBNList();
+}
+
+/*
  * Set undo/redo cursor
  */
-let lastActiveIndex;
+let lastActiveIndex = null;
 function setUndoRedoCursor () {
   let activeIndex = curHNList.activeIndex;
   // Proceed only if there is a change in activeIndex position 
-  if (activeIndex != lastActiveIndex) {
+  if ((activeIndex != lastActiveIndex) || (lastActiveIndex === null)) {
 	// Clear last one if there was one
-	if (lastActiveIndex != undefined) {
-	  let row = curRowList[lastActiveIndex];
+	let row;
+	let cursorClass;
+	let cursor;
+	if (lastActiveIndex !== null) {
+	  if (lastActiveIndex != undefined) {
+		row = curRowList[lastActiveIndex];
+		cursorClass = "urcursor";
+	  }
+	  else {
+		row = curRowList[0];
+		cursorClass = "urcursortop";
+	  }
 	  let seqnum = row.firstElementChild.firstElementChild.firstElementChild;
-	  let cursor = seqnum.nextElementSibling;
-	  cursor.classList.replace("urcursor", "nocursor");
+	  cursor = seqnum.nextElementSibling;
+	  cursor.classList.replace(cursorClass, "nocursor");
 	  cursor.title = seqnum.title;
 	}
+
 	// Set new one, if present
 	if (activeIndex != undefined) {
-	  let row = curRowList[activeIndex];
-	  let cursor = row.firstElementChild.firstElementChild.firstElementChild.nextElementSibling;
-	  cursor.classList.replace("nocursor", "urcursor");
-	  cursor.title = "undo/redo cursor";
+	  row = curRowList[activeIndex];
+	  cursorClass = "urcursor";
 	}
+	else {
+	  row = curRowList[0];
+	  cursorClass = "urcursortop";
+	}
+	cursor = row.firstElementChild.firstElementChild.firstElementChild.nextElementSibling;
+	cursor.classList.replace("nocursor", cursorClass);
+	cursor.title = "undo/redo cursor";
+
 	// Remember the new value for next update
 	lastActiveIndex = activeIndex;
   }
@@ -970,67 +1121,25 @@ function displayPath (node, a_path) {
 /*
  * Display a specific History Node in the "node" panel
  * 
- * hnId is an integer
+ * rowType = String, type of row to display = "meta", "bookmark", "separator", "folder", "multiple", "urlist"
+ *           or "uritem"
+ * hnId = integer, index in the history list, or String of the form "index+pos_insideMulti" or undefined
  */
-function displayHN (hnId) {
-  NDNum.textContent = hnId;
-  let HN = curHNList.hnList[hnId];
-  let t = new Date (HN.timestamp);
-  NDTimestamp.textContent = t.toLocaleString();
-  let actionTextStart, actionTextEnd;
-  let is_multi = HN.is_multi;
-  if (is_multi == true) {
-	actionTextStart = "multi bookmarks ";
-	if (HN.is_complete) {
-	  actionTextEnd = " (complete) "; 
-	  NDAction.style = "";
-	}
-	else {
-	  actionTextEnd = " (incomplete) ";
-	  NDAction.classList.add("incompleteop");
-	}
-  }
-  else {
-	actionTextStart = actionTextEnd = "";
-	if (HN.multi_HNref != undefined) {
-	  actionTextEnd = " (in a multi bookmarks action)";
-	}
-  }
-  let action = HN.action;
-  let map = MapAction[action];
-  let revOp = HN.revOp;
-  if (revOp == undefined) {
-	let reversion = HN.reversion;
-	NDAction.textContent = actionTextStart+map.title+actionTextEnd;
-	if (reversion == HNREVERSION_UNDONE) {
-	  NDAction.textContent += " (undone by record #)"+hnId+HN.revOp_HNref;
-	}
-	else if (reversion == HNREVERSION_REDONE) {
-	  NDAction.textContent += " (redone by record #)"+hnId+HN.revOp_HNref;
-	}
-  }
-  else if (revOp == HNREVOP_ISUNDO) {
-	NDAction.textContent = "undo "+actionTextStart+map.title+" of record #"+hnId+HN.revOp_HNref+actionTextEnd;
-  }
-  else if (revOp == HNREVOP_ISREDO) {
-	NDAction.textContent = "redo "+actionTextStart+map.title+" of record #"+hnId+HN.revOp_HNref+actionTextEnd;
-  }
-  if (HN.state == HNSTATE_INACTIVEBRANCH) {
-	NDState.textContent = "Inactive branch";
-  }
-  else {
-	NDState.textContent = "Active branch";
-  }
-  let type = map.type;
-  if (type != undefined) {				// Meta node
+function displayHN (rowType, hnId) {
+  if (rowType == "urlist") {
+	NDNum.textContent = NBSP;
+	NDTimestamp.textContent = NBSP;
+	NDAction.classList.remove("incompleteop");
+	NDAction.textContent = "Undo / redo list";
+	NDState.textContent = NBSP;
 	NDBNId.textContent = NBSP;
-	NDType.textContent = type;
+	NDType.textContent = NBSP;
 	NDIndex.textContent = NBSP;
 	NDParentId.textContent = NBSP;
 	NDPath.textContent = NBSP;
 	NDTitle.textContent = NBSP;
 	NDFavicon.style = "";
-	NDFavicon.className = "favicon "+map.nclass;
+	NDFavicon.className = "urfavicon";
 	NDUrl.textContent = NBSP;
 	NDInTrash.textContent = NBSP;
 	NDChildIds.textContent = NBSP;
@@ -1042,87 +1151,157 @@ function displayHN (hnId) {
 	NDToChildIds.textContent = NBSP;
   }
   else {
-	let tmp = HN.id;
-	NDBNId.textContent = (tmp == undefined ? NBSP : tmp);
-	type = HN.type;
-	NDType.textContent = (type == undefined ? NBSP : type);
-	displayPath(NDPath, HN.path);
-	tmp = HN.index;
-	NDIndex.textContent = (tmp == undefined ? NBSP : tmp);
-	tmp = HN.parentId;
-	NDParentId.textContent = (tmp == undefined ? NBSP : tmp);
-	if (type == "folder") {				// Folder
-	  NDTitle.textContent = HN.title;
-	  let uri = HN.faviconUri;
-	  if ((uri != undefined) && (uri != "/icons/folder.png")) { // Special folder
-		NDFavicon.className = "favicon";
-		NDFavicon.style = "background-image: url(\""+uri+"\");";
+	NDNum.textContent = hnId;
+
+	// Handle case of HN inside a multi parent node
+	let HN, parentHN;
+	let hnIdType = Object.prototype.toString.call(hnId).slice(8, -1);
+	let pos;
+	let pos_insideMulti;
+	if ((hnIdType == "String") && ((pos = hnId.indexOf("+")) >= 0)) {
+	  pos_insideMulti = parseInt(hnId.substring(pos+1), 10);
+	  hnId = parseInt(hnId.substring(0, pos), 10);
+	  parentHN = curHNList.hnList[hnId];
+	  HN = parentHN.hn_list[pos_insideMulti];
+	}
+	else { 
+	  HN = curHNList.hnList[hnId];
+	}
+
+	let t = new Date (HN.timestamp);
+	NDTimestamp.textContent = t.toLocaleString();
+	let actionTextStart, actionTextEnd;
+	let is_multi = HN.is_multi;
+	if (is_multi == true) {
+	  actionTextStart = "multi bookmarks ";
+	  actionTextEnd = "";
+	}
+	else {
+	  actionTextStart = actionTextEnd = "";
+	  if (HN.is_insideMulti != undefined) {
+		actionTextEnd = " (in a multi bookmarks action)";
+	  }
+	}
+	let revOp = HN.revOp;
+	if ((is_multi == true) || (revOp != undefined)) {
+	  if (HN.is_complete) {
+		actionTextEnd += " (complete) "; 
+		NDAction.classList.remove("incompleteop");
 	  }
 	  else {
-		NDFavicon.style = "";
-		NDFavicon.className = "ffavicon";
+		actionTextEnd += " (incomplete) ";
+		NDAction.classList.add("incompleteop");
 	  }
 	}
-	else if (type == "separator") {		// Separator
-	  NDTitle.textContent = NBSP;
-	  NDFavicon.style = "";
-	  NDFavicon.className = "favicon";
+	else {
+	  NDAction.classList.remove("incompleteop");
 	}
-	else if (type == undefined) {		// Should occur only when is_multi is true
-	  NDTitle.textContent = NBSP;
-	  NDFavicon.style = "";
-	  NDFavicon.className = "mfavicon";
-	}
-	else {								// Presumably a Bookmark
-	  NDTitle.textContent = HN.title;
-	  let uri;
-	  if (options.disableFavicons || ((uri = HN.faviconUri) == undefined)) { // Show nofavicon
-		NDFavicon.style = "";
-		NDFavicon.className = "nofavicon";
-	  }
-	  else { // Show favicon
-		NDFavicon.className = "favicon";
-		NDFavicon.style = "background-image: url(\""+uri+"\");";
-	  }
-	}
-	displayField(NDUrl, HN.url);
-	displayField(NDInTrash, HN.inBSP2Trash);
-	displayField(NDChildIds, HN.childIds);
-	displayPath(NDToPath, HN.toPath);
-	displayField(NDToParentId, HN.toParentId);
-	displayField(NDToIndex, HN.toIndex);
-	displayField(NDToTitle, HN.toTitle);
-	displayField(NDToUrl, HN.toUrl);
-	displayField(NDToChildIds, HN.toChildIds);
-  }
-}
 
-/*
- * Display for an Undo /redo list Node in the "node" panel
- */
-function displayURList () {
-  NDNum.textContent = NBSP;
-  NDTimestamp.textContent = NBSP;
-  NDAction.style = "";
-  NDAction.textContent = "Undo / redo list";
-  NDState.textContent = NBSP;
-  NDBNId.textContent = NBSP;
-  NDType.textContent = type;
-  NDParentId.textContent = NBSP;
-  NDIndex.textContent = NBSP;
-  NDPath.textContent = NBSP;
-  NDTitle.textContent = NBSP;
-  NDFavicon.style = "";
-  NDFavicon.className = "urfavicon";
-  NDUrl.textContent = NBSP;
-  NDInTrash.textContent = NBSP;
-  NDChildIds.textContent = NBSP;
-  NDToParentId.textContent = NBSP;
-  NDToIndex.textContent = NBSP;
-  NDToPath.textContent = NBSP;
-  NDToTitle.textContent = NBSP;
-  NDToUrl.textContent = NBSP;
-  NDToChildIds.textContent = NBSP;
+	let action = HN.action;
+	let map = MapAction[action];
+	if (revOp == undefined) {
+	  let reversion = HN.reversion;
+	  NDAction.textContent = actionTextStart+map.title+actionTextEnd;
+	  if (reversion == HNREVERSION_UNDONE) {
+		let n = parseInt(hnId, 10) + HN.revOp_HNref;
+		NDAction.textContent += " (undone by record #"+n+")";
+	  }
+	  else if (reversion == HNREVERSION_REDONE) {
+		let n = parseInt(hnId, 10) + HN.revOp_HNref;
+		NDAction.textContent += " (redone by record #"+n+")";
+	  }
+	}
+	else if (revOp == HNREVOP_ISUNDO) {
+	  let n = parseInt(hnId, 10) + HN.revOp_HNref;
+	  NDAction.textContent = "undo "+actionTextStart+map.title+" of record #"+n+actionTextEnd;
+	}
+	else if (revOp == HNREVOP_ISREDO) {
+	  let n = parseInt(hnId, 10) + HN.revOp_HNref;
+	  NDAction.textContent = "redo "+actionTextStart+map.title+" of record #"+n+actionTextEnd;
+	}
+	if (((pos_insideMulti == undefined) && (HN.state == HNSTATE_INACTIVEBRANCH))
+		|| ((pos_insideMulti != undefined) && (parentHN.state == HNSTATE_INACTIVEBRANCH))
+	   ) {
+	  NDState.textContent = "Inactive branch";
+	}
+	else {
+	  NDState.textContent = "Active branch";
+	}
+	let type = map.type;
+	if (type != undefined) {				// Meta node
+	  NDBNId.textContent = NBSP;
+	  NDType.textContent = type;
+	  NDIndex.textContent = NBSP;
+	  NDParentId.textContent = NBSP;
+	  NDPath.textContent = NBSP;
+	  NDTitle.textContent = NBSP;
+	  NDFavicon.style = "";
+	  NDFavicon.className = "favicon "+map.nclass;
+	  NDUrl.textContent = NBSP;
+	  NDInTrash.textContent = NBSP;
+	  NDChildIds.textContent = NBSP;
+	  NDToParentId.textContent = NBSP;
+	  NDToIndex.textContent = NBSP;
+	  NDToPath.textContent = NBSP;
+	  NDToTitle.textContent = NBSP;
+	  NDToUrl.textContent = NBSP;
+	  NDToChildIds.textContent = NBSP;
+	}
+	else {
+	  let tmp = HN.id;
+	  NDBNId.textContent = (tmp == undefined ? NBSP : tmp);
+	  type = HN.type;
+	  NDType.textContent = (type == undefined ? NBSP : type);
+	  displayPath(NDPath, HN.path);
+	  tmp = HN.index;
+	  NDIndex.textContent = (tmp == undefined ? NBSP : tmp);
+	  tmp = HN.parentId;
+	  NDParentId.textContent = (tmp == undefined ? NBSP : tmp);
+	  if (type == "folder") {				// Folder
+		NDTitle.textContent = HN.title;
+		let uri = HN.faviconUri;
+		if ((uri != undefined) && (uri != "/icons/folder.png")) { // Special folder
+		  NDFavicon.className = "favicon";
+		  NDFavicon.style = "background-image: url(\""+uri+"\");";
+		}
+		else {
+		  NDFavicon.style = "";
+		  NDFavicon.className = "ffavicon";
+		}
+	  }
+	  else if (type == "separator") {		// Separator
+		NDTitle.textContent = NBSP;
+		NDFavicon.style = "";
+		NDFavicon.className = "favicon";
+	  }
+	  else if (type == undefined) {		// Should occur only when is_multi is true
+		NDTitle.textContent = NBSP;
+		NDFavicon.style = "";
+		NDFavicon.className = "mfavicon";
+	  }
+	  else {								// Presumably a Bookmark
+		NDTitle.textContent = HN.title;
+		let uri;
+		if (options.disableFavicons || ((uri = HN.faviconUri) == undefined)) { // Show nofavicon
+		  NDFavicon.style = "";
+		  NDFavicon.className = "nofavicon";
+		}
+		else { // Show favicon
+		  NDFavicon.className = "favicon";
+		  NDFavicon.style = "background-image: url(\""+uri+"\");";
+		}
+	  }
+	  displayField(NDUrl, HN.url);
+	  displayField(NDInTrash, HN.inBSP2Trash);
+	  displayField(NDChildIds, HN.childIds);
+	  displayPath(NDToPath, HN.toPath);
+	  displayField(NDToParentId, HN.toParentId);
+	  displayField(NDToIndex, HN.toIndex);
+	  displayField(NDToTitle, HN.toTitle);
+	  displayField(NDToUrl, HN.toUrl);
+	  displayField(NDToChildIds, HN.toChildIds);
+	}
+  }
 }
 
 /*
@@ -1157,7 +1336,7 @@ function goHNItem (hnId) {
   if (hnId != undefined) {
 	let row = curRowList[hnId];
 	showRow(row);
-	displayHN(hnId);
+	displayHN(row.dataset.type, hnId);
   }
 }
 
@@ -1180,7 +1359,7 @@ function bkmkMouseHandler (e) {
 	if (className.includes("brow")) {
 	  cell = target;
 	}
-	else if (className.includes("bkmkitem_")) {
+	else if (className.includes("bkmkitem_") || className.includes("meta")) {
 	  cell = target.parentElement;
 	}
 	else {
@@ -1191,7 +1370,20 @@ function bkmkMouseHandler (e) {
 	setCellHighlight(cell);
 	let row = cell.parentElement;
 	let hnId = row.dataset.id;
-	displayHN(hnId);
+	let type = row.dataset.type;
+	displayHN(type, hnId);
+
+	// If click on twistie, handle visibility of corresponding multiple or URList nodes
+	if (className.startsWith("twistiea")) {
+	  let row = cell.parentElement;
+	  let type = row.dataset.type;
+	  if (type == "multiple") {
+		handleMultipleTwistieClick(row, target);
+	  }
+	  else if (type == "urlist") {
+		handleURListTwistieClick(row, target);
+	  }
+	}
   }
   e.stopPropagation(); // Prevent handlers up the DOM chain on same event
 }
@@ -1244,7 +1436,7 @@ function keyHandler (e) {
 		let cell = nextRow.firstElementChild;
 		if (!isResultRow) {
 		  setCellHighlight(cell);
-		  displayHN(nextRow.dataset.id);
+		  displayHN(nextRow.dataset.type, nextRow.dataset.id);
 		}
 		cell.focus();
 	  }
@@ -1257,7 +1449,7 @@ function keyHandler (e) {
 		let cell = previousRow.firstElementChild;
 		if (!isResultRow) {
 		  setCellHighlight(cell);
-		  displayHN(previousRow.dataset.id);
+		  displayHN(previousRow.dataset.type, previousRow.dataset.id);
 		}
 		cell.focus();
 	  }
@@ -1305,7 +1497,7 @@ function keyHandler (e) {
 		let cell = nextRow.firstElementChild;
 		if (!isResultRow) {
 		  setCellHighlight(cell);
-		  displayHN(nextRow.dataset.id);
+		  displayHN(nextRow.dataset.type, nextRow.dataset.id);
 		}
 		cell.focus();
 	  }
@@ -1353,7 +1545,7 @@ function keyHandler (e) {
 		let cell = previousRow.firstElementChild;
 		if (!isResultRow) {
 		  setCellHighlight(cell);
-		  displayHN(previousRow.dataset.id);
+		  displayHN(previousRow.dataset.type, previousRow.dataset.id);
 		}
 		cell.focus();
 	  }
@@ -1374,7 +1566,7 @@ function keyHandler (e) {
 	  let cell = lastRow.firstElementChild;
 	  if (!isResultRow) {
 		setCellHighlight(cell);
-		displayHN(lastRow.dataset.id);
+		displayHN(lastRow.dataset.type, lastRow.dataset.id);
 	  }
 	  cell.focus();
 	  e.preventDefault();
@@ -1391,10 +1583,21 @@ function keyHandler (e) {
 	  let cell = firstRow.firstElementChild;
 	  if (!isResultRow) {
 		setCellHighlight(cell);
-		displayHN(firstRow.dataset.id);
+		displayHN(firstRow.dataset.type, firstRow.dataset.id);
 	  }
 	  cell.focus();
 	  e.preventDefault();
+	}
+	else if (key == "Enter") {
+	  let type = row.dataset.type;
+	  if (type == "multiple") {
+		let twistie = target.firstElementChild.firstElementChild.nextElementSibling.nextElementSibling.nextElementSibling.nextElementSibling;
+		handleMultipleTwistieClick(row, twistie);
+	  }
+	  else if (type == "urlist") {
+		let twistie = target.firstElementChild.firstElementChild.nextElementSibling.nextElementSibling.nextElementSibling;
+		handleURListTwistieClick(row, twistie);
+	  }
 	}
 //  else {
 //	SearchTextInput.focus(); // Focus on search box when a key is typed ...
@@ -1671,43 +1874,48 @@ function setPanelNoFaviconImg (useAltNoFav_option, altNoFavImg_option) {
  *
  * hnList = Array of HN
  */
-let lastHNListLen; // Length of last displayed list
 function displayHNList (hnList) {
   isDisplayComplete = false;
   let HN;
-  lastHNListLen = hnList.length;
-  for (let i=0 ; i<lastHNListLen ; i++) {
+  let len = hnList.length;
+  let is_historyDispURList = options.historyDispURList;
+  for (let i=0 ; i<len ; i++) {
 	HN = hnList[i];
-	let revop;
-	if ((HN.multi_HNref == undefined)		// Do not display items part of a multiple selection as they are done with their "parent"
-		&& (!options.historyDispURList || ((revop = HN.revOp) == undefined))	// If options.historyDispURList, do not display undo/redo, they are done after each bookamrk item
-	   ) {
-	  appendBookmarkHN(i, HN);
+	// If options.historyDispURList, do not display undo/redo, they are done after each bookamrk item
+	if (!is_historyDispURList || (HN.revOp == undefined)) {
+	  appendBookmarkHN(i, HN); // Append at end
 	  if (HN.is_multi) { // Display all multiple selection "children" now
-		let hnref_list = HN.hnref_list;
-		let len = hnref_list.length;
-		let k;
+	    let state = HN.state;
+		let hn_childs = HN.hn_list;
+		let len = hn_childs.length;
+		let is_visible = (HN.is_open == true);
 		for (let j=0 ; j<len ; j++) {
-		  k = i + hnref_list[j]; // Calculate absolute position of "child"
-		  appendBookmarkHN(k, hnList[k]); // Display "child"
+		  // During old format conversion, it can happen that some nodes are missing in the list,
+		  // protect against that
+		  let hn = hn_childs[j];
+		  if (hn != undefined) {
+			appendBookmarkHN(i, hn, is_visible, j, state); // Append "child" at end, and impose the parent state on it
+		  }
 		}
 	  }
+	  // Special display of URList items
 	  let reversion = HN.reversion;
-	  if (options.historyDispURList && (reversion != undefined) && (reversion > 0)) { // Special display of URList items
-		appendURList(); // Create a new URList header
-		// Now display all redo / undo actions as URList items
+	  if (is_historyDispURList && (reversion != undefined) && (reversion > 0)) {
+		let is_visible = (HN.is_urlistOpen == true); // URList items are visible only if URList is open
+		appendURList(i, is_visible); // Create a new URList header
+		// Now display the old history of inactive redo / undo actions as URList items if there are
 		let hnref_list = HN.revOp_HNref_list;
 		let k;
 		if (hnref_list != undefined) {
 		  let len = hnref_list.length;
 		  for (let j=0 ; j<len ; j++) {
 			k = i + hnref_list[j]; // Calculate absolute position of "child"
-			appendBookmarkHN(k, hnList[k]); // Display "child"
+			appendBookmarkHN(k, hnList[k], is_visible); // Append undo/redo record at end
 		  }
 		}
-		// Display last one, not yet in list of inactive ones
-		k = i + revop;
-		appendBookmarkHN(k, hnList[k]); // Display "child"
+		// And display the active undo/redo record, not yet in list of inactive ones
+		k = i + HN.revOp_HNref;
+		appendBookmarkHN(k, hnList[k], is_visible); // Append it at end
 	  }
 	}
   }
@@ -1720,24 +1928,179 @@ function displayHNList (hnList) {
 }
 
 /*
- * Iteratively refresh the HN list on an update, and refresh Node display for selected cell
+ * Refresh display from the HN list on an addition of a new node, at indicated position
  *
  * hnList = Array of HN
+ * nnId = Integer, index of added node in hnList
+ * pos_insideMulti = Integer, position inside parent multi when a refresh is made in a multi. Else, undefined.
  */
-function refreshHNList (hnList) {
+function refreshHNList (hnList, hnId, pos_insideMulti) {
+//console.log("hnId "+hnId+" pos_insideMulti "+pos_insideMulti);
   let HN;
-  // First refresh existing records (only their state, is_complete, reversion and revOp_HNref can change)
-  for (let i=0 ; i<lastHNListLen ; i++) {
+  // First refresh all previous records which could have something changed because of this addition
+  // Note: only their state, is_complete, reversion and revOp_HNref can change,
+  //       and nodes inside a multi record can also change in their displayed state; inherited from their parent
+  let is_historyDispURList = options.historyDispURList;
+  let revOp;
+  for (let i=0 ; i<hnId ; i++) {
 	HN = hnList[i];
-	refreshBookmarkHN(i, HN);
+	if (refreshBookmarkHN(i, HN) && HN.is_multi
+		&& (!is_historyDispURList || ((revOp = HN.revOp) == undefined) || (revOp == HNREVOP_NONE))
+	   ) {
+	  // If a multi went inactive, also change the displayed state of its children, forcing them to inactive,
+	  // when not in URList mode, or when not a reversion multi
+	  let hn_list = HN.hn_list;
+	  let len = hn_list.length;
+	  for (let j=0 ; j<len ; j++) {
+		refreshBookmarkHN(i, hn_list[j], j, HNSTATE_INACTIVEBRANCH);
+	  }
+	}
   }
-  // Then add new record(s)
-  let len = hnList.length;
-  for (let i=lastHNListLen ; i<len ; i++) {
-	HN = hnList[i];
-	appendBookmarkHN(i, HN);
+
+  // Check if hnid is already displayed (can happen on completing a reversion operation
+  HN = hnList[hnId];
+  let row;
+  if ((pos_insideMulti == undefined) && ((row = curRowList[hnId]) != undefined)) { // Yes => simple refresh here also
+	refreshBookmarkHN(hnId, HN);
   }
-  lastHNListLen = len;
+  else { // Add new record, by an insert or an append at end
+	let len = hnList.length;
+	let insertPos = -1; // Append at end by default
+	let forcedState;
+	let is_visible;
+	revOp = HN.revOp;
+	if ((pos_insideMulti == undefined) && (revOp != undefined) && (revOp != HNREVOP_NONE) && is_historyDispURList) {
+ 	  // Insert at end of urlist of reverted bookmark
+	  // Get reverted node
+	  let revHNid = hnId+HN.revOp_HNref;
+	  let rowIndex;
+	  let revHN = hnList[revHNid];
+	  let revOp_HNref_list = revHN.revOp_HNref_list;
+	  is_visible = (revHN.is_urlistOpen == true); // Row is visible if revHN URList is open
+	  if (revOp_HNref_list == undefined) { // This is the first reversion on this node
+	    let len;
+		if (revHN.is_multi) { // If multi, insert after the last displayed item in the multi record 
+		  len = revHN.hn_list.length;
+		  row = curRowList[revHNid+"+"+(len-1)];
+		}
+		else { // Insert just after the reverted record
+		  row = curRowList[revHNid];
+		}
+		// Insert first the URList row and then this node, just after
+		rowIndex = row.rowIndex;
+		len = bookmarksTable.rows.length;
+		if (++rowIndex >= len) { // Already at end
+		  appendURList(revHNid, is_visible);
+		}
+		else { // Not the last panel row, insert before the next row
+		  appendURList(revHNid, is_visible, rowIndex);
+		  insertPos = ++rowIndex; // Shift by 1 for the next insert
+		}
+	  }
+	  else { // Not the first reversion, insert after the latest previous reversion
+		let len = revOp_HNref_list.length;
+		row = curRowList[revHNid+revOp_HNref_list[len-1]];
+		rowIndex = row.rowIndex;
+		len = bookmarksTable.rows.length;
+		if (++rowIndex < len) { // Not at end
+		  insertPos = rowIndex;
+		}
+	  }
+	}
+	else {
+	  // Search for the first node after it, which is already displayed, if any
+	  if (pos_insideMulti != undefined) { // Added inside a multi
+		is_visible = HN.is_open; // Always visible
+		// Refresh parent if it becomes complete
+		if (HN.is_complete) {
+		  refreshBookmarkHN(hnId, HN);
+		}
+		// If parent is a reversion node and we are in URList mode, do not display it, however refresh parent if it becomes complete
+		if ((revOp != undefined) && (revOp != HNREVOP_NONE) && is_historyDispURList) {
+		  return;
+		}
+		// Else, go to multi parent, and check if there is an already displayed later sibbling
+		let len = HN.hn_list.length; // Prepare, before reusing HN and losing the pointer at parent multi
+		forcedState = HN.state;
+		HN = HN.hn_list[pos_insideMulti];
+		for (let i=pos_insideMulti+1 ; i<len ; i++) {
+		  row = curRowList[hnId+"+"+i]; // String
+		  if (row != undefined) { // Found one
+			insertPos = row.rowIndex;
+			break;
+		  }
+		}
+	  }
+	  else {
+		is_visible = true; // Always visible
+	  }
+	  if (insertPos == -1) { ///Still didn't find a place)
+		for (let i=hnId+1 ; i<len ; i++) {
+		  row = curRowList[i];
+		  if ((row != undefined)
+			  && (!is_historyDispURList || ((revOp = hnList[i].revOp) == undefined) || (revOp == HNREVOP_NONE)) // Ignore reversion nodes in URList mode
+			 ) { // Found one
+			insertPos = row.rowIndex;
+			break;
+		  }
+		}
+	  } 
+	}
+	appendBookmarkHN(hnId, HN, is_visible, pos_insideMulti, forcedState, insertPos);
+  }
+}
+
+/*
+ * Refresh favicon of an existing bookmark inside the "pane" table.
+ *
+ * index = integer, index in the history list, or String of the form "index+pos_insideMulti"
+ * uri = String, new faviconuri to show
+ */
+function refreshFaviconRow (index, uri) {
+  let row = curRowList[index];
+  let cell = row.firstElementChild;
+  let bkmkitem = cell.firstElementChild;
+  let oldImg;
+  let classList = bkmkitem.classList;
+  if (classList.contains("bkmkitem_b")) {
+	oldImg = bkmkitem.firstElementChild.nextElementSibling.nextElementSibling.nextElementSibling;
+  }
+  else if (classList.contains("bkmkitem_mb")) {
+	oldImg = bkmkitem.firstElementChild.nextElementSibling.nextElementSibling;
+  }
+  else { // bkmkitem_u or bkmkitem_r
+	if (options.historyDispURList) { // In URList mode, such nodes do not show the favicon
+	  return;
+	}
+	oldImg = bkmkitem.firstElementChild.nextElementSibling.nextElementSibling.nextElementSibling;
+  }
+  // Set image
+  let cn = oldImg.className;
+  if (uri == "/icons/nofavicon.png") {
+	if ((cn == undefined) || !cn.includes("nofavicon")) { // Change to nofavicon only if not already a nofavicon
+	  let tmpElem = document.createElement("div");
+	  tmpElem.classList.add("nofavicon");
+	  tmpElem.draggable = false; // True by default for <img>
+	  bkmkitem.replaceChild(tmpElem, oldImg);
+	}
+  }
+  else {
+	if ((cn != undefined) && cn.includes("nofavicon")) { // Change type from <div> to <img> if it was a nofavicon
+	  let tmpElem = document.createElement("img"); // Assuming it is an HTMLImageElement
+	  tmpElem.classList.add("favicon");
+	  tmpElem.draggable = false; // True by default for <img>
+	  tmpElem.src = uri;
+	  bkmkitem.replaceChild(tmpElem, oldImg);
+	}
+	else {
+	  oldImg.src = uri;
+	}
+  }
+
+  // If row is also in the Node display pane, update it
+  if (cellHighlight == cell) {
+	displayHN(row.dataset.type, index);
+  }
 }
 
 /*
@@ -1750,50 +2113,48 @@ function refreshHNList (hnList) {
 function refreshFavicon (hnList, bnId, uri) {
   // Update all corresponding rows inside the bookmarks table
   let len = hnList.length;
-  let HN;
+  let len2;
+  let HN, hn_list;
   for (let i=0 ; i<len ; i++) {
 	HN = hnList[i];
 	if (HN.id == bnId) { // Corresponding HistoryNode, update its row
-	  let row = curRowList[i];
-	  let cell = row.firstElementChild;
-	  let bkmkitem = cell.firstElementChild;
-	  let oldImg;
-	  if (bkmkitem.classList.contains("bkmkitem_b")) {
-		oldImg = bkmkitem.firstElementChild.nextElementSibling.nextElementSibling.nextElementSibling;
-	  }
-	  else { // bkmkitem_mb
-		oldImg = bkmkitem.firstElementChild.nextElementSibling.nextElementSibling;
-	  }
-	  // Set image
-	  let cn = oldImg.className;
-	  if (uri == "/icons/nofavicon.png") {
-		if ((cn == undefined) || !cn.includes("nofavicon")) { // Change to nofavicon only if not already a nofavicon
-		  let tmpElem = document.createElement("div");
-		  tmpElem.classList.add("nofavicon");
-		  tmpElem.draggable = false; // True by default for <img>
-		  bkmkitem.replaceChild(tmpElem, oldImg);
-		}
-	  }
-	  else {
-		if ((cn != undefined) && cn.includes("nofavicon")) { // Change type from <div> to <img> if it was a nofavicon
-		  let tmpElem = document.createElement("img"); // Assuming it is an HTMLImageElement
-		  tmpElem.classList.add("favicon");
-		  tmpElem.draggable = false; // True by default for <img>
-		  tmpElem.src = uri;
-		  bkmkitem.replaceChild(tmpElem, oldImg);
-		}
-		else {
-		  oldImg.src = uri;
-		}
-	  }
-
-	  // If row is in Node display, update it
-	  if (cellHighlight == cell) {
-		if (row.dataset.type != "urlist") {
-		  displayHN(i);
+	  refreshFaviconRow(i, uri);
+	}
+	if (HN.is_multi
+		|| ((HN.revOp != undefined) && (HN.revOp != HNREVOP_NONE) && (!options.historyDispURList))
+	   ) { // Also update display of the nodes in hn_list
+	  hn_list = HN.hn_list;
+	  if (hn_list != undefined) {
+		len2 = hn_list.length;
+		for (let j=0 ; j<len2 ; j++)  {
+		  if (hn_list[j].id == bnId) {
+			refreshFaviconRow(i+"+"+j, uri);
+		  }
 		}
 	  }
 	}
+  }
+}
+
+/*
+ * Deamnd save of curHNList (qhich is saved by saveBNList() in the background thread).
+ */
+async function saveBNList () {
+  if (backgroundPage == undefined) {
+	try {
+	  let message = await browser.runtime.sendMessage(
+			{source: "sidebar:"+myWindowId,
+			 content: "saveBNList"
+			}
+		  );
+	  handleMsgResponse(message);
+	}
+	catch (error) {
+	  handleMsgError(error);
+	}
+  }
+  else {
+	backgroundPage.saveBNList();
   }
 }
 
@@ -1805,19 +2166,9 @@ function handleMsgResponse (message) {
   // Is always called, even is destination didn't specifically reply (then message is undefined)
   if (message != undefined) {
 	let msg = message.content;
-if (options.traceEnabled) {
-  console.log("Background sent a response: <<"+msg+">> received in options");
-}
-	if (msg == "getStats") {
+	if (options.traceEnabled) {
+	  console.log("History "+myWindowId+" received a response: <<"+msg+">>");
 	}
-	// -> Never happens from traces
-//	else if (msg == "getCurHNList") { // Received curBNList content
-//	  let json = message.json;
-//	  curBNList = ...;
-//	  curHNList = historyListDeserialize(json);
-//
-//	  f_initializeNext();
-//	}
   }
 }
 
@@ -1830,7 +2181,7 @@ function handleMsgError (error) {
  */
 function sendAddonMessage (msg) {
   browser.runtime.sendMessage(
-	{source: "options",
+	{source: "history:"+myWindowId,
 	 content: msg
 	}
   ).then(handleMsgResponse, handleMsgError);
@@ -1845,14 +2196,14 @@ function handleAddonMessage (request, sender, sendResponse) {
 	  // When coming from sidebar:
 	  //   sender.url: moz-extension://28a2a188-53d6-4f91-8974-07cd0d612f9e/sidebar/panel.html
 	  let msg = request.content;
-if (options.traceEnabled) {
-  console.log("Got message <<"+msg+">> from "+request.source+" in "+myWindowId);
-  console.log("  sender.tab: "+sender.tab);
-  console.log("  sender.frameId: "+sender.frameId);
-  console.log("  sender.id: "+sender.id);
-  console.log("  sender.url: "+sender.url);
-  console.log("  sender.tlsChannelId: "+sender.tlsChannelId);
-}
+		if (options.traceEnabled) {
+		  console.log("Got message <<"+msg+">> from "+request.source+" in History "+myWindowId);
+		  console.log("  sender.tab: "+sender.tab);
+		  console.log("  sender.frameId: "+sender.frameId);
+		  console.log("  sender.id: "+sender.id);
+		  console.log("  sender.url: "+sender.url);
+		  console.log("  sender.tlsChannelId: "+sender.tlsChannelId);
+		}
 
 	  if (msg.startsWith("savedOptions")) { // Option page changed something to options, reload them
 		// Look at what changed
@@ -1881,7 +2232,8 @@ if (options.traceEnabled) {
 		  if (reversePath_option_old != options.reversePath) {
 			// Update displayed HN
 			if (cellHighlight != null) {
-			  displayHN(cellHighlight.parentElement.dataset.id);
+			  let row = cellHighlight.parentElement;
+			  displayHN(row.dataset.type, row.dataset.id);
 			}
 		  }
 		  // If match FF theme option changed
@@ -1945,8 +2297,10 @@ if (options.traceEnabled) {
 		// Reset of search pane height
 //		SearchResult.style.height = "";
 	  }
-	  else if (msg.startsWith("hnListAdd")) { // We are getting a new record appended to curHNList
-		refreshHNList(curHNList.hnList); // This takes cre also of the Node display
+	  else if (msg.startsWith("hnListAdd")) { // We are getting a new record appended to curHNList or tp one of its nodes
+		let pos = request.pos;
+		let pos_insideMulti = request.pos_insideMulti;
+		refreshHNList(curHNList.hnList, pos, pos_insideMulti); // This takes care also of the Node display
 		// Update undo/redo cursor
 		setUndoRedoCursor();
 	  }
@@ -1957,7 +2311,7 @@ if (options.traceEnabled) {
 	  else if (msg.startsWith("asyncFavicon")) { // Got a favicon uri to refresh
 		let bnId = request.bnId;
 		let uri = request.uri;
-		refreshFavicon (curHNList.hnList, bnId, uri);
+		refreshFavicon(curHNList.hnList, bnId, uri);
 	  }
 
 	  // Answer (only to background task, to not perturbate dialog between sidebars or other add-on windows, and background)
@@ -2083,6 +2437,8 @@ async function completeFavicons () {
   let HN;
   tt1 = Performance.now();
   let len = hnList.length;
+  let is_historyDispURList = options.historyDispURList;
+  let row, img;
   for (let i=0 ; i<len ; i++) {
 	HN = hnList[i];
 	if (HN.type == "bookmark") {
@@ -2098,16 +2454,39 @@ async function completeFavicons () {
 		}
 	  }
 
-	  // Display the favicon
-	  let row = curRowList[i];
-	  let img;
-	  if (HN.multi_HNref != undefined) {
-		img = row.firstElementChild.firstElementChild.firstElementChild.nextElementSibling.nextElementSibling;
-	  }
-	  else {
+	  // Display the favicon when this is a standard bookmark row
+	  if (!is_historyDispURList || (HN.revOp == undefined)) {
+		row = curRowList[i];
 		img = row.firstElementChild.firstElementChild.firstElementChild.nextElementSibling.nextElementSibling.nextElementSibling;
+		img.src = HN.faviconUri;
 	  }
-	  img.src = HN.faviconUri;
+	}
+	else if (HN.is_multi) { // Also process the nodes inside multi records
+	  let hn_list = HN.hn_list;
+	  let len = hn_list.length;
+	  for (let j=0 ; j<len ; j++) {
+		HN = hn_list[j];
+		if (HN.type == "bookmark") {
+		  // Give a chance to other events every Bunch
+		  if (++bunchCount > Bunch) {
+			// Impose a minimum count, and then
+			// give a chance to other events every Fluidity ms (40 ms = 25 times per second)
+			tt2 = Performance.now();
+			if (tt2 - tt1 >= Fluidity) {
+			  bunchCount = 0;
+			  tt1 = tt2;
+			  await sleep(0);
+			}
+		  }
+
+		  // Display the favicon, if the row exists (not the case when multiple in a reversion node, in URList mode)
+		  row = curRowList[i+"+"+j];
+		  if (row != undefined) {
+			img = row.firstElementChild.firstElementChild.firstElementChild.nextElementSibling.nextElementSibling;
+			img.src = HN.faviconUri;
+		  }
+		}
+	  }
 	}
   }
 }

@@ -141,6 +141,14 @@ tbody {
   background-image: url("/icons/urcursor.png");
 }
 
+.urcursortop {
+  flex: none;
+  height: 16px;
+  width: 16px;
+  vertical-align: text-bottom;
+  background-image: url("/icons/urcursortop.png");
+}
+
 .histicon {
   flex: none;
   height: 16px;

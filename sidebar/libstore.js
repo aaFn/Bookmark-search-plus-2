@@ -13,7 +13,7 @@ const DfltTextColor = "#222426"; // Default text color
 const DfltBckgndColor = "#ffffff"; // Default background color
 const DfltHistoryRetention = 30; // 30 days default - Align trash retention on it also
 
-const OptionsList = {
+const OptionsList = { // OptionDesc (storeName, type, dflt)
 	pauseFavicons: new OptionDesc ("pausefavicons_option", "Boolean", false),
 	disableFavicons: new OptionDesc ("disablefavicons_option", "Boolean", false),
 	enableCookies: new OptionDesc ("enablecookies_option", "Boolean", false),
@@ -27,6 +27,7 @@ const OptionsList = {
 	noffapisearch: new OptionDesc ("noffapisearch_option", "Boolean", false),
 	delayLoad: new OptionDesc ("delayLoad_option", "Boolean", false),
 	searchOnEnter: new OptionDesc ("searchonenter_option", "Boolean", false),
+	deactivateSearchList: new OptionDesc ("deactivatesearchlist_option", "Boolean", false),
 	reversePath: new OptionDesc ("reversepath_option", "Boolean", false),
 	closeSibblingFolders: new OptionDesc ("closesibblingfolders_option", "Boolean", false),
 	rememberSizes: new OptionDesc ("remembersizes_option", "Boolean", false),
@@ -53,12 +54,12 @@ const OptionsList = {
 	altNoFavImg: new OptionDesc ("altnofavimg_option", "DataURI", undefined), // String "data:<URI>"
 	useAltNoFav: new OptionDesc ("usealtnofav_option", "Boolean", false),
 	lastcurbnid: new OptionDesc ("lastcurbnid_option", "String", undefined),
-	sidebarCommand: new OptionDesc ("sidebarcommand_option", "String", undefined),
+	sidebarCommand: new OptionDesc ("sidebarcommand_option", "String", undefined, true), // DEPRECATED
 	appendAtFldrEnd: new OptionDesc ("appendatfldrend_option", "Boolean", true),
-	searchField: new OptionDesc ("searchfield_option", "String", undefined),
-	searchScope: new OptionDesc ("searchscope_option", "String", undefined),
-	searchMatch: new OptionDesc ("searchmatch_option", "String", undefined),
-	searchFilter: new OptionDesc ("searchfilter_option", "String", undefined),
+	searchField: new OptionDesc ("searchfield_option", "String", "both"),
+	searchScope: new OptionDesc ("searchscope_option", "String", "all"),
+	searchMatch: new OptionDesc ("searchmatch_option", "String", "words"),
+	searchFilter: new OptionDesc ("searchfilter_option", "String", "all"),
 	trashEnabled: new OptionDesc ("trashenabled_option", "Boolean", true),
 	trashVisible: new OptionDesc ("trashvisible_option", "Boolean", false),
 	historyDispURList: new OptionDesc ("historydispurlist_option", "Boolean", true), // Used to group undo/redo as sublist under related bookmark action - true by default
@@ -116,7 +117,7 @@ function cleanupOptions (options) {
 		browser.storage.local.remove("historyheight_option");
 		browser.storage.local.remove("historywidth_option");
 	}
-	if (!options.fontsetFontSize) { // Reset to default size value
+	if (!options.setFontSize) { // Reset to default size value
 		options.fontSize = DfltFontSize;
 	}
 	if (!options.setSpaceSize) { // Reset to default space value
@@ -154,7 +155,7 @@ function refreshOptionsBgnd(backgroundPage) {
 function refreshOptionsLStore() {
 	let a_option_specs = [];
 	for (let o in OptionsList) {
-		if (Object.hasOwn(OptionsList, o)) {
+		if (OptionsList.hasOwnProperty(o)) {
 			a_option_specs.push(OptionsList[o].storeName);
 		}
 	}
@@ -165,9 +166,20 @@ function refreshOptionsLStore() {
 				a_option_specs
 			);
 			gettingItem.then((res) => {
+				let option, value;
 				for (let o in OptionsList) {
-					if (Object.hasOwn(OptionsList, o)) {
-						options[o] = OptionsList[o].readValue(res);
+					if (OptionsList.hasOwnProperty(o)) {
+						option = OptionsList[o];
+						value = option.readValue(res);
+						// Delete this option from local store if deprecated
+						if (option.isDeprecated()) {
+							if (value != undefined) {
+								browser.storage.local.remove([option.storeName]);
+							}
+						}
+						else {
+							options[o] = value;
+						}
 					}
 				}
 				cleanupOptions(options);
@@ -253,7 +265,7 @@ function readFoldersLStore(waitMsg) {
 function launchReadFullLStore(isSidebar) {
 	let a_option_specs = [];
 	for (let o in OptionsList) {
-		if (Object.hasOwn(OptionsList, o)) {
+		if (OptionsList.hasOwnProperty(o)) {
 			a_option_specs.push(OptionsList[o].storeName);
 		}
 	}
@@ -294,14 +306,29 @@ function launchReadFullLStore(isSidebar) {
 function readFullOptions(res, isSidebar, waitMsg) {
 	waitMsg("Read options..");
 	for (let o in OptionsList) {
-		if (Object.hasOwn(OptionsList, o)) {
+		if (OptionsList.hasOwnProperty(o)) {
 			options[o] = OptionsList[o].readValue(res);
+		}
+	}
+	let option, value;
+	for (let o in OptionsList) {
+		if (OptionsList.hasOwnProperty(o)) {
+			option = OptionsList[o];
+			value = option.readValue(res);
+			// Delete this option from local store if deprecated
+			if (option.isDeprecated()) {
+				if (value != undefined) {
+					browser.storage.local.remove([option.storeName]);
+				}
+			}
+			else {
+				options[o] = value;
+			}
 		}
 	}
 	cleanupOptions(options);
 
 	// If sidebar, read folders state, else read saved Bookmark Node or uri structure
-	let value;
 	if (isSidebar) {
 		waitMsg("Read folders state..");
 		if ((value = res.savedFldrOpenList) != undefined) {
