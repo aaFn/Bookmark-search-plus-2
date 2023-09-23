@@ -1,8 +1,32 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.118 23/09/2023 Bugs and Improvements
+    - Hide the reset filters button of the search box when it is not active. Only show it when there is something
+      to reset. This avoids confusion, and simplifies the interface.
+    - Added handling of right and middle clicks on the reset filters button, to avoid showing the FF native menus.
+    - Added a menu-twistie button on the left of the search box in the sidebar, to show / hide an expanded menu,
+      containing new buttons for undo and redo.
+    - Added undo and redo buttons in the new expanded menu in the bookmarks panel, doing the same as Ctrl-Z and Ctrl-Y.
+    - Added handling of Ctrl-Z and Ctrl-Y shortcut keys in the history window.
+    - Enabled the undo and redo buttons in the history window, doing the same as Ctrl-Z and Ctrl-Y.
+    - Modified the layout of the action buttons in the History window, and some of their naming. 
+    - Simplified slightly the CSS for panel.html.
+    - Improved the contrast between hover and no hover on red buttons in the search box.
+    - Modified behavior in the history window, to set the focus on the undo/redo cursor when it changes position.
+    - Corrected a bug where a wrong title was displayed on the search button, when selecting a particular
+      filter (folders or bookmarks only).
+    - Corrected a bug when converting to new HistoryList format, where an old "inside multi" node placed in its
+      parent was still appearing in the HistoryList.
+    - Corrected a bug where navigating with keyboard in the history panel was selecting hidden (non expanded) rows.
+    - Corrected a code exception happening when a node was created or changed inside BSP2 trash and the BSP2 trash
+      was not visible (could happen on an undo/redo of a past action when BSP2 trash was visible, or when an action
+      is made inside BSP2 trash from native FF bookmarks sidebar, or another add-on).
+    - Corrected a code exception happening when an history node was created inside another history node, in case of
+      a folder within a multi record, on undo/redo or on folder copy.
 - 2.0.117 08/09/2023 Bugs and Improvements
- 	- Added undo/redo support.
+    - Added undo/redo support (for now only by keyboard shortcuts Ctrl-Z and Ctrl-Y on the main panel - buttons,
+      and Ctrl-Z / Ctrl-Y in the history window, will come in next version. 
     - Added support for multiple create when copying a list of bookmarks or copying a folder with children,
       so that they group as one operation in history, and can be undone/redone in one go - until now, they were
       created as individual actions, not grouped.
