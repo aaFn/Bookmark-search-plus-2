@@ -130,6 +130,10 @@ const HNREVERSION_REDONE = 2;
 //    Array of String, target order when "reorder", else undefined.
 // *state
 //    Integer. 0 (or undefined) means "active branch", 1 means "inactive branch"
+// nextUndone_HNref
+//    Valid only when state is "active branch". Indicates relative (positive) position of the next normal undone history
+//    node, which can be redone. Initialized to 0 for every node. Then set to the positive value when the next active node
+//    is undone (reversion set to inside that next node).
 // *revOp
 //    If undefined, this is a normal operation. Else, 1 is for an "undo" record, and 2 is for a "redo" record
 // *revOp_HNref
@@ -213,6 +217,9 @@ function HistoryNode (action,
 	if (revOp != undefined) {
 	  this.revOp       = revOp; 
 	  this.is_complete = false;
+	}
+	else {
+	  this.nextUndone_HNref = 0;
 	}
 	if (revOp_HNref != undefined) {
 	  this.revOp_HNref = revOp_HNref
@@ -346,41 +353,37 @@ function HN_trace (HN) {
 // hnList
 //   List (array) of HistoryNode
 // activeIndex
-//   Index in list of last active and not undone record (undefined if the list is empty)
+//   Index in list of last active and not undone record (undefined if the list is empty) - recalculated at restart
+// undoList
+//   List (array) of indexes of undone records after activeIndex, which can be redone - rebuilt at each restart
 // lastMulti
 //   Index in list of last is_multi action, when not yet complete (else, undefined)
 // lastRevOp
 //   Index in list of last reversion operation (undo or redo), when not yet complete (else, undefined)
 function HistoryList (hnList = []) {
   this.hnList = hnList;
+  this.undoList = [];
   // Recalculate activeIndex, and find lastMulti at same time, if any
   // Also, convert the old format with multi_HNref into the new one of multi records containing involved nodes.
   let hn;
   let action, state;
   let activeIndex = undefined;
-  let lastMulti = undefined;
-  let is_multiFound = false;
+  let decrActiveIndex = 0;
   let multiIndex, multiHN, hn_list;
   let toIndex;
+  let delta, pos;
   for (let i=hnList.length-1 ; i>=0 ; i--) {
 	hn = hnList[i];
-	let delta = undefined;
+	delta = undefined;
 	if (hn.is_multi) { // This is a multi node
-	   // For the old multi format, make sure there is a childs list, even if no "inside multi" node
+	   // For the new multi format, make sure there is a childs list, even if no "inside multi" node
 	   // is encountered later
 	  if (hn.hn_list == undefined) {
 		hn.hn_list = new Array (hn.id_list_len);
 	  }
-	  // Remember the most recent incomplete one
-	  if (!is_multiFound) {
-		is_multiFound = true;
-		if (!hn.is_complete) {
-		  lastMulti = i;
-		}
-	  }
 	}
 	else {
-	  // Convert old "inside multi" nodes to the new format
+	  // Convert old "inside multi" nodes to the new format, really insde their multi parent
 	  if ((delta = hn.multi_HNref) != undefined) { // Old format = this is a node refering to a multi parent
 		multiIndex = i + delta;
 		multiHN = hnList[multiIndex];
@@ -388,8 +391,8 @@ function HistoryList (hnList = []) {
 		if (hn_list == undefined) { // Create the list if missing
 		  hn_list = multiHN.hn_list = new Array (multiHN.id_list_len);
 		}
-		// Insert at right place in the mluti record
-		let pos = multiHN.found_id_list.indexOf(hn.id);
+		// Insert at right place in the parent multi record
+		pos = multiHN.found_id_list.indexOf(hn.id);
 		hn_list[pos] = hn;
 		hn.is_insideMult = true;
 		delete hn.multi_HNref; // Remove the attribute
@@ -403,40 +406,51 @@ function HistoryList (hnList = []) {
 		}
 	  }
 	}
-	  
-	if ((activeIndex == undefined) && (delta == undefined)) { // Remember node as activeIndex if appropriate
-	  state = hn.state;
-	  if (((state == undefined) || (state == HNSTATE_ACTIVEBRANCH))
-		  && ((action = hn.action) != HNACTION_BSP2START)
-		  && (action != HNACTION_RELOADFFAPI)
-		  && (action != HNACTION_AUTORELOADFFAPI)
-		  && (action != HNACTION_CLEARHISTORY)
-		  && (hn.revOp == undefined)
-		  && (hn.reversion != HNREVERSION_UNDONE)
-		 ) {
-		activeIndex = i;
+
+	// As there was a bug in 2.0.117 forgetting to remove hn when moved inside its parent, do it now
+	// This covers also the conversion case aboce
+	if (hn.is_insideMult == true) {
+	  // Remove the node from the history list, since it is now inside its parent
+	  // Note: this is possible because we are going through the list from its end in reverse order ..
+	  hnList.splice(i, 1);
+	  if (activeIndex != undefined) {
+console.log("Removing node from HistoryList because moved inside multi.");
+		decrActiveIndex++; // Decrease activeIndex and undoList when the loop is finished
 	  }
 	}
-	
+
+	if (delta == undefined) { // Potentially a normal node
+	  if (activeIndex == undefined) { // Analyze node
+		if ((((state = hn.state) == undefined) || (state == HNSTATE_ACTIVEBRANCH))
+			&& ((action = hn.action) != HNACTION_BSP2START)
+			&& (action != HNACTION_RELOADFFAPI)
+			&& (action != HNACTION_AUTORELOADFFAPI)
+			&& (action != HNACTION_CLEARHISTORY)
+			&& (hn.revOp == undefined)
+		   ) { // This is a normal node
+		  // Build the undone list
+		  if (hn.reversion == HNREVERSION_UNDONE) {
+			// Remember this undone node
+			this.undoList.unshift(i);
+		  }
+		  else { // No reversion, or already redone
+			// Remember node as activeIndex if appropriate
+			activeIndex = i;
+		  }
+		}
+	  }
+	}
   }
 
+  // Adjust activeIndex and undoList indexes
+  if (decrActiveIndex > 0) {
+	activeIndex -= decrActiveIndex;
+	for (let i=this.undoList.length-1 ; i>=0 ; i--) {
+	  this.undoList[i] -= decrActiveIndex; 
+	}
+  }
   // Store the activeIndex value
-  if ((activeIndex == undefined) || (activeIndex < 0)) {
-	this.activeIndex = undefined;
-  }
-  else { // Adjust activeIndex in case the found record is a reversion operation
-	let revOp;
-	if ((revOp = hn.revOp) == HNREVOP_ISUNDO) { // Last not undone record is the one before revOp_HNref
-	  activeIndex += hn.revOp_HNref - 1;
-	}
-	else if (revOp == HNREVOP_ISREDO) { // Last not undone record is the one on revOp_HNref
-	  activeIndex += hn.revOp_HNref;
-	}
-	this.activeIndex = (activeIndex >= 0 ? activeIndex : undefined);
-  }
-
-  // Store the lastMulti value
-  this.lastMulti = lastMulti;
+  this.activeIndex = activeIndex;
 }
 
 
@@ -686,7 +700,10 @@ function historyListAdd (hl, action,
 		  // Update undone record with proper information
 		  tmpHn.revOp_HNref = -revOp_HNref;
 		  tmpHn.reversion = HNREVERSION_UNDONE;
+		  // Add undone record to the undone list
+		  hl.undoList.unshift(tmpIndex);
 		  // Find the last active record before the undone one, and set it in activeIndex
+		  // Also update nextUndone_HNref in the found node, if there is one
 		  let tmpState, tmpAction;
 		  while (--tmpIndex >= 0) {
 			tmpState = (tmpHn = hnList[tmpIndex]).state;
@@ -707,7 +724,7 @@ function historyListAdd (hl, action,
 		  // Remember the operation
 		  hl.lastRevOp = pos;
 
-		  // There must be already a reversion on the redone record, inactivate the revOp record we are replacing
+		  // There must be already an undo on the redone record, inactivate the revOp record we are replacing
 		  // Also set activeIndex to the redone record itself
 		  let tmpIndex = hl.activeIndex = revOp_HNref;
 		  hn.revOp_HNref = revOp_HNref = tmpIndex - pos;
@@ -716,6 +733,7 @@ function historyListAdd (hl, action,
 		  if (reversion != undefined) { // Must be ...!!
 			let oldDelta = tmpHn.revOp_HNref;
 			let revOpIndex = tmpIndex + oldDelta;
+			// Inactivate the old undo
 			hnList[revOpIndex].state = HNSTATE_INACTIVEBRANCH;
 			// Store old revOp_HNref in revOp_HNref_list
 			let lst = tmpHn.revOp_HNref_list;
@@ -723,6 +741,8 @@ function historyListAdd (hl, action,
 			  lst = tmpHn.revOp_HNref_list = [];
 			}
 			lst.push(oldDelta);
+			// Remove the undone index from undoList - it must be front one (LIFO mode)
+			hl.undoList.shift();
 		  }
 		  // Update redone record with proper information
 		  tmpHn.revOp_HNref = -revOp_HNref;
@@ -748,6 +768,11 @@ function historyListAdd (hl, action,
 			  tmpHn.state = HNSTATE_INACTIVEBRANCH;
 			}
 		  }
+		  // Also clear the undoList, as all its items are now inactive
+		  let undoList = hl.undoList;
+		  if (undoList.length > 0) {
+			undoList.length = 0;
+		  }
 		}
 	  }
 	}
@@ -760,7 +785,9 @@ function historyListAdd (hl, action,
 	{source: "background",
 	 content: "hnListAdd",
 	 pos: pos,
-	 pos_insideMulti: pos_insideMulti
+	 pos_insideMulti: pos_insideMulti,
+	 canUndo: (hl.activeIndex != undefined),
+	 canRedo: (hl.undoList.length > 0)
 	});
 
   return(hn);
@@ -812,6 +839,11 @@ function historyListAddCreate (hl, hn) {
 		tmpHn.state = HNSTATE_INACTIVEBRANCH;
 	  }
 	}
+	// Also clear the undoList, as all its items are now inactive
+	let undoList = hl.undoList;
+	if (undoList.length > 0) {
+	  undoList.length = 0;
+	}
   }
 
   // Notify the Bookmark history window that there is a change, if it is open
@@ -819,7 +851,9 @@ function historyListAddCreate (hl, hn) {
 	{source: "background",
 	 content: "hnListAdd",
 	 pos: pos,
-	 pos_insideMulti: undefined
+	 pos_insideMulti: undefined,
+	 canUndo: (hl.activeIndex != undefined),
+	 canRedo: (hl.undoList.length > 0)
 	});
 }
 
@@ -844,9 +878,7 @@ function historyListAttachCreate (hl, hn, toHN) {
   let foundLen = found_id_list.push(bnId);
   let is_multi = hn.is_insideMulti = toHN.is_multi; // Mark it as inside a Multi action record
 
-  let pos;
   if (is_multi) {
-	pos = hl.lastMulti;
 	if (foundLen == toHN.id_list_len) { // We found the complete list
 		toHN.is_complete = true;
 		hl.lastMulti = undefined; // No more lastMulti to remember for matching
@@ -856,10 +888,9 @@ function historyListAttachCreate (hl, hn, toHN) {
 	  }
   }
   else {
-	pos = hl.lastRevOp;
 	pos_insideMulti = undefined;
-	toHN.is_complete = true;
-	if (toHN.revOp != undefined) { // No more lastRevOp
+	if (toHN.revOp != undefined) { // Merk toHN complete, and no more lastRevOp
+	  toHN.is_complete = true;
 	  hl.lastRevOp = undefined;
 	}
   }
@@ -876,12 +907,15 @@ function historyListAttachCreate (hl, hn, toHN) {
   }
 */
 
+  let pos = hl.hnList.indexOf(toHN); // Retrieve index of toHN in hnList. Will be -1 in case of a folder within multi
   // Notify the Bookmark history window that there is a change, if it is open
   sendAddonMsgComplex(
 	{source: "background",
 	 content: "hnListAdd",
 	 pos: pos,
-	 pos_insideMulti: pos_insideMulti
+	 pos_insideMulti: pos_insideMulti,
+	 canUndo: (hl.activeIndex != undefined),
+	 canRedo: (hl.undoList.length > 0)
 	});
 }
 
@@ -1098,15 +1132,25 @@ async function executeUndo (hl) {
  * Execute a Redo action, obtained from history (if thre is an action to redo)
  */
 async function executeRedo (hl) {
+  // Redo the next undone record on active branch which is just after activeIndex
+  // It is the first record in undoList
+  let undoList = hl.undoList;
+  let activeIndex;
+  if (undoList.length > 0) {
+	activeIndex = undoList[0];
+  }
+/*
   let activeIndex = hl.activeIndex;
   if (activeIndex == undefined) {
 	activeIndex = -1;
   }
-  // Redo the next undone record on active branch which is just after activeIndex
+*/
+
+/*
   // Search for such a record and redo it
   let hnList = hl.hnList;
-  let len = hnList.length;
-  let HN, state, action;
+  let HN, action;
+  let state;
   while (++activeIndex < len) {
 	state = (HN = hnList[activeIndex]).state;
 	if (((state == undefined) || (state == HNSTATE_ACTIVEBRANCH))
@@ -1119,8 +1163,12 @@ async function executeRedo (hl) {
 	  break;
 	}
   }
+*/
 
-  if (activeIndex < len) { // Found one !
+  if (activeIndex != undefined) { // Found one !
+	let hnList = hl.hnList;
+	let HN = hnList[activeIndex];
+	let action = HN.action;
 	// Remember the undo record which we are going to revert before it gets overwritten by historyListAdd()
 	let hnRev = hnList[activeIndex + HN.revOp_HNref];
 	let orig_id_list = hnRev.orig_id_list;
@@ -1162,7 +1210,7 @@ async function executeRedo (hl) {
 	// Take the received list of HNs in the undo to revert
 	// If it is not complete, then we will not redo the not received undone HNs
 	let a_HN = hnRev.hn_list;
-	len = (a_HN == undefined) ? 0 : a_HN.length;
+	let len = (a_HN == undefined) ? 0 : a_HN.length;
 
 	// Determine the redo action to accomplish
 	let moveLoc;
@@ -1312,14 +1360,22 @@ function historyListTrim (hl, retention) {
 	  break;
   }
 //console.log("Records to trim: "+count);
-  if (count > 0) { // Remove all outdated records at start, and update activeIndex and lastMulti
+  if (count > 0) { // Remove all outdated records at start, and update activeIndex and undoList
 	hnList.splice(0, count);
 	let activeIndex = hl.activeIndex - count;
 	hl.activeIndex = (activeIndex >= 0 ? activeIndex : undefined);
-	let lastMulti = hl.lastMulti;
-	if (lastMulti != undefined) {
-	  lastMulti -= count;
-	  hl.lastMulti = (lastMulti >= 0 ? lastMulti : undefined);
+	let undoList = hl.undoList;
+	let i = undoList.length - 1;
+	let v;
+	while (i >= 0) {
+	  v = undoList[i] - count; 
+	  if (v < 0) {
+		break;
+	  }
+	  undoList[i--] = v;
+	}
+	if (i >= 0) { // We need to trim also undoList
+	  undoList.splice(0, i+1);
 	}
   }
 }
@@ -1334,6 +1390,7 @@ function historyListClear (hl) {
   let hn = new HistoryNode (HNACTION_CLEARHISTORY);
   hnList.push(hn);
   hl.activeIndex = hl.lastMulti = hl.lastRevOp = undefined;
+  hl.undoList.length = 0;
 
   // Notify the Bookmark history window of the clear, if it is open
   sendAddonMessage("hnListClear");

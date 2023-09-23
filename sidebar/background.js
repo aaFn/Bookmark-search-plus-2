@@ -111,7 +111,8 @@ var rootBN; // Type is BookmarkNode. This is curBNList[0]
 let selfName; // Our extension name
 let justInstalled; // Signal if we were just installed or this is an update
 let isSidebarOpen = {};			// Track state of open sidebars
-let sidebarCurId = {};			// Track cursor possition of each sidebar to remember it across sidebar close
+let sidebarCurId = {};			// Track cursor position of each sidebar to remember it across sidebar close
+let sidebarExpMenu = {};		// Track expanded menu state of each sidebar to remember it across sidebar close
 let privateSidebarsList = {};	// Track private windows sidebars
 let sidebarScanIntervalId = undefined; // To scan open private sidebars ...
 //let faviconWorker; // For background retrieval of favicons
@@ -341,7 +342,7 @@ function saveBNList () {
 /*
  * Called by a sidebar when opening
  * 
- * Return the corresponding saved cursor position if any (a Bookmark Id String)
+ * Return an object with the corresponding saved cursor position (a Bookmark Id String) and expand menu state if any
  */
 let showInSidebarWId   = undefined;
 let showInSidebarTabId = undefined;
@@ -353,6 +354,7 @@ function newSidebar (windowId) {
   if (bnId == undefined) { // No value for that window, use last saved value instead
 	bnId = options.lastcurbnid;
   }
+  // In case it was open by a show bookmark action, and it was not yet ready, process now the show bookmark action
   if ((showInSidebarWId == windowId) && (showInSidebarBnId != undefined)) {
 	setTimeout(
 	  sendAddonMsgShowBkmk(showInSidebarWId, showInSidebarTabId, showInSidebarBnId)
@@ -362,7 +364,13 @@ function newSidebar (windowId) {
 	showInSidebarTabId = undefined;
 	showInSidebarBnId  = undefined;
   }
-  return(bnId);
+
+  let expMenu = sidebarExpMenu[windowId];
+  if (expMenu == undefined) { // No value for that window, use last saved value instead
+	expMenu = options.expandMenu;
+  }
+
+  return({bnId: bnId, expMenu: expMenu});
 }
 
 /*
@@ -381,6 +389,17 @@ function saveCurBnId (windowId, bnId) {
   options.lastcurbnid = sidebarCurId[windowId] = bnId;
   browser.storage.local.set({
 	lastcurbnid_option: bnId
+  });
+}
+
+/*
+ * Remember current expand menu state for each window, and save it to local store for
+ * next FF restart.
+ */
+function saveExpMenu (windowId, state) {
+  options.expandMenu = sidebarExpMenu[windowId] = state;
+  browser.storage.local.set({
+	expandmenu_option: state
   });
 }
 
@@ -1103,6 +1122,10 @@ if (options.traceEnabled) {
 	  let windowId = parseInt(request.source.slice(8), 10);
 	  saveCurBnId(windowId, request.bnId);
 	}
+	if (msg.startsWith("saveExpMenu")) {
+	  let windowId = parseInt(request.source.slice(8), 10);
+	  saveExpMenu(windowId, request.state);
+	}
 	else if (msg.startsWith("Close:")) { // Private window closing - De-register it
 	  									 // In fact, this message never comes :-(
 	  									 // So have to poll such pages ...
@@ -1345,14 +1368,15 @@ if (options.traceEnabled) {
 	if (msg.startsWith("New:")) { // New private window sidebar opening - Register it
 	  let windowId = parseInt(msg.slice(4), 10);
 	  privateSidebarsList[windowId] = windowId;
-	  let bnId = newSidebar(windowId);
+	  let obj = newSidebar(windowId);
 	  // Start private windows sidebar tracking, except if FF56 as we cannot track sidebar status in that version
 	  if ((sidebarScanIntervalId == undefined) && !beforeFF57) {
 		sidebarScanIntervalId = setInterval(scanSidebars, SidebarScanInterval);
 	  }
 	  sendResponse(
-		{content: "savedCurBnId",
-		 bnId: bnId
+		{content: "savedUIState",
+		 bnId: obj.bnId,
+		 expMenu: obj.expMenu
 		}
 	   );
 	}
@@ -1370,7 +1394,9 @@ if (options.traceEnabled) {
 		 mostVisitedBNId: mostVisitedBNId,
 		 recentTagBNId: recentTagBNId, 
 		 recentBkmkBNId: recentBkmkBNId,
-		 bsp2TrashFldrBNId: bsp2TrashFldrBNId
+		 bsp2TrashFldrBNId: bsp2TrashFldrBNId,
+		 canUndo: (curHNList.activeIndex != undefined),
+		 canRedo: (curHNList.undoList.length > 0)
 		}
 	  );
 	  json = undefined;
@@ -2962,7 +2988,7 @@ function panelShowBookmark (wId, tabId, bnId) {
   if (isSidebarOpen[wId] == true) { // If open and ready, send message to show bnId
 	sendAddonMsgShowBkmk(wId, tabId, bnId);
   }
-  else { // Else, wait it is fully open, in newSidebar() callback above, to send it
+  else { // Else, wait it is fully open when receiving newSidebar() callback above, to send it
 	showInSidebarWId   = wId;
 	showInSidebarTabId = tabId;
 	showInSidebarBnId  = bnId;
@@ -3074,7 +3100,7 @@ function onClickedContextMenuHandler (info, tab) {
 	  if (isSidebarOpen[windowId] == true) { // Already open
 		panelShowBookmark(windowId, tab.id, lastMenuBnId);
 	  }
-	  else {
+	  else { // Open the sidebar and send to it the message to display the bookmark 
 		browser.sidebarAction.open()
 		.then(panelShowBookmark(windowId, tab.id, lastMenuBnId));
 	  }

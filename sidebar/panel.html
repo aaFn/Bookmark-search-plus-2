@@ -7,13 +7,21 @@
   </head>
 
 <body id="body" class="fontdflt">
-  <div id="searchbox">
-    <button type="button" id="sresetflt" class="sreset" title="Reset filters" disabled><div id="sfilters"></div></button>
-    <button type="button" id="sbutton" class="swboth sfilterall"><div id="mglass"></div></button>
-    <input id="searchtext" type="text" placeholder="Search bookmarks.." class="fontdflt" size=1 list="searchlist" autofocus>
-      <datalist id="searchlist">
-      </datalist>
-    <input id="cancelsearch" type="image" src="/icons/empty.png" disabled>
+  <div id="searchbox" style="height: 22px;">
+    <div id="firstrow">
+      <div id="buttoncontainer" style="width: 11px;">
+        <button type="button" id="expmenu" class="butgray" title="Open/hide the expansion menu"><div id="twistmenu" class="expmenuc"></div></button>
+        <button type="button" id="sresetflt" class="butgray" title="Reset filters" disabled style="left: -21px;"><div id="sfilters"></div></button>
+      </div>
+      <button type="button" id="sbutton" class="swboth sfilterall"><div id="mglass"></div></button >
+      <input type="text" id="searchtext" placeholder="Search bookmarks.." class="fontdflt" size=1 list="searchlist" autofocus>
+        <datalist id="searchlist"></datalist>
+      <input type="image" id="cancelsearch" src="/icons/butempty.png" disabled>
+    </div>
+	<div id="secondrow" style="top: -20px;">
+      <button type="button" id="butundo" class="butred" title="Undo (Ctrl-Z)" disabled><div id="undo"></div></button>
+      <button type="button" id="butredo" class="butred" title="Redo (Ctrl-Y)" disabled><div id="redo"></div></button>
+    </div>
   </div>
   <div id="searchresult" class="rscrollok" hidden=true>
     <img src="/icons/waiting.gif" height="20px" id="waitingsearch">

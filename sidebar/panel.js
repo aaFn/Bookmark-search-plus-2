@@ -104,16 +104,25 @@ let p_ffversion = browser.runtime.getBrowserInfo();
 
 const Performance = window.performance;
 const Body = document.querySelector("#body"); // Assuming it is an HTMLBodyElement
+const SearchBox = document.querySelector("#searchbox"); // Assuming it is an HTMLDivElement
+const SearchBoxStyle = SearchBox.style;
+const ButtonContainer = document.querySelector("#buttoncontainer"); // Assuming it is an HTMLDivElement
+const ButtonContainerStyle = ButtonContainer.style;
+const ExpandMenuButtonInput = document.querySelector("#expmenu"); // Assuming it is an HTMLButtonElement
+const TwistMenuImg = document.querySelector("#twistmenu"); // Assuming it is an HTMLDivElement
 const ResetFiltersButtonInput = document.querySelector("#sresetflt"); // Assuming it is an HTMLButtonElement
-const SFiltersImg = document.querySelector("#sfilters"); // Assuming it is an HTMLImgElement
-const SFiltersImgStyle = SFiltersImg.style;
+const ResetFiltersButtonInputStyle = ResetFiltersButtonInput.style;
 const SearchButtonInput = document.querySelector("#sbutton"); // Assuming it is an HTMLButtonElement
-const MGlassImg = document.querySelector("#mglass"); // Assuming it is an HTMLImgElement
+const MGlassImg = document.querySelector("#mglass"); // Assuming it is an HTMLDivElement
 const MGlassImgStyle = MGlassImg.style;
 const SearchTextInput = document.querySelector("#searchtext"); // Assuming it is an HTMLInputElement
 const SearchDatalist = document.querySelector("#searchlist"); // Assuming it is an HTMLDataListElement
 const SearchListMax = 5; // Must be >= 3
 const CancelSearchInput = document.querySelector("#cancelsearch"); // Assuming it is an HTMLInputElement
+const ExpandedMenu = document.querySelector("#secondrow"); // Assuming it is an HTMLDivElement
+const ExpandedMenuStyle = ExpandedMenu.style;
+const UndoButtonInput = document.querySelector("#butundo"); // Assuming it is an HTMLButtonElement
+const RedoButtonInput = document.querySelector("#butredo"); // Assuming it is an HTMLButtonElement
 const SearchResult = document.querySelector("#searchresult"); // Assuming it is an HTMLDivElement
 const Bookmarks = document.querySelector("#bookmarks"); // Assuming it is an HTMLDivElement
 //const ResultsTable = document.querySelector("#searchresult table"); // Assuming it is an HTMLTableElement
@@ -483,6 +492,11 @@ let bkmkClipboard = []; // Unique list of copied or cut BookmarkNode(s), [] if e
 let isClipboardOpCut = undefined; // Boolean, false if copy operation ongoing, true if cut, undefined if empty clipboard
 let bkmkDragIds = []; // Unique list of dragged Bookmark Id(s), [] if empty
 let bkmkDrag = []; // Unique list of dragged BookmarkNode(s), [] if empty
+let expMenu = false; // Current state of the expanded menu (true = expanded)
+let canUndo = false; // To enable or disable the undo button on the expanded menu
+let canRedo = false; // To enable or disable the redo button on the expanded menu
+let initCanUndo; // To hold initial status of undo button received from background page
+let initCanRedo; // To hold initial status of redo button received from background page
 
 // Declared in BookmarkNode.js
 //var countBookmarks, countFolders, countSeparators, countOddities, countFetchFav, countNofavicon;
@@ -950,7 +964,7 @@ function refreshFaviconSearch (btnId, uri) {
  */
 let sboxState = SBoxEmpty;	// No active search
 function enableCancelSearch () {
-  CancelSearchInput.src = "/icons/cancel.png";
+  CancelSearchInput.src = "/icons/butcancel.png";
   CancelSearchInput.disabled = false;
   sboxState = SBoxExecuted;	// Search was launched or is complete
   SearchResult.hidden = false;
@@ -960,7 +974,7 @@ function enableCancelSearch () {
  * Turn the Cancel search button off, and hide seach pane
  */
 function disableCancelSearch () {
-  CancelSearchInput.src = "/icons/empty.png";
+  CancelSearchInput.src = "/icons/butempty.png";
   CancelSearchInput.disabled = true;
   sboxState = SBoxEmpty;	// No active search
   SearchResult.hidden = true;
@@ -970,7 +984,7 @@ function disableCancelSearch () {
  * Turn the execute search button on
  */
 function enableExecuteSearch () {
-  CancelSearchInput.src = "/icons/enter.png";
+  CancelSearchInput.src = "/icons/butenter.png";
   CancelSearchInput.disabled = false;
   sboxState = SBoxChanging;	// Content of search box is changing
 }
@@ -1379,6 +1393,34 @@ function cancelSearchTextHandler () {
 */
 
 /*
+ * Disable or enable the expanded menu
+ * 
+ * state: Boolean, true if menu is expanded
+ */
+function setExpMenu (state) {
+  if (state != expMenu) {
+	expMenu = state;
+	if (expMenu) {
+	  TwistMenuImg.className = "expmenuo";
+	  ExpandedMenuStyle.top = "0px";
+	  SearchBoxStyle.height = "42px";
+	}
+	else {
+	  TwistMenuImg.className = "expmenuc";
+	  ExpandedMenuStyle.top = "-20px";
+	  SearchBoxStyle.height = "22px";
+	}
+	// Save expand menu state
+	if (backgroundPage == undefined) {
+	  sendAddonMsgExpMenu(state);
+	}
+	else {
+	  backgroundPage.saveExpMenu(myWindowId, state);
+	}
+  }
+}
+
+/*
  * Handle search options
  */
 function setSearchOptions () {
@@ -1400,26 +1442,26 @@ function setSearchOptions () {
   else if (options.searchFilter == "fldr") {
 	SFilterFldrOnlyInput.checked = true;
 	SFieldUrlOnlyInput.disabled = true; // Disable search on URL
-	buttonTitleFilter = SFieldUrlOnlyInput.nextSibling.nextSibling.textContent;
+	buttonTitleFilter = SFilterFldrOnlyInput.nextSibling.nextSibling.textContent;
   }
   else {
 	SFilterBkmkOnlyInput.checked = true;
 	SFieldUrlOnlyInput.disabled = SFieldUrlOnlyLabel.disabled = false;
-	buttonTitleFilter = SFieldUrlOnlyInput.nextSibling.nextSibling.textContent;
+	buttonTitleFilter = SFilterBkmkOnlyInput.nextSibling.nextSibling.textContent;
   }
   cn +=  " sfilter"+options.searchFilter;
   SearchButtonInput.className = cn;
   if (options.searchScope == "all") {
-	MGlassImgStyle.backgroundImage = 'url("/icons/search.png"';
+	MGlassImgStyle.backgroundImage = 'url("/icons/butsearch.png"';
 	SScopeAllInput.checked = true;
   }
   else if (options.searchScope == "subfolder") {
-	MGlassImgStyle.backgroundImage = 'url("/icons/searchsub.png"';
+	MGlassImgStyle.backgroundImage = 'url("/icons/butsearchsub.png"';
 	SScopeSubfolderInput.checked = true;
 	buttonTitleScope = SScopeSubfolderInput.nextSibling.nextSibling.textContent;
   }
   else {
-	MGlassImgStyle.backgroundImage = 'url("/icons/searchfldnosub.png"';
+	MGlassImgStyle.backgroundImage = 'url("/icons/butsearchfldnosub.png"';
 	SScopeFolderonlyInput.checked = true;
 	buttonTitleScope = SScopeFolderonlyInput.nextSibling.nextSibling.textContent;
   }
@@ -1468,11 +1510,15 @@ function setSearchOptions () {
   if (buttonTitle == undefined) {
 	buttonTitle = "Filters: none\nPress button to modify";
 	ResetFiltersButtonInput.disabled = true;
-	SFiltersImgStyle.backgroundImage = 'url("/icons/resetfiltersdis.png"';
+//	ResetFiltersButtonInput.hidden = true;
+	ResetFiltersButtonInputStyle.left = "-21px";
+	ButtonContainerStyle.width = "11px";
   }
   else {
 	ResetFiltersButtonInput.disabled = false;
-	SFiltersImgStyle.backgroundImage = 'url("/icons/resetfiltersen.png"';
+//	ResetFiltersButtonInput.hidden = false;
+	ResetFiltersButtonInputStyle.left = "0px";
+	ButtonContainerStyle.width = "32px";
   }
   SearchButtonInput.title = buttonTitle;
 
@@ -1882,51 +1928,55 @@ function bkmkCreated (BN, index) {
   }
 
   // Find insertion point, setting it in global variable insertRowIndex
-  // We need to retrieve the insertion point the hard way if we do not want to call
-  // getSubtree() which is very very long ...
-  let parentRow = curRowList[parentId];
-  // Introduce robustness in case the BN tree is empty and index is not 0, as that seems to occur some times
-  let children = parentBN.children;
-  if ((index == 0) || (children == undefined)) { // Insert just after parent row
-	// Note that this also takes care of the case where parent had so far no child
-	insertRowIndex = parentRow.rowIndex + 1; // Can be at end of bookmarks table
-  }
-  else { // Insert just after previous row
-		 // ASSUMPTION (true so far): when multiple moves / creates to same parent, like in multi-select move
-	 	 //            or reorder or ..., items are sent to us in increasing row/index order, so previous
-    	 //            rows to current item under process are always already at the right place.
-		 // Note that in such multi operations, things have been all processed in background first for the copy,
-		 //       so the BN tree is not anymore in sync with display.
-	let previousSibblingBN = children[index-1];
-	if (previousSibblingBN.inBSP2Trash && !options.trashVisible) { // Protect against inserting just after BSP2 trash when not visible
-	  if (index < 2) {
-		insertRowIndex = parentRow.rowIndex + 1;
+  // Note: only do it when the parent is really visible, that is when the parent is not BSP2 trash, or not in
+  //       the BSP2 trash, or when BSP2 trash is visible
+  if (!parentBN.inBSP2Trash || options.trashVisible) {
+	// We need to retrieve the insertion point the hard way if we do not want to call
+	// getSubtree() which is very very long ...
+	let parentRow = curRowList[parentId];
+	// Introduce robustness in case the BN tree is empty and index is not 0, as that seems to occur some times
+	let children = parentBN.children;
+	if ((index == 0) || (children == undefined)) { // Insert just after parent row
+	  // Note that this also takes care of the case where parent had so far no child
+	  insertRowIndex = parentRow.rowIndex + 1; // Can be at end of bookmarks table
+	}
+	else { // Insert just after previous row
+		   // ASSUMPTION (true so far): when multiple moves / creates to same parent, like in multi-select move
+	 	   //            or reorder or ..., items are sent to us in increasing row/index order, so previous
+    	   //            rows to current item under process are always already at the right place.
+		   // Note that in such multi operations, things have been all processed in background first for the copy,
+		   //       so the BN tree is not anymore in sync with display.
+	  let previousSibblingBN = children[index-1];
+	  if (previousSibblingBN.inBSP2Trash && !options.trashVisible) { // Protect against inserting just after BSP2 trash when not visible
+		if (index < 2) {
+		  insertRowIndex = parentRow.rowIndex + 1;
+		}
+		else {
+		  let previousBN = BN_lastDescendant(children[index-2]);
+		  let row = curRowList[previousBN.id];
+		  insertRowIndex = row.rowIndex + 1; // Can be at end of bookmarks table
+		}
 	  }
 	  else {
-		let previousBN = BN_lastDescendant(children[index-2]);
+		let previousBN = BN_lastDescendant(previousSibblingBN);
 		let row = curRowList[previousBN.id];
 		insertRowIndex = row.rowIndex + 1; // Can be at end of bookmarks table
 	  }
 	}
-	else {
-	  let previousBN = BN_lastDescendant(previousSibblingBN);
-	  let row = curRowList[previousBN.id];
-	  insertRowIndex = row.rowIndex + 1; // Can be at end of bookmarks table
+
+	// We got the insertion point, proceed to insertion
+	insertBkmks(BN, parentRow);
+
+	// Save new current info and refresh search
+	let type = BN.type;
+	if (type != "separator") {
+	  if (type == "folder") {
+		saveFldrOpen(); // If real folder creation, there is no children (yet)
+	  }
+
+	  // Call refresh search if there is one active
+	  triggerUpdate();
 	}
-  }
-
-  // We got the insertion point, proceed to insertion
-  insertBkmks(BN, parentRow);
-
-  // Save new current info and refresh search
-  let type = BN.type;
-  if (type != "separator") {
-	if (type == "folder") {
-	  saveFldrOpen(); // If real folder creation, there is no children (yet)
-	}
-
-	// Call refresh search if there is one active
-	triggerUpdate();
   }
 }
 
@@ -2043,21 +2093,23 @@ function bkmkRemoved (bnId) {
 
   if (row != undefined) { // If non existing, do not try to remove
 						  // Can happen for example on restore bookmarks, on our special "place:xxx"
-						  // BNs unders the special most recent or most visited folders
+						  // BNs unders the special most recent or most visited folders, or when a
+						  // bookmark under non visible BSP2 trash is removed by an undo/redo of past
+						  // when BSP2 was visible, or from a non-BSP2 bookmark management mean
 	// Remove item and its children from display, and from the appropriate display lists
 	// The returned value is the row which took its place in the table (or none if at end).
 	row = removeBkmks(row, true);
-  }
 
-  // Save new current info
-  // A folder delete can presumably delete bookmarks, and a bookmark delete can
-  // also change the open state of its parent if it was the only children in there,
-  // so save at all times.
-  saveFldrOpen();
+	// Save new current info
+	// A folder delete can presumably delete bookmarks, and a bookmark delete can
+  	// also change the open state of its parent if it was the only children in there,
+	// so save at all times.
+	saveFldrOpen();
 
-  // Call refresh search if there is one active
-  if (isOtherThanSeparatorRemoved) { // Global variable set by removeBkmks()
-	triggerUpdate();
+	// Call refresh search if there is one active
+	if (isOtherThanSeparatorRemoved) { // Global variable set by removeBkmks()
+	  triggerUpdate();
+	}
   }
 }
 
@@ -2089,42 +2141,48 @@ function bkmkChanged (bnId, isBookmark, title, url, uri) {
   // Retrieve changed item in the bookmarks table
   let row = curRowList[bnId];
 
-  // Update display
-  let item = row.firstElementChild.firstElementChild;
-  if (isBookmark) { // item is a .bkmkitem_b <div>
-    // item.title mixes both, so is always updated
-    // Update all
-	let img = item.firstElementChild; // Assuming it is an HTMLImageElement
-	img.src = uri;
-	let span = img.nextElementSibling;
-	if (title == "") {
-	  item.title = url;
-	  span.textContent = suggestDisplayTitle(url);
-	}
-	else {
-	  item.title = title+"\n"+url;
-	  span.textContent = title;
-	}
-	let isSpecial = url.startsWith("place:");
-	if (isSpecial) {
-	  if (item.hasAttribute("href")) { // It was not special before .. remove the href
-		item.removeAttribute("href");
+  if (row != undefined) { // If non existing, do not try to remove
+						  // Can happen for example on restore bookmarks, on our special "place:xxx"
+						  // BNs unders the special most recent or most visited folders, or when a
+						  // bookmark under non visible BSP2 trash is changed by an undo/redo of past
+						  // when BSP2 was visible, or from a non-BSP2 bookmark management mean 
+	// Update display
+	let item = row.firstElementChild.firstElementChild;
+	if (isBookmark) { // item is a .bkmkitem_b <div>
+      // item.title mixes both, so is always updated
+      // Update all
+	  let img = item.firstElementChild; // Assuming it is an HTMLImageElement
+	  img.src = uri;
+	  let span = img.nextElementSibling;
+	  if (title == "") {
+		item.title = url;
+		span.textContent = suggestDisplayTitle(url);
+	  }
+	  else {
+		item.title = title+"\n"+url;
+		span.textContent = title;
+	  }
+	  let isSpecial = url.startsWith("place:");
+	  if (isSpecial) {
+		if (item.hasAttribute("href")) { // It was not special before .. remove the href
+		  item.removeAttribute("href");
+		}
+	  }
+	  else { // Set the new href value
+		item.href = url;
 	  }
 	}
-	else { // Set the new href value
-	  item.href = url;
+	else { // Can only be a folder, per spec of the event, not a separator
+		   // => item is a ".bkmkmitem_f" <div>
+	  // Get to the <span> in it
+	  let span = item.firstElementChild.nextElementSibling.nextElementSibling;
+	  span.textContent = title;
 	}
-  }
-  else { // Can only be a folder, per spec of the event, not a separator
-		 // => item is a ".bkmkmitem_f" <div>
-	// Get to the <span> in it
-	let span = item.firstElementChild.nextElementSibling.nextElementSibling;
-	span.textContent = title;
-  }
 
-  // Trigger an update as results can change, if there is a search active
-  // Note: a separator is never modified, so that can only be a bookmark or folder.
-  triggerUpdate();
+	// Trigger an update as results can change, if there is a search active
+	// Note: a separator is never modified, so that can only be a bookmark or folder.
+	triggerUpdate();
+  }
 }
 
 /*
@@ -2157,10 +2215,12 @@ function bkmkMoved (bnId, curParentId, targetParentId, targetIndex) {
 	BN_insert(BN, targetParentBN, targetIndex, false);
   }
 
+  let is_actionVisible = false;
   // Get move description in current (= old) reference
   if ((tgtInBSP2Trash == true) && !options.trashVisible) { // Simply remove source row, there is no visible target where to insert
 	if (curInBSP2Trash != true) { // If source is also in trash, nothing wisible to do ..
 	  let movedRow = curRowList[bnId];
+	  is_actionVisible = true;
 	  removeBkmks(movedRow, true); // remove from cur lists, as there is no visible targets
 	}
   }
@@ -2203,6 +2263,7 @@ function bkmkMoved (bnId, curParentId, targetParentId, targetIndex) {
 	if (targetRow == null) // Moving at end of bookmarks table
 	  insertRowIndex = bookmarksTable.rows.length;
 	else   insertRowIndex = targetRow.rowIndex; // Get the updated row index of target
+	is_actionVisible = true;
 	insertBkmks(BN, targetParentRow);
   }
   else { // Normal case
@@ -2256,6 +2317,7 @@ function bkmkMoved (bnId, curParentId, targetParentId, targetIndex) {
 	// as this is only a move.
 	// The returned value is the row which took its place in the table (or null if
 	// removed at end).
+	is_actionVisible = true;
 	let deletePos = removeBkmks(movedRow, false);
 
 	// Insert the item at its new place (with its children) using global variable insertRowIndex
@@ -2277,12 +2339,14 @@ function bkmkMoved (bnId, curParentId, targetParentId, targetIndex) {
 	insertBkmks(BN, targetParentRow);
   }
 
-  // State of parent folders may change, so save folder open state
-  saveFldrOpen();
+  if (is_actionVisible) {
+	// State of parent folders may change, so save folder open state
+	saveFldrOpen();
 
-  if (options.showPath || options.trashEnabled) {
-	// Trigger an update as results can change, if there is a search active
-	triggerUpdate();
+	if (options.showPath || options.trashEnabled) {
+	  // Trigger an update as results can change, if there is a search active
+	  triggerUpdate();
+	}
   }
 }
 
@@ -2301,7 +2365,6 @@ function bkmkReordered (bnId, reorderInfo) {
 	return;
 
   // We need the BN to get real info
-  let folderBN = curBNList[bnId];
   let children = folderBN.children;
   if (children != undefined) {
 	let childIds = reorderInfo.childIds;
@@ -2314,30 +2377,33 @@ function bkmkReordered (bnId, reorderInfo) {
 	  }
 	}
 
-	// Delete all children of folderBN on display, if any (no cleanup)
-	let folderRow = curRowList[bnId];
-	let rowIndex = folderRow.rowIndex + 1;
-	let level = folderBN.level;
-	let nextRow = folderRow.nextElementSibling;
-	while ((nextRow != null) && (parseInt(nextRow.dataset.level, 10) > level)) {
-	  // rowIndex is constant since the next row takes the place each time
-	  nextRow = nextRow.nextElementSibling; // Do it before delete to not get a null ..
-	  bookmarksTable.deleteRow(rowIndex);
+	// Don't do anything on screen if inside non-visible BSP2 trash
+	if (!folderBN.inBSP2Trash || options.trashVisible) {
+	  // Delete all children of folderBN on display, if any (no cleanup)
+	  let folderRow = curRowList[bnId];
+	  let rowIndex = folderRow.rowIndex + 1;
+	  let level = folderBN.level;
+	  let nextRow = folderRow.nextElementSibling;
+	  while ((nextRow != null) && (parseInt(nextRow.dataset.level, 10) > level)) {
+		// rowIndex is constant since the next row takes the place each time
+		nextRow = nextRow.nextElementSibling; // Do it before delete to not get a null ..
+		bookmarksTable.deleteRow(rowIndex);
+	  }
+
+	  // And reinsert all children of folderBN in new order
+	  let is_open = curFldrOpenList[bnId]; // Retrieve our intended open state
+	  insertRowIndex = rowIndex;
+	  for (let i=0 ; i<len ; i++) {
+		insertBkmks(curBNList[childIds[i]], folderRow, level, is_open);
+	  }
+
+	  // No folder state changed, so nothing to save
+
+	  if (options.showPath) {
+		// Trigger an update as results can change, if there is a search active
+		triggerUpdate();
+	  }
 	}
-
-	// And reinsert all children of folderBN in new order
-	let is_open = curFldrOpenList[bnId]; // Retrieve our intended open state
-	insertRowIndex = rowIndex;
-	for (let i=0 ; i<len ; i++) {
-	  insertBkmks(curBNList[childIds[i]], folderRow, level, is_open);
-	}
-  }
-
-  // No folder state changed, so nothing to save
-
-  if (options.showPath) {
-	// Trigger an update as results can change, if there is a search active
-	triggerUpdate();
   }
 }
 
@@ -6894,6 +6960,13 @@ function onHiddenContextMenuHandler () {
 }
 
 /*
+ * Chenge state the the expaned menu
+ */
+function switchExpMenu (e) {
+  setExpMenu(!expMenu);
+}
+
+/*
  * Reset all filters
  */
 function resetFiltersButtonHandler (e) {
@@ -6991,8 +7064,9 @@ function handleMsgResponse (message) {
 	if (options.traceEnabled) {
 	  console.log("Sidebar "+myWindowId+" received a response: <<"+msg+">>");
 	}
-	if (msg == "savedCurBnId") { // Restore last saved cursor position
+	if (msg == "savedUIState") { // Restore last saved cursor position and last exapnd menu state
 	  goBkmkItem(message.bnId);
+	  setExpMenu(message.expMenu);
 	}
 	else if (msg == "getCurBNList") { // Received curBNList content
 	  curBNList = message.json;
@@ -7006,8 +7080,10 @@ function handleMsgResponse (message) {
 	  recentTagBNId = message.recentTagBNId; 
 	  recentBkmkBNId = message.recentBkmkBNId;
 	  bsp2TrashFldrBNId = message.bsp2TrashFldrBNId;
+	  initCanUndo = message.canUndo;
+	  initCanRedo = message.canRedo;
 
-	  f_initializeNext();
+	  f_initializeNext(); // initialize2()
 	}
 	else if (msg == "Ready") {
 	  backgroundReady = true; // Signal background ready for private windows for asking curBNList
@@ -7015,7 +7091,7 @@ function handleMsgResponse (message) {
 if (options.traceEnabled) {
   console.log("Background is Ready 3");
 }
-		f_initializeNext();
+		f_initializeNext(); // initializePriv()
 	  }
 	}
   }
@@ -7046,6 +7122,20 @@ function sendAddonMsgCurBnId (bnId) {
 	{source: "sidebar:"+myWindowId,
 	 content: "saveCurBnId",
 	 bnId: bnId
+	}
+  ).then(handleMsgResponse, handleMsgError);
+}
+
+/*
+ * Send current expand menu state Background (when we are a private window)
+ * 
+ * state = Boolean
+ */
+function sendAddonMsgExpMenu (state) {
+  browser.runtime.sendMessage(
+	{source: "sidebar:"+myWindowId,
+	 content: "saveExpMenu",
+	 state: state
 	}
   ).then(handleMsgResponse, handleMsgError);
 }
@@ -7480,6 +7570,10 @@ console.log("Received message in "+wId+" to show "+bnId+" for tab "+tabId);
 	  else if (msg.startsWith("bsp2TrashFldrBNId")) { // Recreated, so note the id
 		bsp2TrashFldrBNId = request.bnId;
 	  }
+	  else if (msg.startsWith("hnListAdd")) { // We are getting an update on undo / redo buttons
+		// Update undo/redo buttons if any change
+		setUndoRedoButtons(request.canUndo, request.canRedo);
+	  }
 
 	  // Answer (only to background task, to not perturbate dialog between another sidebar or add-on window, and background)
 	  sendResponse(
@@ -7509,7 +7603,12 @@ function closeHandler (e) {
   // If running in sidebar, signal to background page we are going off
   if (isInSidebar) {
 	if (backgroundPage != undefined) {
-	  backgroundPage.closeSidebar(myWindowId);
+	  try {
+		backgroundPage.closeSidebar(myWindowId);
+	  }
+	  catch (e) {
+		sendAddonMessage("Close:"+myWindowId);
+	  }
 	}
 	else {
 	  sendAddonMessage("Close:"+myWindowId);
@@ -7720,7 +7819,12 @@ function completeDisplay () {
   }
 
   // Setup mouse handlers for search buttons
+  ExpandMenuButtonInput.addEventListener("click", switchExpMenu);
+  ExpandMenuButtonInput.addEventListener("contextmenu", switchExpMenu);
+  ExpandMenuButtonInput.addEventListener("auxclick", switchExpMenu);
   ResetFiltersButtonInput.addEventListener("click", resetFiltersButtonHandler);
+  ResetFiltersButtonInput.addEventListener("contextmenu", resetFiltersButtonHandler);
+  ResetFiltersButtonInput.addEventListener("auxclick", resetFiltersButtonHandler);
   SearchButtonInput.addEventListener("click", searchButtonHandler);
   SearchButtonInput.addEventListener("contextmenu", searchButtonHandler);
   SearchButtonInput.addEventListener("auxclick", searchButtonSwitchMode);
@@ -7790,8 +7894,9 @@ function completeDisplay () {
 	  trace("Oddities:              "+countOddities, true);
 	  trace("--------------------", true);
 
-	  let bnId = backgroundPage.newSidebar(myWindowId);
-	  goBkmkItem(bnId);
+	  let obj = backgroundPage.newSidebar(myWindowId);
+	  goBkmkItem(obj.bnId);
+	  setExpMenu(obj.expMenu);
 	}
   }
 
@@ -8191,6 +8296,23 @@ function setPanelNoFaviconImg (useAltNoFav_option, altNoFavImg_option) {
 }
 
 /*
+ * Set undo and redo buttons disabled or enabled state
+ * 
+ * undo = Boolean; true for enabled, false for disabled
+ * redo = Boolean; true for enabled, false for disabled
+ */
+function setUndoRedoButtons (undo, redo) {
+  if (undo != canUndo) {
+	UndoButtonInput.disabled = !undo;
+	canUndo = undo;
+  }
+  if (redo != canRedo) {
+	RedoButtonInput.disabled = !redo;
+	canRedo = redo;
+  }
+}
+
+/*
  * Set UI overall fonts, sizes, spacing ..
  */
 function setupUI () {
@@ -8347,6 +8469,8 @@ function initialize2 () {
 	recentTagBNId = backgroundPage.recentTagBNId;
 	recentBkmkBNId = backgroundPage.recentBkmkBNId;
 	bsp2TrashFldrBNId = backgroundPage.bsp2TrashFldrBNId;
+	initCanUndo = (backgroundPage.curHNList.activeIndex != undefined);
+	initCanRedo = (backgroundPage.curHNList.undoList.length > 0);
 
 	// Get options and curBNList / rootBN
 	refreshOptionsBgnd(backgroundPage);
@@ -8361,6 +8485,8 @@ function initialize2 () {
   // Set the scene ..
   setupUI();
   setSearchOptions();
+  setUndoRedoButtons(initCanUndo, initCanRedo);
+  setExpMenu(options.expandMenu);
 
   if (options.searchHeight != undefined) { // Set current saved size 
 	SearchResult.style.height = options.searchHeight; 
@@ -8392,6 +8518,10 @@ function initialize2 () {
   // Catch clicks on the Cancel search button
   CancelSearchInput.addEventListener("click", cancelSearchTextHandler);
 //    CancelSearchInput.addEventListener("contextmenu", contextSearchTextHandler);
+
+  // Handle undo/redo buttons
+  UndoButtonInput.addEventListener("click", triggerUndo);
+  RedoButtonInput.addEventListener("click", triggerRedo);
 
   // Display the bookmarks tree inside the sidebar table
   // Create a Document Fragment to go faster (work is in memory only, no reflow.
@@ -8437,7 +8567,7 @@ function initialize2 () {
 }
 
 /*
- * Initialization phase 1 for private windows = get CurBNList from background
+ * Initialization phase 1 for private windows = when background is ready, get CurBNList from background
  * and then link to initialization phase 2
  */
 function initializePriv () {
@@ -8489,10 +8619,10 @@ function initialize () {
 //		  .then(function () {console.log("closed")})
 //		  .catch(function (err) {console.log("Error name: "+err.name+" Error message: "+err.message);})
 //		  ;
-console.log("Terminating BSP2 sidebar execution in private window "+myWindowId+' windowInfo.type='+winType);
+//console.log("Terminating BSP2 sidebar execution in private window "+myWindowId+' windowInfo.type='+winType);
 		}
 		else {
-console.log("sidebar is open in private window "+myWindowId+' windowInfo.type='+winType);
+//console.log("sidebar is open in private window "+myWindowId+' windowInfo.type='+winType);
 
 		  // Process read values from Store (they are already in Global variables from libstore.js)
 		  endLoadTime = (new Date ()).getTime();

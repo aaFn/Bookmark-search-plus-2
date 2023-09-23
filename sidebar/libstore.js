@@ -54,6 +54,7 @@ const OptionsList = { // OptionDesc (storeName, type, dflt)
 	altNoFavImg: new OptionDesc ("altnofavimg_option", "DataURI", undefined), // String "data:<URI>"
 	useAltNoFav: new OptionDesc ("usealtnofav_option", "Boolean", false),
 	lastcurbnid: new OptionDesc ("lastcurbnid_option", "String", undefined),
+	expandMenu: new OptionDesc ("expandmenu_option", "Boolean", false),
 	sidebarCommand: new OptionDesc ("sidebarcommand_option", "String", undefined, true), // DEPRECATED
 	appendAtFldrEnd: new OptionDesc ("appendatfldrend_option", "Boolean", true),
 	searchField: new OptionDesc ("searchfield_option", "String", "both"),

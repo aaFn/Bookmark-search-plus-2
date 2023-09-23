@@ -485,6 +485,8 @@ let curRowList = {}; // Current map between id and row for each bookmark item
 let bookmarksTable; // Assuming it is an HTMLTableElement
 let cellHighlight = null; // Current highlight of a row in source bookmarks = cell
 let sidebarTextColor = undefined; // Contains text color if we apply a theme's colors
+let canUndo = false; // To enable or disable the undo button on the expanded menu
+let canRedo = false; // To enable or disable the redo button on the expanded menu
 
 
 /*
@@ -1396,6 +1398,7 @@ function bkmkMouseHandler (e) {
 function keyHandler (e) {
   let target = e.target; // Type depends, but is an HTMLTableCellElement when a row is highlighted
   let key = e.key;
+  let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
   let classList = target.classList;
 //console.log("Key event: "+e.type+" key: "+key+" char: "+e.char+" target: "+target+" classList: "+classList);
 
@@ -1428,10 +1431,12 @@ function keyHandler (e) {
 */
   if (classList.contains(Selhighlight) || isResultRow) { // Keyboard actions on an highlighted (=> focused) cell
 	let row = target.parentElement;
+	let keyProcessed = false;
 
 	if (key == "ArrowDown") {
-	  // Highlight next row
-	  let nextRow = row.nextElementSibling;
+	  // Highlight next visible row
+	  let nextRow = row;
+	  while (((nextRow = nextRow.nextElementSibling) != null) && (nextRow.hidden));
 	  if (nextRow != null) { // We got one
 		let cell = nextRow.firstElementChild;
 		if (!isResultRow) {
@@ -1440,11 +1445,12 @@ function keyHandler (e) {
 		}
 		cell.focus();
 	  }
-	  e.preventDefault();
+	  keyProcessed = true;
 	}
 	else if (key == "ArrowUp") {
-	  // Highlight previous row
-	  let previousRow = row.previousElementSibling;
+	  // Highlight previous visible row
+	  let previousRow = row;
+	  while (((previousRow = previousRow.previousElementSibling) != null) && (previousRow.hidden));
 	  if (previousRow != null) { // We got one
 		let cell = previousRow.firstElementChild;
 		if (!isResultRow) {
@@ -1453,7 +1459,7 @@ function keyHandler (e) {
 		}
 		cell.focus();
 	  }
-	  e.preventDefault();
+	  keyProcessed = true;
 	}
 	else if (key == "PageDown") {
 	  // Find bottom of bounding parent (it can change with window size or search panel presence,
@@ -1488,7 +1494,8 @@ function keyHandler (e) {
 	  let nextRow = row;
 	  let temp;
 	  do {
-		temp = nextRow.nextElementSibling;
+		temp = nextRow;
+		while (((temp = temp.nextElementSibling) != null) && (temp.hidden));
 		if (temp == null) // Reached end
 		  break;
 		nextRow = temp;
@@ -1501,7 +1508,7 @@ function keyHandler (e) {
 		}
 		cell.focus();
 	  }
-	  e.preventDefault();
+	  keyProcessed = true;
 	}
 	else if (key == "PageUp") {
 	  // Find top of bounding parent (it can change with window size or search panel presence,
@@ -1536,7 +1543,8 @@ function keyHandler (e) {
 	  let previousRow = row;
 	  let temp;
 	  do {
-		temp = previousRow.previousElementSibling;
+		temp = previousRow;
+		while (((temp = temp.previousElementSibling) != null) && (temp.hidden));
 		if (temp == null) // Reached end
 		  break;
 		previousRow = temp;
@@ -1549,7 +1557,7 @@ function keyHandler (e) {
 		}
 		cell.focus();
 	  }
-	  e.preventDefault();
+	  keyProcessed = true;
 	}
 	else if (key == "End") {
 	  // Find last visible row and highlight it
@@ -1562,6 +1570,9 @@ function keyHandler (e) {
 	  else {
 		len = bookmarksTable.rows.length; // Start from end of table
 		lastRow = bookmarksTable.rows[len-1];
+		if (lastRow.hidden) {
+		  while ((lastRow = lastRow.previousElementSibling).hidden);
+		}
 	  }
 	  let cell = lastRow.firstElementChild;
 	  if (!isResultRow) {
@@ -1569,7 +1580,7 @@ function keyHandler (e) {
 		displayHN(lastRow.dataset.type, lastRow.dataset.id);
 	  }
 	  cell.focus();
-	  e.preventDefault();
+	  keyProcessed = true;
 	}
 	else if (key == "Home") {
 	  // Find next visible row and highlight it
@@ -1578,7 +1589,7 @@ function keyHandler (e) {
 //		firstRow = resultsTable.rows[0];
 	  }
 	  else {
-		firstRow = bookmarksTable.rows[0];
+		firstRow = bookmarksTable.rows[0]; // Always visible
 	  }
 	  let cell = firstRow.firstElementChild;
 	  if (!isResultRow) {
@@ -1586,7 +1597,7 @@ function keyHandler (e) {
 		displayHN(firstRow.dataset.type, firstRow.dataset.id);
 	  }
 	  cell.focus();
-	  e.preventDefault();
+	  keyProcessed = true;
 	}
 	else if (key == "Enter") {
 	  let type = row.dataset.type;
@@ -1598,10 +1609,43 @@ function keyHandler (e) {
 		let twistie = target.firstElementChild.firstElementChild.nextElementSibling.nextElementSibling.nextElementSibling;
 		handleURListTwistieClick(row, twistie);
 	  }
+	  keyProcessed = true;
 	}
 //  else {
 //	SearchTextInput.focus(); // Focus on search box when a key is typed ...
 //  }
+
+	if (keyProcessed) { // We used up the key, don't pass it to FF for further processing
+	  e.stopPropagation();
+	  e.preventDefault();
+	}
+  }
+}
+
+/*
+ * Receive event from keyboard anywhere in the history window
+ * 
+ * e is of type KeyboardEvent
+ */
+function globalKeyHandler (e) {
+  let target = e.target; // Type depends, but is an HTMLTableCellElement when a row is highlighted
+  let key = e.key;
+  let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
+  let classList = target.classList;
+//console.log("Global key event: "+e.type+" key: "+key+" char: "+e.char+" target: "+target+" classList: "+classList);
+
+  let keyProcessed = false;
+  if ((key.toLowerCase() == "z") && is_ctrlKey) { // Undo
+	triggerUndo();
+	keyProcessed = true;
+  }
+  else if ((key.toLowerCase() == "y") && is_ctrlKey) { // Redo
+	triggerRedo();
+	keyProcessed = true;
+  }
+
+  if (keyProcessed) { // We used up the key, don't pass it to FF for further processing
+	e.preventDefault();
   }
 }
 
@@ -1867,6 +1911,23 @@ function setPanelNoFaviconImg (useAltNoFav_option, altNoFavImg_option) {
 															: "url(\"/icons/nofavicon.png\")"
 										)
 				   );
+}
+
+/*
+ * Set undo and redo buttons disabled or enabled state
+ * 
+ * undo = Boolean; true for enabled, false for disabled
+ * redo = Boolean; true for enabled, false for disabled
+ */
+function setUndoRedoButtons (undo, redo) {
+  if (undo != canUndo) {
+	AUndoButton.disabled = !undo;
+	canUndo = undo;
+  }
+  if (redo != canRedo) {
+	ARedoButton.disabled = !redo;
+	canRedo = redo;
+  }
 }
 
 /*
@@ -2137,7 +2198,7 @@ function refreshFavicon (hnList, bnId, uri) {
 }
 
 /*
- * Deamnd save of curHNList (qhich is saved by saveBNList() in the background thread).
+ * Demand save of curHNList (which is saved by saveBNList() in the background thread).
  */
 async function saveBNList () {
   if (backgroundPage == undefined) {
@@ -2185,6 +2246,50 @@ function sendAddonMessage (msg) {
 	 content: msg
 	}
   ).then(handleMsgResponse, handleMsgError);
+}
+
+/*
+ * Trigger an undo operation if possible
+ */
+async function triggerUndo () {
+  if (backgroundPage == undefined) {
+	try {
+	  let message = await browser.runtime.sendMessage(
+			{source: "sidebar:"+myWindowId,
+			 content: "triggerUndo"
+			}
+		  );
+	  handleMsgResponse(message);
+	}
+	catch (error) {
+	  handleMsgError(error);
+	}
+  }
+  else {
+	backgroundPage.triggerUndo();
+  }
+}
+
+/*
+ * Trigger a redo operation if possible
+ */
+async function triggerRedo () {
+  if (backgroundPage == undefined) {
+	try {
+	  let message = await browser.runtime.sendMessage(
+			{source: "sidebar:"+myWindowId,
+			 content: "triggerRedo"
+			}
+		  );
+	  handleMsgResponse(message);
+	}
+	catch (error) {
+	  handleMsgError(error);
+	}
+  }
+  else {
+	backgroundPage.triggerRedo();
+  }
 }
 
 function handleAddonMessage (request, sender, sendResponse) {
@@ -2297,16 +2402,23 @@ function handleAddonMessage (request, sender, sendResponse) {
 		// Reset of search pane height
 //		SearchResult.style.height = "";
 	  }
-	  else if (msg.startsWith("hnListAdd")) { // We are getting a new record appended to curHNList or tp one of its nodes
+	  else if (msg.startsWith("hnListAdd")) { // We are getting a new record appended to curHNList or to one of its nodes
 		let pos = request.pos;
-		let pos_insideMulti = request.pos_insideMulti;
-		refreshHNList(curHNList.hnList, pos, pos_insideMulti); // This takes care also of the Node display
-		// Update undo/redo cursor
-		setUndoRedoCursor();
+		if (pos != -1) { // This is a node within a folder inside a multi, do not redfresh display
+		  let pos_insideMulti = request.pos_insideMulti;
+		  refreshHNList(curHNList.hnList, pos, pos_insideMulti); // This takes care also of the Node display
+		  // Go to and show the current active position (cursor)
+		  goHNItem(curHNList.activeIndex);
+		  setUndoRedoCursor();
+		  // Update undo/redo buttons if any change
+		  setUndoRedoButtons(request.canUndo, request.canRedo);
+		}
 	  }
 	  else if (msg.startsWith("hnListClear")) { // History was cleared
  		// Reload ourselves
 		window.location.reload();
+		// Disable both undo & redo buttons if not already disabled
+		setUndoRedoButtons(false, false);
 	  }
 	  else if (msg.startsWith("asyncFavicon")) { // Got a favicon uri to refresh
 		let bnId = request.bnId;
@@ -2518,7 +2630,8 @@ function completeDisplay () {
 	SearchResult.addEventListener("dragleave", rsltMouseLeaveHandler, true);
   }
 */
-  HPane.addEventListener("keydown", keyHandler);
+  HPane.addEventListener("keydown", keyHandler); // History pane only
+  addEventListener("keydown", globalKeyHandler); // Window wide
 
   // Setup mouse handlers for search button
 //  SearchButtonInput.addEventListener("click", searchButtonHandler);
@@ -2555,6 +2668,10 @@ function completeDisplay () {
   SearchResult.addEventListener("dragleave", rsltDragLeaveHandler);
   SearchResult.addEventListener("dragexit", rsltDragExitHandler);
 */
+
+  // Handle action buttons
+  AUndoButton.addEventListener("click", triggerUndo);
+  ARedoButton.addEventListener("click", triggerRedo);
 
   // Catch button clicks, and window close
   window.onbeforeunload = closeHandler;
@@ -2616,6 +2733,9 @@ function initialize2 () {
   else {
 	RawListInput.checked = true;
   }
+
+  // Update undo/redo buttons if any change
+  setUndoRedoButtons((curHNList.activeIndex != undefined), (curHNList.undoList.length > 0));
 
   // Display the HN list inside a table in "pane"
   bookmarksTable = document.createElement("table");
