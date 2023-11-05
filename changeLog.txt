@@ -1,6 +1,23 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.119 05/11/2023 Bugs and Improvements
+    - Added ability to force keeping folders open when Shift is pressed at same time than Enter or Click, when the
+      "Only 1 open folder at a time" option is enabled (documentation also updated on ).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/284
+    - Improved behavior on mouse clicks to avoid selection expansion when Shift or Ctrl are pressed at same time, when
+      there is another action triggered by the mouse click. This is to avoid 2 effects at the same time (priority goes
+      to the action, not to the selection extension / adjustment).
+    - Improved behavior on opening the property popup window of a bookmark, by checking if there is already one open
+      for that bookmark id, and if yes, by focusing on it rather than opening a new one.
+    - Changed the way the bookmark property windows is acting, to match the new way FF is doing it since some time.
+      It is no more changing values (title, url) in real-time, but it waits for the "Save" or "Add" button to be
+      pressed to really make them happen. Therefore, the Cancel button is now simply closing the window, and not
+      reverting to previous values.
+      The old behavior was mimicking the one of FF in the past, when BSP2 was created some years ago.
+    - When opening history, display the "nofavicon" image when a bookmark has the temporary or loading favicon image.
+    - Corrected a regression where opening the bookmark history window was failing in retrieving the existing one
+      if already open, and was opening another one.
 - 2.0.118 23/09/2023 Bugs and Improvements
     - Hide the reset filters button of the search box when it is not active. Only show it when there is something
       to reset. This avoids confusion, and simplifies the interface.
@@ -10,7 +27,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Added undo and redo buttons in the new expanded menu in the bookmarks panel, doing the same as Ctrl-Z and Ctrl-Y.
     - Added handling of Ctrl-Z and Ctrl-Y shortcut keys in the history window.
     - Enabled the undo and redo buttons in the history window, doing the same as Ctrl-Z and Ctrl-Y.
-    - Modified the layout of the action buttons in the History window, and some of their naming. 
+    - Modified the layout of the action buttons in the History window, and some of their text. 
     - Simplified slightly the CSS for panel.html.
     - Improved the contrast between hover and no hover on red buttons in the search box.
     - Modified behavior in the history window, to set the focus on the undo/redo cursor when it changes position.
