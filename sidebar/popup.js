@@ -101,6 +101,8 @@ function keyHandler (e) {
   else if (e.key == "Enter") {
 	if (!AckInput.disabled) {
 	  // Commit any change and close self
+// Now the commit is on "Add" or "Save", so do it later in the button handler
+/*
 	  if (btnId != undefined) {
 		if (isFolder) {
 		  browser.bookmarks.update(
@@ -121,6 +123,7 @@ function keyHandler (e) {
 		  );
 		}
 	  }
+*/
 	  ackInputHandler();
 	}
   }
@@ -158,6 +161,8 @@ function selectTitleHandler () {
  */
 function titleInputHandler () {
   // Modify title of the bookmark
+// Do not commit the change now anymore, this was the old FF behavior, modified now to wait for "Add" or Save"
+/*
   if (btnId != undefined) {
 	browser.bookmarks.update(
 	  btnId,
@@ -165,6 +170,7 @@ function titleInputHandler () {
 	  }
 	);
   }
+*/
 }
 
 /*
@@ -194,6 +200,8 @@ function addressInputHandler () {
   // Modify url of the bookmark if ok
   if (AddressInput.validity.valid) {
 	AckInput.disabled = false;
+// Do not commit the change now anymore, this was the old FF behavior, modified now to wait for "Add" or Save"
+/*
 	let value = AddressInput.value;
 	if (value.length == 0)
 	  value = "about:blank";
@@ -204,6 +212,7 @@ function addressInputHandler () {
 		}
 	  );
 	}
+*/
   }
   else {
 	AckInput.disabled = true;
@@ -293,6 +302,32 @@ console.log("closeSelf() - browser.windows.getCurrent wInfo - top="+top1+" left=
  */
 function ackInputHandler () {
 //  console.log("Ack clicked");
+// Commit the values if they were changed
+  if (btnId != undefined) {
+	if (isFolder) {
+	  if (TitleInput.value != btnTitle) {
+		browser.bookmarks.update(
+		  btnId,
+		  {title: TitleInput.value,
+		  }
+		);
+	  }
+	}
+	else {
+	  let value = AddressInput.value;
+	  if (value.length == 0)
+		value = "about:blank";
+	  if ((TitleInput.value != btnTitle) || (value != btnUrl)) {
+		browser.bookmarks.update(
+		  btnId,
+		  {title: TitleInput.value,
+		   url: value	
+		  }
+		);
+	  }
+	}
+  }
+
   closeSelf();
 }
 
@@ -302,6 +337,10 @@ function ackInputHandler () {
 function cancelInputHandler () {
 //  console.log("Cancel clicked");
   if (isPropPopup) { // Cancel on properties = set back previous values if they changed, and then close
+// As changes are not committed before "Add" or "Save", do not revert any value ..
+// (this was the old FF behavior, modified now to wait for "Add" or Save")
+	closeSelf();
+/*
 	if ((TitleInput.value != btnTitle) || (AddressInput.value != btnUrl)) {
 	  browser.bookmarks.update(
 		btnId,
@@ -323,9 +362,10 @@ function cancelInputHandler () {
 	else {
 	  closeSelf();
 	}
+*/
   }
   else { // Delete the bookmark, then close
- 	// Proceed like native bookmark FF = no undo / redo on such "cancel" => do not use BSP2 trash
+ 	// Proceed like the old native bookmark FF = no undo / redo on such "cancel" => do not use BSP2 trash
 	browser.bookmarks.remove(btnId)
 	.then(
 	  function () {
@@ -407,6 +447,9 @@ console.log("closeHandler() - browser.windows.getCurrent wInfo - top="+top1+" le
 	);
 
 	if (isPropPopup) { // Set back previous values
+// As changes are not committed before "Add" or "Save", do not revert any value ..
+// (this was the old FF behavior, modified now to wait for "Save")
+/*
 	  browser.bookmarks.update(
 		btnId,
 		(isFolder ?
@@ -418,6 +461,7 @@ console.log("closeHandler() - browser.windows.getCurrent wInfo - top="+top1+" le
 		 }
 		)
 	  );
+*/
 	}
 	else { // Delete the bookmark
 	  browser.bookmarks.remove(btnId);

@@ -743,7 +743,9 @@ function appendBookmarkHN (hnId, HN, is_visible = true, pos_insideMulti = undefi
 		row.draggable = true; // Note: it is false by default for <tr>
 		let img;
 		let uri;
-		if (((uri = HN.faviconUri) == undefined) || (uri == "/icons/nofavicon.png")) { // Clone with nofavicon image background
+		if (((uri = HN.faviconUri) == undefined) || (uri == "/icons/nofavicon.png")
+			|| (uri == "/icons/waiting.gif") || (uri == "/icons/nofavicontmp.png")
+		   ) { // Clone with nofavicon image background
 		  if (pos_insideMulti != undefined) { // Item is part of a multi-selection operation
 			div = ItemNFBMultiSelTempl.cloneNode(true);
 			seqnum = div.firstElementChild;
@@ -1284,7 +1286,9 @@ function displayHN (rowType, hnId) {
 	  else {								// Presumably a Bookmark
 		NDTitle.textContent = HN.title;
 		let uri;
-		if (options.disableFavicons || ((uri = HN.faviconUri) == undefined)) { // Show nofavicon
+		if (options.disableFavicons || ((uri = HN.faviconUri) == undefined)
+			|| (uri == "/icons/waiting.gif") || (uri == "/icons/nofavicontmp.png")
+		   ) { // Show nofavicon
 		  NDFavicon.style = "";
 		  NDFavicon.className = "nofavicon";
 		}
@@ -2137,7 +2141,7 @@ function refreshFaviconRow (index, uri) {
   }
   // Set image
   let cn = oldImg.className;
-  if (uri == "/icons/nofavicon.png") {
+  if ((uri == "/icons/nofavicon.png") || (uri == "/icons/waiting.gif") || (uri == "/icons/nofavicontmp.png")) {
 	if ((cn == undefined) || !cn.includes("nofavicon")) { // Change to nofavicon only if not already a nofavicon
 	  let tmpElem = document.createElement("div");
 	  tmpElem.classList.add("nofavicon");

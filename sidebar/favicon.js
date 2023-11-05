@@ -732,6 +732,7 @@ function faviconWorkerPostMessage (e) { // e is of type MessageEvent,
 	}
   }
   else if (action == "stopfetching") { // Stop all process and empty the queue
+//console.log("Stop fetching");
 	if (requestTimerID != undefined) { // A request is scheduled with Hysteresis
 	  clearTimeout(requestTimerID);
 	  requestTimerID = undefined; // It will get rescheduled on next request submitted
@@ -755,6 +756,7 @@ function faviconWorkerPostMessage (e) { // e is of type MessageEvent,
 	  reqQueue.unshift(data); // Add new request at beginning
 	}
 	else { // Not a manual refresh of favicon, queue at end
+//console.log("Normal fetch");
 //	  if (((nbBN >= nbBNmin) && (nbBN < nbBNmax)) || e.data[0].startsWith("icon:") || e.data[0].startsWith("get2")) {
 	  reqQueue.push(data); // Add new request at end
 	}
@@ -763,7 +765,7 @@ function faviconWorkerPostMessage (e) { // e is of type MessageEvent,
 	  requestTimerID = setTimeout(handleRequest, hysteresis);
 	}
   }
-//console.log("Finished queueing request "+action+" for BN.id: "+data[1]+" url: "+data[2]+" Queue length: "+reqQueue.length);
+//console.log("Finished processing request "+action+" for BN.id: "+data[1]+" url: "+data[2]+" Queue length: "+reqQueue.length);
 //  }
 //  nbBN++;
 }

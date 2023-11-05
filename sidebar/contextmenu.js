@@ -184,112 +184,130 @@ ContextMenu["bsp2prop"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_rb
  */
 
 /*
- * Open bookmark Property popup with given title
+ * Open bookmark Property popup with given title - If already open for a given bookmark id
+ * then focus on it rather than creating a new one.
  * 
  * propType = "new" or "prop", to indicate creation of a new item, or editing its properties
  * BN_id = String identifying the bookmark item to edit
  */
 function openPropPopup (popupType, BN_id, path, type, title, url, dateAdded) {
-  // Open popup on bookmark item
-  let titlePreface;
-  let popupUrl;
-//  let popupURL = browser.runtime.getURL("sidebar/popup.html");
-  // Did not find a good way to get a modal dialog so far :-(
-  // 1) let sign = prompt("What's your sign?");
-  //    creates a modal inside the sidebar, half hidden if the sidebar is not large enough. 
-  // 2) It appears window.open works outside of the .then, but not inside !!
-  //    I do not understand why ..
-  //    window.open(popupURL, "_blank", "dialog,modal,height=200,width=200");
-  //    Anyway, "modal" is ignored, and I can't figure how to get the UniversalBrowserWrite privilege so far .. :-(
-  // So using browser.windows instead, which is not modal, and which is resizeable.
-  if (type == "folder") {
-	let winType;
-	if (popupType == "new") {
-	  winType = "newfldr";
-	  titlePreface = "New Folder";
+  // Check all open popup windows to verify if not already open 
+  browser.windows.getAll({populate: true, windowTypes: ["popup"]})
+  .then((a_win) => {
+	let len = a_win.length;
+	let win, tab;
+	let found_winId;
+	for (let i=0 ; i<len ; i++) {
+	  win = a_win[i];
+	  tab = win.tabs[0]; // Only 1 "tab" in the popup window
+	  if (tab.url.includes("&id="+BN_id)) { // Found it !
+		found_winId = win.id;
+		break;
+	  }
 	}
-	else {
-	  winType = "propfldr";
-	  titlePreface = "Properties of « "+title+" »";
+	if (found_winId != undefined) { // Focus on the already open popup (this also un-minimizes it)
+	  browser.windows.update(found_winId, {focused: true});
 	}
-	// Keep url as last argument as it can itself have a "&""
-	popupUrl = PopupURL+"?type="+winType
-					   +"&id="+BN_id
-					   +"&path="+encodeURIComponent(path)
-					   +"&title="+encodeURIComponent(title)
-					   +"&dateadded="+encodeURIComponent(dateAdded)
-					   +"&url=null"
-					   ;
-  }
-  else { // Bookmark
-	let winType;
-	if (popupType == "new") {
-	  winType = "newbkmk";
-	  titlePreface = "New Bookmark";
-	}
-	else {
-	  winType = "propbkmk";
-	  titlePreface = "Properties of « "+title+" »";
-	}
-	// Keep url as last argument as it can itself have a "&""
-	popupUrl = PopupURL+"?type="+winType
-					   +"&id="+BN_id
-					   +"&path="+encodeURIComponent(path)
-					   +"&title="+encodeURIComponent(title)
-					   +"&dateadded="+encodeURIComponent(dateAdded)
-					   +"&url="+encodeURIComponent(url)
-					   ;
-  }
-  popupUrl = encodeURI(popupUrl);
-  let gettingItem = browser.storage.local.get(
-	{popuptop_option: 300,
-	 popupleft_option: 300
-	}
-  );
-  gettingItem.then((res) => {
-	// Open popup window where it was last. If it was in another screen than
-	// our current screen, then center it.
-	// This avoids having the popup out of screen and unreachable, in case
-	// the previous screen went off, or display resolution changed.
-	let top = res.popuptop_option;
-	let left = res.popupleft_option;
+	else { // Open popup on bookmark item
+	  let titlePreface;
+	  let popupUrl;
+//	  let popupURL = browser.runtime.getURL("sidebar/popup.html");
+	  // Did not find a good way to get a modal dialog so far :-(
+	  // 1) let sign = prompt("What's your sign?");
+	  //    creates a modal inside the sidebar, half hidden if the sidebar is not large enough. 
+	  // 2) It appears window.open works outside of the .then, but not inside !!
+	  //    I do not understand why ..
+	  //    window.open(popupURL, "_blank", "dialog,modal,height=200,width=200");
+	  //    Anyway, "modal" is ignored, and I can't figure how to get the UniversalBrowserWrite privilege so far .. :-(
+	  // So using browser.windows instead, which is not modal, and which is resizeable.
+	  if (type == "folder") {
+		let winType;
+		if (popupType == "new") {
+		  winType = "newfldr";
+		  titlePreface = "New Folder";
+		}
+		else {
+		  winType = "propfldr";
+		  titlePreface = "Properties of « "+title+" »";
+		}
+		// Keep url as last argument as it can itself have a "&""
+		popupUrl = PopupURL+"?type="+winType
+						   +"&id="+BN_id
+						   +"&path="+encodeURIComponent(path)
+						   +"&title="+encodeURIComponent(title)
+						   +"&dateadded="+encodeURIComponent(dateAdded)
+						   +"&url=null"
+						   ;
+	  }
+	  else { // Bookmark
+		let winType;
+		if (popupType == "new") {
+		  winType = "newbkmk";
+		  titlePreface = "New Bookmark";
+		}
+		else {
+		  winType = "propbkmk";
+		  titlePreface = "Properties of « "+title+" »";
+		}
+		// Keep url as last argument as it can itself have a "&""
+		popupUrl = PopupURL+"?type="+winType
+						   +"&id="+BN_id
+						   +"&path="+encodeURIComponent(path)
+						   +"&title="+encodeURIComponent(title)
+						   +"&dateadded="+encodeURIComponent(dateAdded)
+						   +"&url="+encodeURIComponent(url)
+						   ;
+	  }
+	  popupUrl = encodeURI(popupUrl);
+	  let gettingItem = browser.storage.local.get(
+		{popuptop_option: 300,
+		 popupleft_option: 300
+		}
+	  );
+	  gettingItem.then((res) => {
+		// Open popup window where it was last. If it was in another screen than
+		// our current screen, then center it.
+		// This avoids having the popup out of screen and unreachable, in case
+		// the previous screen went off, or display resolution changed.
+		let top = res.popuptop_option;
+		let left = res.popupleft_option;
 //console.log("openPropPopup() - top="+top+" left="+left);
-	let scr = window.screen;
-	let adjust = false;
-	// Also, protect if possible against privacy.resistFingerprinting which does not return the screen size,
-	// but the sidebar size instead !! :-(
-	let al = scr.availLeft;
-	let aw = scr.availWidth;
-	if ((PopupWidth < aw) // If wider than the reported screen width, do not adjust
-		&& ((left < al) || (left >= al + aw))
-	   ) {
-	  adjust = true;
-	  left = al + Math.floor((aw - PopupWidth) / 2);
-	}
-	let at = scr.availTop;
-	let ah = scr.availHeight;
-	if ((PopupHeight < ah) // If higher than the reported screen height, do not adjust
-		&& ((top < at) || (top >= at + ah))
-	   ) {
-	  adjust = true;
-	  top = at + Math.floor((ah - PopupHeight) / 2);
-	}
-	if (adjust) { // Save new position values
-	  browser.storage.local.set({
-		popuptop_option: top,
-		popupleft_option: left
-	  });
+		let scr = window.screen;
+		let adjust = false;
+		// Also, protect if possible against privacy.resistFingerprinting which does not return the screen size,
+		// but the sidebar size instead !! :-(
+		let al = scr.availLeft;
+		let aw = scr.availWidth;
+		if ((PopupWidth < aw) // If wider than the reported screen width, do not adjust
+			&& ((left < al) || (left >= al + aw))
+		   ) {
+		  adjust = true;
+		  left = al + Math.floor((aw - PopupWidth) / 2);
+		}
+		let at = scr.availTop;
+		let ah = scr.availHeight;
+		if ((PopupHeight < ah) // If higher than the reported screen height, do not adjust
+			&& ((top < at) || (top >= at + ah))
+		   ) {
+		  adjust = true;
+		  top = at + Math.floor((ah - PopupHeight) / 2);
+		}
+		if (adjust) { // Save new position values
+		  browser.storage.local.set({
+			popuptop_option: top,
+			popupleft_option: left
+		  });
 //console.log("openPropPopup() - had to adjust position top="+top+" left="+left);
-	}
+		}
   
-	browser.windows.create(
-	  {titlePreface: titlePreface,
-	   type: "popup",
-//		 type: "detached_panel",
-	   // Using a trick with URL parameters to tell the window which type
-	   // it is, which bookmark id, .. etc .. since titlePreface doesn't appear to work
-	   // and there appears to be no way to pass parameters to the popup by the call. 
-	   url: popupUrl,
+		browser.windows.create(
+		  {titlePreface: titlePreface,
+		   type: "popup",
+//		   type: "detached_panel",
+		   // Using a trick with URL parameters to tell the window which type
+		   // it is, which bookmark id, .. etc .. since titlePreface doesn't appear to work
+		   // and there appears to be no way to pass parameters to the popup by the call. 
+		   url: popupUrl,
 //----- Workaround for top and left position parameters being ignored for panels and bug on popups (since panel is an alias for popup) -----
 // Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
 //     https://bugzilla.mozilla.org/show_bug.cgi?id=1271047
@@ -300,16 +318,18 @@ function openPropPopup (popupType, BN_id, path, type, title, url, dateAdded) {
 //Also tried to start minimized, but the window pops in a big size first before being minimized,
 //even less pretty.			   .
 //=> .. FF does not seem very clean on all this .. :-( 
-//       height: PopupHeight,
-//       width: PopupWidth,
-	   height: 40,
-	   width: 40,
-//	     left: left,
-//		 top: top,
+//		   height: PopupHeight,
+//		   width: PopupWidth,
+		   height: 40,
+		   width: 40,
+//		   left: left,
+//		   top: top,
 //----- End of position ignored workaround -----
-	   allowScriptsToClose: true
-	  }
-	);
+		   allowScriptsToClose: true
+		  }
+		);
+	  });
+	}
   });
 }
 
@@ -331,62 +351,63 @@ function openBsp2NewTab (tab) {
  * tab = referring tab
  */
 function openBsp2History () {
-  let href = HistoryURL;
-  // Open in new window, like Properties popup
-  // Open popup window where it was last. If it was in another screen than
-  // our current screen, then center it.
-  // This avoids having the popup out of screen and unreachable, in case
-  // the previous screen went off, or display resolution changed.
-  let gettingItem = browser.storage.local.get(
-	{historytop_option: 50,
-	 historyleft_option: 100
-	}
-  );
-  gettingItem.then((res) => {
-	let top = res.historytop_option;
-	let left = res.historyleft_option;
-	let scr = window.screen;
-	let adjust = false;
-	// Also, protect if possible against privacy.resistFingerprinting which does not return the screen size,
-	// but the sidebar size instead !! :-(
-	let al = scr.availLeft;
-	let aw = scr.availWidth;
-	if ((HistoryWidth < aw) // If wider than the reported screen width, do not adjust
-		&& ((left < al) || (left >= al + aw))
-	   ) {
-	  adjust = true;
-	  left = al + Math.floor((aw - HistoryWidth) / 2);
-	}
-	let at = scr.availTop;
-	let ah = scr.availHeight;
-	if ((HistoryHeight < ah) // If higher than the reported screen height, do not adjust
-		&& ((top < at) || (top >= at + ah))
-	   ) {
-	  adjust = true;
-	  top = at + Math.floor((ah - HistoryHeight) / 2);
-	}
-	if (adjust) { // Save new values
-	  browser.storage.local.set({
-		historytop_option: top,
-		historyleft_option: left
-	  });
-	}
-
-	// Open Bookmark history window if not already open, else just focus on it
-	browser.windows.getAll({populate: true, windowTypes: ["popup"]})
-	.then(
-	  function (a_Windowinfo) {
-		let wi, openedWi;
-		let wTitle = "("+selfName+") - Bookmark History -";
-		for (wi of a_Windowinfo) {
-		  if (wi.title.includes(wTitle)) {
-			openedWi = wi; 
+  // Open Bookmark history window if not already open, else just focus on it
+  browser.windows.getAll({populate: true, windowTypes: ["popup"]})
+  .then(
+	function (a_Windowinfo) {
+	  let wi, openedWi;
+	  let wTitle = "("+selfName+") - Bookmark History ";
+	  for (wi of a_Windowinfo) {
+		if (wi.title.includes(wTitle)) {
+		  openedWi = wi;
+		  break; 
+		}
+	  }
+	  if (openedWi != undefined) {
+		browser.windows.update(openedWi.id, {focused: true});
+	  }
+	  else {
+		let href = HistoryURL;
+		// Open in new window, like Properties popup
+		// Open popup window where it was last. If it was in another screen than
+		// our current screen, then center it.
+		// This avoids having the popup out of screen and unreachable, in case
+		// the previous screen went off, or display resolution changed.
+		let gettingItem = browser.storage.local.get(
+		  {historytop_option: 50,
+		   historyleft_option: 100
 		  }
-		}
-		if (openedWi != undefined) {
-		  browser.windows.update(openedWi.id, {focused: true});
-		}
-		else {
+		);
+		gettingItem.then((res) => {
+		  let top = res.historytop_option;
+		  let left = res.historyleft_option;
+		  let scr = window.screen;
+		  let adjust = false;
+		  // Also, protect if possible against privacy.resistFingerprinting which does not return the screen size,
+		  // but the sidebar size instead !! :-(
+		  let al = scr.availLeft;
+		  let aw = scr.availWidth;
+		  if ((HistoryWidth < aw) // If wider than the reported screen width, do not adjust
+			  && ((left < al) || (left >= al + aw))
+			 ) {
+			adjust = true;
+			left = al + Math.floor((aw - HistoryWidth) / 2);
+		  }
+		  let at = scr.availTop;
+		  let ah = scr.availHeight;
+		  if ((HistoryHeight < ah) // If higher than the reported screen height, do not adjust
+			  && ((top < at) || (top >= at + ah))
+			 ) {
+			adjust = true;
+			top = at + Math.floor((ah - HistoryHeight) / 2);
+		  }
+		  if (adjust) { // Save new values
+			browser.storage.local.set({
+			  historytop_option: top,
+			  historyleft_option: left
+			});
+		  }
+
 		  browser.windows.create(
 			{titlePreface: "Bookmark History",
 			 type: "popup",
@@ -411,8 +432,8 @@ function openBsp2History () {
 			}
 		  );
 		}
-	  }
-	);
+	  );
+	}
   });
 }
 

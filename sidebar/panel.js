@@ -2747,8 +2747,9 @@ function handleResultClick (resultBN_id) {
  * Handle clicks on folders - Change twistie and visibility of children (recursively)
  *
  * twistie is an HTLMDivElement
+ * is_forceNoClose is a Boolean, true will ignore the closeSibblingFolders option
  */
-function handleFolderClick (twistie) {
+function handleFolderClick (twistie, is_forceNoClose = false) {
   // Retrieve bookmark information in the row (BN.id and level)
   let row = twistie.parentElement.parentElement.parentElement;
   let BN_id = row.dataset.id;
@@ -2777,12 +2778,13 @@ function handleFolderClick (twistie) {
 	} 
 
 	// If option set, go backwards until parent folder to close all other open folders at same level
+	let is_closeSibblingFolders = options.closeSibblingFolders && !is_forceNoClose;
 	let prev_row = row;
 	let prev_level;
 	let prev_twistie;
 	let is_open;
 	let bnId;
-	if (options.closeSibblingFolders) {
+	if (is_closeSibblingFolders) {
 	  while ((prev_row = prev_row.previousElementSibling) != null) {
 		prev_level = parseInt(prev_row.dataset.level, 10);
 		if (prev_level < level) { // Reached parent, stop
@@ -2836,7 +2838,7 @@ function handleFolderClick (twistie) {
 	}
 
 	// If option set, go until end or lower level to close all other open folders at same level
-	if (options.closeSibblingFolders && (row != null) && (cur_level == level)) { // There are sibbling rows
+	if (is_closeSibblingFolders && (row != null) && (cur_level == level)) { // There are sibbling rows
 	  // Check if current row is an open folder
 	  twistie = row.firstElementChild.firstElementChild.firstElementChild;
 	  is_open = twistie.classList.contains("twistieao");
@@ -3073,6 +3075,7 @@ function bkmkMouseHandler (e) {
   // to handle click
   // Cannot be scrollbars when left mouse click
   let cell;
+  let is_altKey = e.altKey;
   if (className.includes("fav") || className.startsWith("twistie")) {
 	target = target.parentElement;
 	cell = target.parentElement;
@@ -3084,7 +3087,7 @@ function bkmkMouseHandler (e) {
   else if (className.includes("brow")) {
 	cell = target;
 	// If Alt is pressed on bookmark, open in current tab wherever we click, so retarget to the .bkmkitem_x div 
-	if (e.altKey && (target.parentElement.dataset.type == "bookmark")) {
+	if (is_altKey && (target.parentElement.dataset.type == "bookmark")) {
 	  target = target.firstElementChild;
 	  className = target.className;
 	}
@@ -3095,11 +3098,7 @@ function bkmkMouseHandler (e) {
 	// Adjust selection to a simple select if we are inside one and there is no modifier
 	let is_shiftKey = e.shiftKey;
 	let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
-	if (cell.classList.contains(selection.selectHighlight)
-		&& !is_ctrlKey && !is_shiftKey
-	   ) {
-	  addCellCursorSelection(cell, cursor, selection);
-	}
+	let action;
 
 	// Do action corresponding to click and modifiers
 	if (className == "bkmkitem_b") { // An HTMLDivElement
@@ -3124,19 +3123,20 @@ function bkmkMouseHandler (e) {
 			);
 		  }
 		}
-		else if (e.shiftKey) { // Open in new window
+		else if (is_shiftKey) { // Open in new window
 		  browser.windows.create({url: href});
 		}
 		else { // Open in current tab, except if we are running BSP2 inside a tab and Alt is not pressed
-		  if (isInSidebar || e.altKey) {
+		  if (isInSidebar || is_altKey) {
 			browser.tabs.update({url: href});
 		  }
 		}
+		action = true;
 	  }
 	}
 	// If folder bkmkitem with active twistie, handle folder click
 	else if (className == "bkmkitem_f") {
-	  if (options.traceEnabled && e.altKey) {
+	  if (options.traceEnabled && is_altKey) {
 		let bnId = cell.parentElement.dataset.id;
 		if ((bnId == mostVisitedBNId) || (bnId == recentTagBNId) || (bnId == recentBkmkBNId)) {
 		  // Special trick .. if traces are enabled, authorize this .. with href = "" or SelfURL, it will
@@ -3156,12 +3156,20 @@ function bkmkMouseHandler (e) {
 			}
 		  );
 		}
+		action = true;
 	  }
 	  // If active twistie (folder with children), go for folder action
 	  let twistie = target.firstElementChild;
 	  if (twistie.className.startsWith("twistiea")) {
-		handleFolderClick(twistie);
+		handleFolderClick(twistie, is_shiftKey);
+		action = true;
 	  }
+	}
+
+	if (action ||
+		(cell.classList.contains(selection.selectHighlight) && !is_ctrlKey && !is_shiftKey)
+	   ) {
+	  addCellCursorSelection(cell, cursor, selection);
 	}
   }
   e.stopPropagation(); // Prevent handlers up the DOM chain on same event
@@ -5645,6 +5653,7 @@ function keyHandler (e) {
   let classList = target.classList;
   let key = e.key;
   let normKey;
+  let is_shiftKey = e.shiftKey;
   let is_ctrlKey = (isMacOS ? e.metaKey : e.ctrlKey);
 //console.log("Key event: "+e.type+" key: "+key+" char: "+e.char+" target: "+target+" classList: "+classList);
 
@@ -5697,11 +5706,11 @@ function keyHandler (e) {
 		  let cell = nextRow.firstElementChild;
 		  if (isResultRow) { // Set result cursor and selection if in search panel
 //			setCellHighlight(rcursor, rlastSelOp, cell, rselection.selectIds);
-			addCellCursorSelection(cell, rcursor, rselection, false, is_ctrlKey, e.shiftKey);
+			addCellCursorSelection(cell, rcursor, rselection, false, is_ctrlKey, is_shiftKey);
 		  }
 		  else { // Set cursor and selection in main panel
 //			setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
-			addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, e.shiftKey);
+			addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, is_shiftKey);
 		  }
 		  cell.focus();
 		}
@@ -5717,7 +5726,7 @@ function keyHandler (e) {
 		  let cell = previousRow.firstElementChild;
 		  if (isResultRow) { // Set result cursor and selection if in search panel
 //			setCellHighlight(rcursor, rlastSelOp, cell, rselection.selectIds);
-			addCellCursorSelection(cell, rcursor, rselection, false, is_ctrlKey, e.shiftKey);
+			addCellCursorSelection(cell, rcursor, rselection, false, is_ctrlKey, is_shiftKey);
 		  }
 		  else { // Set cursor and selection in main panel
 //			setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
@@ -5772,11 +5781,11 @@ function keyHandler (e) {
 		  let cell = nextRow.firstElementChild;
 		  if (isResultRow) { // Set result cursor and selection if in search panel
 //			setCellHighlight(rcursor, rlastSelOp, cell, rselection.selectIds);
-			addCellCursorSelection(cell, rcursor, rselection, false, is_ctrlKey, e.shiftKey);
+			addCellCursorSelection(cell, rcursor, rselection, false, is_ctrlKey, is_shiftKey);
 		  }
 		  else { // Set cursor and selection in main panel
 //			setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
-			addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, e.shiftKey);
+			addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, is_shiftKey);
 		  }
 		  cell.focus();
 		}
@@ -5827,11 +5836,11 @@ function keyHandler (e) {
 		  let cell = previousRow.firstElementChild;
 		  if (isResultRow) { // Set result cursor and selection if in search panel
 //			setCellHighlight(rcursor, rlastSelOp, cell, rselection.selectIds);
-			addCellCursorSelection(cell, rcursor, rselection, false, is_ctrlKey, e.shiftKey);
+			addCellCursorSelection(cell, rcursor, rselection, false, is_ctrlKey, is_shiftKey);
 		  }
 		  else { // Set cursor and selection in main panel
 //			setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
-			addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, e.shiftKey);
+			addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, is_shiftKey);
 		  }
 		  cell.focus();
 		}
@@ -5850,7 +5859,7 @@ function keyHandler (e) {
 		  cell = lastRow.firstElementChild;
 		  // Set result cursor and selection
 //		  setCellHighlight(rcursor, rlastSelOp, cell, rselection.selectIds);
-		  addCellCursorSelection(cell, rcursor, rselection, false, is_ctrlKey, e.shiftKey);
+		  addCellCursorSelection(cell, rcursor, rselection, false, is_ctrlKey, is_shiftKey);
 		}
 		else {
 		  len = bookmarksTable.rows.length; // Start from end of table
@@ -5861,7 +5870,7 @@ function keyHandler (e) {
 		  cell = lastRow.firstElementChild;
 		  // Set cursor and selection in main panel
 //		  setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
-		  addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, e.shiftKey);
+		  addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, is_shiftKey);
 		}
 		cell.focus();
 		keyProcessed = true;
@@ -5877,14 +5886,14 @@ function keyHandler (e) {
 		  cell = firstRow.firstElementChild;
 		  // Set result cursor and selection
 //		  setCellHighlight(rcursor, rlastSelOp, cell, rselection.selectIds);
-		  addCellCursorSelection(cell, rcursor, rselection, false, is_ctrlKey, e.shiftKey);
+		  addCellCursorSelection(cell, rcursor, rselection, false, is_ctrlKey, is_shiftKey);
 		}
 		else {
 		  firstRow = bookmarksTable.rows[0]; // Always visible
 		  cell = firstRow.firstElementChild;
 		  // Set cursor and selection in main panel
 //		  setCellHighlight(cursor, rlastSelOp, cell, selection.selectIds);
-		  addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, e.shiftKey);
+		  addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, is_shiftKey);
 		}
 		cell.focus();
 		keyProcessed = true;
@@ -5895,7 +5904,7 @@ function keyHandler (e) {
 		// If on an open folder, close it, else go to parent folder (if not root)
 		let type = row.dataset.type;
 		let twistie = target.firstElementChild.firstElementChild;
-		if (e.shiftKey) { // Collapse it (even if already closed)
+		if (is_shiftKey) { // Collapse it (even if already closed)
 		  collapseAll(row.dataset.id, row);
 		}
 		else if ((type == "folder") && (twistie.className.includes("twistieao"))) { // This is an open folder
@@ -5910,7 +5919,7 @@ function keyHandler (e) {
 			row = curRowList[bnId];
 			let cell = row.firstElementChild;
 //			setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
-			addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, e.shiftKey);
+			addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, is_shiftKey);
 			cell.focus();
 		  }
 		}
@@ -5923,7 +5932,7 @@ function keyHandler (e) {
 		let type = row.dataset.type;
 		if (type == "folder") {
 		  let twistie = target.firstElementChild.firstElementChild;
-		  if (e.shiftKey) { // Expand it (even if already open)
+		  if (is_shiftKey) { // Expand it (even if already open)
 			expandAll(row.dataset.id, row);
 		  }
 		  else if (twistie.className.includes("twistieac")) { // Closed folder
@@ -5940,7 +5949,7 @@ function keyHandler (e) {
 			  row = curRowList[bnId];
 			  let cell = row.firstElementChild;
 //			  setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
-			  addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, e.shiftKey);
+			  addCellCursorSelection(cell, cursor, selection, false, is_ctrlKey, is_shiftKey);
 			  cell.focus();
 			}
 		  }
@@ -5953,11 +5962,11 @@ function keyHandler (e) {
 		let cell = row.firstElementChild;
 		if (isResultRow) { // Set result cursor and selection if in search panel
 //		  setCellHighlight(rcursor, rlastSelOp, cell, rselection.selectIds);
-		  addCellCursorSelection(cell, rcursor, rselection, true, is_ctrlKey, e.shiftKey);
+		  addCellCursorSelection(cell, rcursor, rselection, true, is_ctrlKey, is_shiftKey);
 		}
 		else { // Set cursor and selection in main panel
 //		  setCellHighlight(cursor, lastSelOp, cell, selection.selectIds);
-		  addCellCursorSelection(cell, cursor, selection, true, is_ctrlKey, e.shiftKey);
+		  addCellCursorSelection(cell, cursor, selection, true, is_ctrlKey, is_shiftKey);
 		}
 		keyProcessed = true;
 	  }
@@ -5994,7 +6003,7 @@ function keyHandler (e) {
 	else if (key == "Enter") {
 	  if (!myMenu_open) {
 		let type = row.dataset.type;
-		if (isResultRow && !is_ctrlKey && !e.shiftKey && !e.altKey) { // Show original bookmark item
+		if (isResultRow && !is_ctrlKey && !is_shiftKey && !e.altKey) { // Show original bookmark item
 		  // Retrieve bookmark information in the result row (BN.id)
 		  let resultBN_id = row.dataset.id;
 		  // Then show it
@@ -6020,7 +6029,7 @@ function keyHandler (e) {
 				}
 			  );
 			}
-			else if (e.shiftKey) { // Open in new window
+			else if (is_shiftKey) { // Open in new window
 			  browser.windows.create({url: href});
 			}
 			else { // Open in current tab, except if we are running BSP2 inside a tab and Alt is not pressed
@@ -6033,7 +6042,7 @@ function keyHandler (e) {
 		else if (!isResultRow && (type == "folder")) { // Folder default action
 		  let twistie = target.firstElementChild.firstElementChild;
 		  if (twistie.className.startsWith("twistiea")) {
-			handleFolderClick(twistie);
+			handleFolderClick(twistie, is_shiftKey);
 		  }
 		}
 		keyProcessed = true;
@@ -6076,7 +6085,7 @@ function keyHandler (e) {
 		keyProcessed = true;
 	  }
 	}
-	else if (!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (key.length == 1)
+	else if (!e.altKey && !e.ctrlKey && !e.metaKey && !is_shiftKey && (key.length == 1) // Do test both ctrl and meta keys
 			 && (normKey = strLowerNormalize(key)).match(PatternAlphanumeric)
 			 && !myMenu_open
 			) { // An alphanumeric key, accummulate and use to jump to next matching bookmark item
@@ -6681,7 +6690,7 @@ function clickHandler (e) {
 	  menuAction = true;
 	  let row = bookmarksTable.rows[getMenuRowIndex(target)];
 	  // Retrieve bookmark item in that row
-	  menuNewBkmkItem(row.dataset.id, NEWBCURTAB, e.altKey);
+	  menuNewBkmkItem(row.dataset.id, NEWBCURTAB, e.ctrlKey);
 	}
 	else if (classList.contains("menunewb")) { // Create a new bookmark
 	  // Can only be on bookmarks table row
@@ -8542,12 +8551,13 @@ function initialize2 () {
   }
   completeDisplay();
 
-  // Display our version number
-/*
+  // Get our self name
   browser.management.getSelf()
   .then(
 	function (extensionInfo) {
 	  selfName = extensionInfo.name;
+/*
+	  // Display our version number
 	  let version = extensionInfo.version;
 	  trace("BSP2 version: "+version, true);
 //	  let title1 = selfName + " v" +version;
@@ -8561,9 +8571,9 @@ function initialize2 () {
 //	  }
 //	  MGlassImg.title = title2;
 	  SearchButtonInput.title = title2;
+*/
 	}
   );
-*/
 }
 
 /*
