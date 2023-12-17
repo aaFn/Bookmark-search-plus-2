@@ -645,7 +645,7 @@ function appendBookmarkHN (hnId, HN, is_visible = true, pos_insideMulti = undefi
 	cell.appendChild(div);
   }
   else {
-	let div, seqnum;
+	let div, seqnum, img;
 	let revOp = HN.revOp; // If undefined, normal operation, else undo or redo
 	if ((revOp != undefined) && (revOp != HNREVOP_NONE) && options.historyDispURList) { // Special display as URList item
 	  type = "uritem";
@@ -659,7 +659,7 @@ function appendBookmarkHN (hnId, HN, is_visible = true, pos_insideMulti = undefi
 		textOp = "redo ";
 	  }
 	  seqnum = div.firstElementChild;
-	  let img = seqnum.nextElementSibling;
+	  img = seqnum.nextElementSibling;
 	  let span = img.nextElementSibling;
 	  let op = map.title;
 	  seqnum.textContent = hnId;
@@ -678,7 +678,7 @@ function appendBookmarkHN (hnId, HN, is_visible = true, pos_insideMulti = undefi
 		seqnum = div.firstElementChild;
 		cursor = seqnum.nextElementSibling;
 		histicon = cursor.nextElementSibling;
-		let img = histicon.nextElementSibling;
+		img = histicon.nextElementSibling;
 		let twistie = img.nextElementSibling;
 		twistie.classList.add((HN.is_open == true) ? "twistieao" : "twistieac");
 		span = twistie.nextElementSibling;
@@ -687,7 +687,6 @@ function appendBookmarkHN (hnId, HN, is_visible = true, pos_insideMulti = undefi
 		}
 	  }
 	  else if (type == "folder") {				// Folder
-		let img;
 		let uri = HN.faviconUri;
 		if (pos_insideMulti != undefined) { // Item is part of a multi-selection operation
 		  row.draggable = true; // Note: it is false by default for <tr>
@@ -741,7 +740,6 @@ function appendBookmarkHN (hnId, HN, is_visible = true, pos_insideMulti = undefi
 	  }
 	  else {										// Presumably a Bookmark
 		row.draggable = true; // Note: it is false by default for <tr>
-		let img;
 		let uri;
 		if (((uri = HN.faviconUri) == undefined) || (uri == "/icons/nofavicon.png")
 			|| (uri == "/icons/waiting.gif") || (uri == "/icons/nofavicontmp.png")

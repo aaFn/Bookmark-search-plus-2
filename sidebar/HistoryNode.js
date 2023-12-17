@@ -945,7 +945,7 @@ async function executeUndo (hl) {
 	let is_multi = HN.is_multi;
 	if (is_multi) {
 	  // Note: use the latest list of ids in hnRev.id_list if it exists
-	  // Also, take the received list of HNs in the multi or redo to revert if thre is one
+	  // Also, take the received list of HNs in the multi or redo to revert if there is one
 	  // If it is not complete, then we will not undo the not received multi/redone HNs
 	  let id_list;
 	  if (hnRev != undefined) {
