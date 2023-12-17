@@ -1,6 +1,11 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.120 17/12/2023 Bugs
+    - Corrected an exception in the history window on an undeclared variable, happening when a multiple action in the
+      history was containing a separator (probably a regression which went undetected by my tests, but I can't retrace
+      easily to when that particular modification was introduced).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/75
 - 2.0.119 05/11/2023 Bugs and Improvements
     - Added ability to force keeping folders open when Shift is pressed at same time than Enter or Click, when the
       "Only 1 open folder at a time" option is enabled (documentation also updated on ).
