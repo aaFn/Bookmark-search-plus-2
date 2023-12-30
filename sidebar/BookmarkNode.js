@@ -1145,8 +1145,13 @@ function scanBNTree (BN, faviconWorker, doStats = true) {
 		if (doStats)
 		  countFolders++;
 		if ((bsp2TrashFldrBNId == undefined) && (BN.title == BSP2TrashName)) {
-		  bsp2TrashFldrBNId = bnId;
-		  bsp2TrashFldrBN = BN;
+		  if (options.trashEnabled) { // Keep trace of BSP2 trash id
+			bsp2TrashFldrBNId = bnId;
+			bsp2TrashFldrBN = BN;
+		  }
+		  else { // Shouldn't be there, remove it !
+			browser.bookmarks.removeTree(bnId);
+		  }
 		}
 	  }
 	  else if (url.startsWith("place:")) { // Remember pointers at special folders ..
