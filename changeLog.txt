@@ -1,6 +1,10 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.121 30/12/2023 Improvements
+    - Added some robustness for cases where a remnant of a past BSP2 trash folder would still be around, disconnected
+      from any parent in the FF bookmarks, by deleting all occurrence of it when BSP2 trash option is disabled.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/282
 - 2.0.120 17/12/2023 Bugs
     - Corrected an exception in the history window on an undeclared variable, happening when a multiple action in the
       history was containing a separator (probably a regression which went undetected by my tests, but I can't retrace
