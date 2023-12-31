@@ -308,6 +308,26 @@ async function util_delBkmk (a_BN, is_trashEnabled) {
 	// If BSP2 trash enabled, move the bookmark item to trash instead
 	// (except when already in trash, where we really delete it)
 	if (is_trashEnabled && !BN.inBSP2Trash) { // Move at end of trash
+	  if (bsp2TrashFldrBNId == undefined) { // The BSP2 trash was deleted by somebody else, get it back now !
+console.log("Recreating the BSP2 trash which was deleted by somebody else !")
+	    let BTN;
+		if (beforeFF57) {
+		  BTN = await browser.bookmarks.create(
+			{parentId: OtherBookmarks,
+			 title: BSP2TrashName
+			}
+		  );
+		}
+		else {
+		  BTN = await browser.bookmarks.create(
+			{parentId: OtherBookmarks,
+			 title: BSP2TrashName,
+			 type: "folder"
+			}
+		  );
+		}
+		bsp2TrashFldrBNId = BTN.id;
+	  }
 	  await browser.bookmarks.move(
 		bnId,
 		{parentId: bsp2TrashFldrBNId

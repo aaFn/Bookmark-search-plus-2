@@ -465,7 +465,7 @@ function BN_updateLevel (BN, level) {
   }
 }
 
-// Insert a BookmarkNode under its parent and in list bnList (curBNList by default) if real
+// Given a BookmarkNode, insert it under its parent and in list bnList (curBNList by default) if real
 // at 0-based position index (if -1, append at end)
 // Note: for a move, set real to false for both delete and insert.
 //
@@ -589,9 +589,9 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 	}
 	else if (title == BSP2TrashName) {
 	  uri = "/icons/bsp2trash.png";
-	  protect = inBSP2Trash = true;
 	  fetchedUri = true;
 	  if (bsp2TrashFldrBNId == undefined) {
+		protect = inBSP2Trash = true;
 		bsp2TrashFldrBNId = BTN_id;
 	  }
 	}
@@ -1145,11 +1145,12 @@ function scanBNTree (BN, faviconWorker, doStats = true) {
 		if (doStats)
 		  countFolders++;
 		if ((bsp2TrashFldrBNId == undefined) && (BN.title == BSP2TrashName)) {
-		  if (options.trashEnabled) { // Keep trace of BSP2 trash id
+		  if (options.trashEnabled) { // Keep track of BSP2 trash id and BookmarkNode
 			bsp2TrashFldrBNId = bnId;
 			bsp2TrashFldrBN = BN;
 		  }
 		  else { // Shouldn't be there, remove it !
+console.log("Removing an undue BSP2 trash folder instance "+bnId);
 			browser.bookmarks.removeTree(bnId);
 		  }
 		}

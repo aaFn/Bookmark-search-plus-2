@@ -956,6 +956,9 @@ function reloadFFAPI (is_autoDetected) {
   savedHNList = curHNList;
   faviconWorkerPostMessage({data: ["hysteresis"]});
   countBookmarks = countFolders = countSeparators = countOddities = countFetchFav = countNoFavicon = 0;
+  // Forget any instance of BSP2 trash, we will rediscover it
+  bsp2TrashFldrBNId = undefined;
+  bsp2TrashFldrBN = undefined;
 
   browser.bookmarks.getTree()
   .then(storeAndConvertTree, onRejected)
@@ -1016,9 +1019,13 @@ function createBSP2TrashFolder () {
 /*
  * Remove BSP2 trash folder 
  */
-function removeBSP2TrashFolder () {
+async function removeBSP2TrashFolder () {
   if (bsp2TrashFldrBNId != undefined) { // Only remove if present !
-	browser.bookmarks.removeTree(bsp2TrashFldrBNId);
+	// Make sure the delete is complete before doing a rescan
+	await browser.bookmarks.removeTree(bsp2TrashFldrBNId);
+	// Do a rescan (but with no stats refresh) to check if there are any other undue instances of BSP2 trash left
+	// and remove them if so
+	scanBNTree(rootBN, faviconWorkerPostMessage, false);
   }
 }
 
@@ -2100,8 +2107,8 @@ function bkmkCreatedHandler (id, BTN) {
 
   // Create the new BN tree and insert it under its parent + maintain inBSP2Trash and trashDate fields
   let inBSP2Trash = options.trashEnabled && parentBN.inBSP2Trash;
-  let BN = buildTree(BTN, parentBN.level+1, inBSP2Trash);
-  BN_insert(BN, parentBN, index);
+  let BN = buildTree(BTN, parentBN.level+1, inBSP2Trash); // This creates the new nodes
+  BN_insert(BN, parentBN, index); // This places them in the tree
 
   // Create a new HistoryNode for it, and pass it to the CreateHistQueue mechanism for recognition (or not)
   // and proper addition to the HistoryList
