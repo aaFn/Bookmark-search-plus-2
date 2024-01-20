@@ -1,6 +1,19 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.123 20/01/2024 Improvements
+    - Removed the workaround for the popup position bug when running in FF version 109 and above, as it was corrected
+      since that version. This accelerates the properties and history windows opening, by removing the intermediate
+      step of opening them around top and as small as possible, and then updating them to the right position and size.
+        https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
+        https://bugzilla.mozilla.org/show_bug.cgi?id=1271047      
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/289
+    - Improved the behavior when opening the history window for FF version before 109, by making the history window
+      size as small as possible when executing the workaround for the window position bug.
+- 2.0.122 31/12/2023 Improvements
+    - Improved handling of BSP2 trash when removed, and of cleaning up undue instances. Also added the automatic
+      recreation of it when it is needed but it is not there anymore.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/282
 - 2.0.121 30/12/2023 Improvements
     - Added some robustness for cases where a remnant of a past BSP2 trash folder would still be around, disconnected
       from any parent in the FF bookmarks, by deleting all occurrence of it when BSP2 trash option is disabled.
