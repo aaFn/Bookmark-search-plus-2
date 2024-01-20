@@ -99,6 +99,7 @@ let beforeFF57;
 let beforeFF58;
 let beforeFF63;
 let beforeFF64;
+let beforeFF109;
 let ffversion;
 let p_ffversion = browser.runtime.getBrowserInfo();
 
@@ -8614,6 +8615,8 @@ function initialize () {
 	Promise.all([p_getWindowId, p]) // Make sure we get myWindowId as we can directly call a function using it
 	.then(
 	  function (a_values) { // An array of one value per Promise is returned
+		p_getWindowId = p = undefined; // Free memory held by these global variables
+
 		// Handle myWindowId
 		let windowInfo = a_values[0];
 		myWindowId = windowInfo.id;
@@ -8674,6 +8677,8 @@ function initialize () {
 	Promise.all([p_getWindowId, p]) // Make sure we get myWindowId as we can directly call a function using it
 	.then(
 	  function (a_values) { // An array of one value per Promise is returned
+		p_getWindowId = p = undefined; // Free memory held by these global variables
+
 		// Handle myWindowId
 		let windowInfo = a_values[0];
 		myWindowId = windowInfo.id;
@@ -8764,6 +8769,7 @@ Promise.all([p_platform, p_background, p_ffversion, p_getTab])
 	beforeFF58 = (ffversion < 58.0);
 	beforeFF63 = (ffversion < 63.0);
 	beforeFF64 = (ffversion < 64.0);
+	beforeFF109 = (ffversion < 109.0);
 
 	// In a private browsing window (incognito), this will be null
 	if (page != null) { // Not in a private browsing window

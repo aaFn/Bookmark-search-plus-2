@@ -1,15 +1,9 @@
 'use strict';
 
-//----- Workaround for top and left position parameters being ignored for panels and bug on popups (szince panel is an alis for popup) -----
-// Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
-//     https://bugzilla.mozilla.org/show_bug.cgi?id=1271047
-//This is also used as workaround for bug 1408446 in Linux (window contents is not painted ..)
-// Cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1408446
-// imposing to resize in order to draw contents - Apparently corrected in FF 59.x -
+// Retrieve some options
+let remembersizes_option; // At this stage, we didn't collect all options yet
 const HistoryWidth  = 800;
 const HistoryHeight = 800;
-
-let remembersizes_option; // At this stage, we didn't collect all options yet
 let gettingItem = browser.storage.local.get(
   {historytop_option: 50,
    historyleft_option: 100,
@@ -18,41 +12,76 @@ let gettingItem = browser.storage.local.get(
    historywidth_option: HistoryWidth
   }
 );
-gettingItem.then((res) => {
-  let top = res.historytop_option;
-  let left = res.historyleft_option;
-  remembersizes_option = res.remembersizes_option;
-  let height;
-  let width;
-  if (remembersizes_option) {
-	height = res.historyheight_option;
-	width = res.historywidth_option;
-//console.log("history.js entrance - remembersizes_option set - top="+top+" left="+left+" height="+height+" width="+width);
-  }
-  else {
-	height = HistoryHeight;
-	width = HistoryWidth;
-//console.log("history.js entrance - top="+top+" left="+left);
-  }
-  browser.windows.update(browser.windows.WINDOW_ID_CURRENT,
-						 {left: left,
-						  top: top,
-						  height: height,
-						  width: width
-						 }
-						);
-});
-//----- End of position ignored workaround -----
 
+// Retrieve FF version
+let beforeFF57;
+let beforeFF58;
+let beforeFF60;
+let beforeFF63;
+let beforeFF109;
+let ffversion;
+let p_ffversion = browser.runtime.getBrowserInfo();
 
-//Retrieve Platform and Background page
+//Retrieve Platform, Background page and Window id
 let p_platform = browser.runtime.getPlatformInfo();
 let p_background = browser.runtime.getBackgroundPage();
-let p_ffversion = browser.runtime.getBrowserInfo();
 let p_getWindowId = browser.windows.getCurrent(
 //  {populate: true	
 //  }
 );
+
+//----- Workaround for top and left position parameters being ignored for panels and bug on popups (szince panel is an alis for popup) -----
+// Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
+//     https://bugzilla.mozilla.org/show_bug.cgi?id=1271047
+//This is also used as workaround for bug 1408446 in Linux (window contents is not painted ..)
+// Cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1408446
+// imposing to resize in order to draw contents - Apparently corrected in FF 59.x -
+
+//gettingItem.then((res) => {
+Promise.all([p_ffversion, gettingItem])
+.then(
+  function (a_values) { // An array of one value per Promise is returned
+	p_ffversion = gettingItem = undefined; // Free memory held by these global variables
+
+	// Retrieve values in the same order
+	let info = a_values[0];
+	let res = a_values[1];
+
+	// Check FF version
+	ffversion = parseFloat(info.version);
+	beforeFF57 = (ffversion < 57.0);
+	beforeFF58 = (ffversion < 58.0);
+	beforeFF60 = (ffversion < 60.0);
+	beforeFF63 = (ffversion < 63.0);
+	beforeFF109 = (ffversion < 109.0);
+
+	remembersizes_option = res.remembersizes_option;
+    if (beforeFF109) { // Use the workaround for popup window placement
+	  let top = res.historytop_option;
+	  let left = res.historyleft_option;
+	  let height;
+	  let width;
+	  if (remembersizes_option) {
+		height = res.historyheight_option;
+		width = res.historywidth_option;
+//console.log("history.js entrance - remembersizes_option set - top="+top+" left="+left+" height="+height+" width="+width);
+	  }
+	  else {
+		height = HistoryHeight;
+		width = HistoryWidth;
+//console.log("history.js entrance - top="+top+" left="+left);
+	  }
+	  browser.windows.update(browser.windows.WINDOW_ID_CURRENT,
+							 {left: left,
+							  top: top,
+							  height: height,
+							  width: width
+							 }
+							);
+	}
+  }
+);
+//----- End of position ignored workaround -----
 
 
 /*
@@ -473,11 +502,6 @@ let backgroundPage;
 let platformOs;
 let isMacOS = false; // To indicate we are under MacOS, used for properly detecting the Cmd key
 					 // which is Ctrl in Windows/Linux (Apple always want to do it their way, don't they ?)
-let beforeFF57;
-let beforeFF58;
-let beforeFF60;
-let beforeFF63;
-let ffversion;
 let myWindowId;
 let curBNList; // Current list of BookmarkNode - Saved in storage at each modification
 let curHNList; // Current history of HistoryNode - Saved in storage at each modification
@@ -2762,10 +2786,10 @@ function initialize2 () {
  */
 function initialize () {
   // Start when we have the platform and the background page
-  Promise.all([p_platform, p_background, p_ffversion, p_getWindowId])
+  Promise.all([p_platform, p_background, p_getWindowId])
   .then(
 	function (a_values) { // An array of one value per Promise is returned
-	  p_platform = p_background = undefined;
+	  p_platform = p_background = p_getWindowId = undefined; // Free memory held by these global variables
 
 	  // Retrieve values in the same order
 	  platformOs = a_values[0].os; // info object
@@ -2776,16 +2800,8 @@ function initialize () {
 		backgroundPage = page;
 //	  }
 
-	  // Check FF version
-	  let info = a_values[2];
-	  ffversion = parseInt(info.version);
-	  beforeFF57 = (ffversion < 57.0);
-	  beforeFF58 = (ffversion < 58.0);
-	  beforeFF60 = (ffversion < 60.0);
-	  beforeFF63 = (ffversion < 63.0);
-
 	  // Handle myWindowId
-	  let windowInfo = a_values[3];
+	  let windowInfo = a_values[2];
 	  myWindowId = windowInfo.id;
 
 	  // Watch for background script messages

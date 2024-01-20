@@ -261,7 +261,10 @@ function openPropPopup (popupType, BN_id, path, type, title, url, dateAdded) {
 	  popupUrl = encodeURI(popupUrl);
 	  let gettingItem = browser.storage.local.get(
 		{popuptop_option: 300,
-		 popupleft_option: 300
+		 popupleft_option: 300,
+		 remembersizes_option: false,
+		 popupheight_option: PopupHeight,
+		 popupwidth_option: PopupWidth
 		}
 	  );
 	  gettingItem.then((res) => {
@@ -278,19 +281,32 @@ function openPropPopup (popupType, BN_id, path, type, title, url, dateAdded) {
 		// but the sidebar size instead !! :-(
 		let al = scr.availLeft;
 		let aw = scr.availWidth;
-		if ((PopupWidth < aw) // If wider than the reported screen width, do not adjust
+		let remembersizes_option = res.remembersizes_option;
+		let height;
+		let width;
+		if (remembersizes_option) {
+		  height = res.popupheight_option;
+		  width = res.popupwidth_option;
+//console.log("popup.js entrance - remembersizes_option set - top="+top+" left="+left+" height="+height+" width="+width);
+		}
+		else {
+		  height = PopupHeight;
+		  width = PopupWidth;
+//console.log("popup.js entrance - top="+top+" left="+left);
+		}
+		if ((width < aw) // If wider than the reported screen width, do not adjust
 			&& ((left < al) || (left >= al + aw))
 		   ) {
 		  adjust = true;
-		  left = al + Math.floor((aw - PopupWidth) / 2);
+		  left = al + Math.floor((aw - width) / 2);
 		}
 		let at = scr.availTop;
 		let ah = scr.availHeight;
-		if ((PopupHeight < ah) // If higher than the reported screen height, do not adjust
+		if ((height < ah) // If higher than the reported screen height, do not adjust
 			&& ((top < at) || (top >= at + ah))
 		   ) {
 		  adjust = true;
-		  top = at + Math.floor((ah - PopupHeight) / 2);
+		  top = at + Math.floor((ah - height) / 2);
 		}
 		if (adjust) { // Save new position values
 		  browser.storage.local.set({
@@ -318,12 +334,10 @@ function openPropPopup (popupType, BN_id, path, type, title, url, dateAdded) {
 //Also tried to start minimized, but the window pops in a big size first before being minimized,
 //even less pretty.			   .
 //=> .. FF does not seem very clean on all this .. :-( 
-//		   height: PopupHeight,
-//		   width: PopupWidth,
-		   height: 40,
-		   width: 40,
-//		   left: left,
-//		   top: top,
+		   height: (beforeFF109 ? 40 : height),
+		   width: (beforeFF109 ? 40 : width),
+		   left: (beforeFF109 ? undefined : left),
+		   top: (beforeFF109 ? undefined : top),
 //----- End of position ignored workaround -----
 		   allowScriptsToClose: true
 		  }
@@ -375,7 +389,10 @@ function openBsp2History () {
 		// the previous screen went off, or display resolution changed.
 		let gettingItem = browser.storage.local.get(
 		  {historytop_option: 50,
-		   historyleft_option: 100
+		   historyleft_option: 100,
+		   remembersizes_option: false,
+		   historyheight_option: HistoryHeight,
+		   historywidth_option: HistoryWidth
 		  }
 		);
 		gettingItem.then((res) => {
@@ -387,19 +404,30 @@ function openBsp2History () {
 		  // but the sidebar size instead !! :-(
 		  let al = scr.availLeft;
 		  let aw = scr.availWidth;
-		  if ((HistoryWidth < aw) // If wider than the reported screen width, do not adjust
+		  let remembersizes_option = res.remembersizes_option;
+		  let height;
+		  let width;
+		  if (remembersizes_option) {
+			height = res.historyheight_option;
+			width = res.historywidth_option;
+		  }
+		  else {
+			height = HistoryHeight;
+			width = HistoryWidth;
+		  }
+		  if ((width < aw) // If wider than the reported screen width, do not adjust
 			  && ((left < al) || (left >= al + aw))
 			 ) {
 			adjust = true;
-			left = al + Math.floor((aw - HistoryWidth) / 2);
+			left = al + Math.floor((aw - width) / 2);
 		  }
 		  let at = scr.availTop;
 		  let ah = scr.availHeight;
-		  if ((HistoryHeight < ah) // If higher than the reported screen height, do not adjust
+		  if ((height < ah) // If higher than the reported screen height, do not adjust
 			  && ((top < at) || (top >= at + ah))
 			 ) {
 			adjust = true;
-			top = at + Math.floor((ah - HistoryHeight) / 2);
+			top = at + Math.floor((ah - height) / 2);
 		  }
 		  if (adjust) { // Save new values
 			browser.storage.local.set({
@@ -421,12 +449,10 @@ function openBsp2History () {
 			 //Also tried to start minimized, but the window pops in a big size first before being minimized,
 			 //even less pretty.			   .
 			 //=> .. FF does not seem very clean on all this .. :-(  
-//			 height: PopupHeight,
-//			 width: PopupWidth,
-			 height: 800,
-			 width: 800,
-//			 left: left,
-//			 top: top,
+			 height: (beforeFF109 ? 40 : height),
+			 width: (beforeFF109 ? 40 : width),
+			 left: (beforeFF109 ? undefined : left),
+			 top: (beforeFF109 ? undefined : top),
 			 //----- End of position ignored workaround -----
 			 allowScriptsToClose: true
 			}

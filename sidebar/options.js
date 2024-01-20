@@ -1344,7 +1344,7 @@ function initialize () {
   Promise.all([p_platform, p_background, p_ffversion, p_getWindowId, p_commands])
   .then(
 	function (a_values) { // An array of one value per Promise is returned
-	  p_platform = p_background = p_ffversion = p_getWindowId = p_commands = undefined;
+	  p_platform = p_background = p_ffversion = p_getWindowId = p_commands = undefined; // Free memory held by these global variables
 
 	  // Retrieve values in the same order
 	  platformOs = a_values[0].os; // info object

@@ -23,6 +23,7 @@ let beforeFF63;
 let beforeFF64;
 let beforeFF66;
 let beforeFF77;
+let beforeFF109;
 browser.runtime.getBrowserInfo()
 .then(function (info) {
   let ffversion = parseFloat(info.version);
@@ -34,6 +35,7 @@ browser.runtime.getBrowserInfo()
   beforeFF64 = (ffversion < 64.0);
   beforeFF66 = (ffversion < 66.0);
   beforeFF77 = (ffversion < 77.0);
+  beforeFF109 = (ffversion < 109.0);
 });
 
 const SaveMinHysteresis = 2000; // Space saves to lower memory consumption

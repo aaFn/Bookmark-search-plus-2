@@ -1,47 +1,75 @@
 'use strict';
 
-//----- Workaround for top and left position parameters being ignored for panels and bug on popups (szince panel is an alis for popup) -----
-// Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
-//     https://bugzilla.mozilla.org/show_bug.cgi?id=1271047
-//This is also used as workaround for bug 1408446 in Linux (window contents is not painted ..)
-// Cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1408446
-// imposing to resize in order to draw contents - Apparently corrected in FF 59.x -
+// Retrieve some options
+let remembersizes_option; // At this stage, we didn't collect all options yet
 const PopupWidth  = 380;
 const PopupHeight = 190;
-
-let remembersizes_option; // At this stage, we didn't collect all options yet
 let gettingItem = browser.storage.local.get(
-  {popuptop_option: 300,
+  {
+   popuptop_option: 300,
    popupleft_option: 300,
    remembersizes_option: false,
    popupheight_option: PopupHeight,
    popupwidth_option: PopupWidth
   }
 );
-gettingItem.then((res) => {
-  let top = res.popuptop_option;
-  let left = res.popupleft_option;
-  remembersizes_option = res.remembersizes_option;
-  let height;
-  let width;
-  if (remembersizes_option) {
-	height = res.popupheight_option;
-	width = res.popupwidth_option;
-//console.log("popup.js entrance - remembersizes_option set - top="+top+" left="+left+" height="+height+" width="+width);
+
+// Retrieve FF version
+let beforeFF109;
+let ffversion;
+let p_ffversion = browser.runtime.getBrowserInfo();
+
+//Retrieve Platform
+let p_platform = browser.runtime.getPlatformInfo();
+
+//Retrieve our Window id
+let p_getWindowId = browser.windows.getCurrent(
+	{populate: true	
+	}
+);
+
+//----- Workaround for top and left position parameters being ignored for panels and bug on popups (since panel is an alias for popup) -----
+// Cf. https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/windows/create
+//     https://bugzilla.mozilla.org/show_bug.cgi?id=1271047
+// This is also used as workaround for bug 1408446 in Linux (window contents is not painted ..)
+// Cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1408446
+// imposing to resize in order to draw contents - Apparently corrected in FF 59.x -
+
+Promise.all([p_ffversion, gettingItem])
+.then(
+  function (a_values) { // An array of one value per Promise is returned
+	p_ffversion = gettingItem = undefined; // Free memory held by these global variables
+
+	// Retrieve values in the same order
+	let info = a_values[0];
+	let res = a_values[1];
+
+	beforeFF109 = ((ffversion = parseFloat(info.version)) < 109.0);
+
+    remembersizes_option = res.remembersizes_option;
+    if (beforeFF109) { // Use the workaround for popup window placement
+	  let top = res.popuptop_option;
+	  let left = res.popupleft_option;
+	  let height;
+	  let width;
+	  if (remembersizes_option) {
+		height = res.popupheight_option;
+		width = res.popupwidth_option;
+	  }
+	  else {
+		height = PopupHeight;
+		width = PopupWidth;
+	  }
+	  browser.windows.update(browser.windows.WINDOW_ID_CURRENT,
+							 {left: left,
+							  top: top,
+							  height: height,
+							  width: width
+	  						 }
+  							);
+	}
   }
-  else {
-	height = PopupHeight;
-	width = PopupWidth;
-//console.log("popup.js entrance - top="+top+" left="+left);
-  }
-  browser.windows.update(browser.windows.WINDOW_ID_CURRENT,
-	  					 {left: left,
-						  top: top,
-						  height: height,
-						  width: width
-	  					 }
-  						);
-});
+);
 //----- End of position ignored workaround -----
 
 /*
@@ -505,117 +533,115 @@ function paramParse (paramStr) {
  * ----------
 */
 //Retrieve Platform
-browser.runtime.getPlatformInfo().then(function(info){
-  platformOs = info.os;
+Promise.all([p_platform, p_getWindowId])
+.then(
+  function (a_values) { // An array of one value per Promise is returned
+	p_platform = p_getWindowId = undefined; // Free memory held by these global variables
 
-  // Get Id of the window we are running in
-  //browser.windows.getCurrent(
-  browser.windows.get(browser.windows.WINDOW_ID_CURRENT,
-	  				  {populate: true	
-	  				  }
-  					 )
-  .then(
-	(windowInfo) => {
-	  myWindowId = windowInfo.id;
-	  myTab = windowInfo.tabs[0];
-	  let myUrl = myTab.url; 
+	// Retrieve values in the same order
+	platformOs = a_values[0].os; // info object
+
+	// Get Id of the window we are running in
+	let windowInfo = a_values[1];
+	myWindowId = windowInfo.id;
+	myTab = windowInfo.tabs[0];
+	let myUrl = myTab.url; 
 //console.log("Id: "+windowInfo.id+" Window title: "+windowInfo.title+" Window type: "+windowInfo.type+" Tabs length: "+windowInfo.tabs.length);
 //console.log("Tab title: "+myTab.title+" Tab url: "+myUrl);
 
-	  // Some variations depending on platform
-	  if (platformOs == "win") {
-		let fontDflt = "fontdflt";
-		let fontWin = "fontwin";
-		Body.classList.replace(fontDflt, fontWin);
-		TitleInput.classList.replace(fontDflt, fontWin);
-		AddressInput.classList.replace(fontDflt, fontWin);
-		AckInput.classList.replace(fontDflt, fontWin);
-		CancelInput.classList.replace(fontDflt, fontWin);
-	  }
-	  else if (platformOs == "linux") {
-		let fontSize = "12px";
-		Body.style.fontSize = fontSize;
-		TitleInput.style.fontSize = fontSize;
-		AddressInput.style.fontSize = fontSize;
-		AckInput.style.fontSize = fontSize;
-		CancelInput.style.fontSize = fontSize;
-	  }
-	  else if (platformOs == "mac") {
-		isMacOS = true;
-		let fontSize = "12px";
-		Body.style.fontSize = fontSize;
-		TitleInput.style.fontSize = fontSize;
-		AddressInput.style.fontSize = fontSize;
-		AckInput.style.fontSize = fontSize;
-		CancelInput.style.fontSize = fontSize;
-	  }
+	// Some variations depending on platform
+	if (platformOs == "win") {
+	  let fontDflt = "fontdflt";
+	  let fontWin = "fontwin";
+	  Body.classList.replace(fontDflt, fontWin);
+	  TitleInput.classList.replace(fontDflt, fontWin);
+	  AddressInput.classList.replace(fontDflt, fontWin);
+	  AckInput.classList.replace(fontDflt, fontWin);
+	  CancelInput.classList.replace(fontDflt, fontWin);
+	}
+	else if (platformOs == "linux") {
+	  let fontSize = "12px";
+	  Body.style.fontSize = fontSize;
+	  TitleInput.style.fontSize = fontSize;
+	  AddressInput.style.fontSize = fontSize;
+	  AckInput.style.fontSize = fontSize;
+	  CancelInput.style.fontSize = fontSize;
+	}
+	else if (platformOs == "mac") {
+	  isMacOS = true;
+	  let fontSize = "12px";
+	  Body.style.fontSize = fontSize;
+	  TitleInput.style.fontSize = fontSize;
+	  AddressInput.style.fontSize = fontSize;
+	  AckInput.style.fontSize = fontSize;
+	  CancelInput.style.fontSize = fontSize;
+	}
 
-	  // Parse the url, it will give us our type of window, the BTN.id, BTN.title and BTN.url
-	  let paramsPos = myUrl.indexOf("?");
+	// Parse the url, it will give us our type of window, the BTN.id, BTN.title and BTN.url
+	let paramsPos = myUrl.indexOf("?");
 
-	  // There should be 6 arguments, url should be the last and can itself contain "&"
-	  let paramStr;
-	  let endPos;
-	  for (let i=0 ; i<5 ; i++) {
-		endPos = myUrl.indexOf("&", paramsPos+1);
-		if (endPos == -1) { // Reached last param
-		  break;
-		}
-		paramStr = myUrl.slice(paramsPos+1, endPos);
-		paramParse(paramStr);
-		paramsPos = endPos;
+	// There should be 6 arguments, url should be the last and can itself contain "&"
+	let paramStr;
+	let endPos;
+	for (let i=0 ; i<5 ; i++) {
+	  endPos = myUrl.indexOf("&", paramsPos+1);
+	  if (endPos == -1) { // Reached last param
+		break;
 	  }
-	  // Get last param until end of string
-	  paramStr = myUrl.slice(paramsPos+1);
+	  paramStr = myUrl.slice(paramsPos+1, endPos);
 	  paramParse(paramStr);
+	  paramsPos = endPos;
+	}
+	// Get last param until end of string
+	paramStr = myUrl.slice(paramsPos+1);
+	paramParse(paramStr);
 //console.log("Type: "+myType+" BTN id: "+btnId+" title: "+btnTitle);
 //console.log("Url: "+btnUrl);
 
-	  // Adjust Window contents
-	  if (myType.startsWith("prop")) {
-		isPropPopup = true;
-		AckInput.value = "Save";
+	// Adjust Window contents
+	if (myType.startsWith("prop")) {
+	  isPropPopup = true;
+	  AckInput.value = "Save";
+	}
+	else {
+	  isPropPopup = false;
+	}
+	PathLabel.textContent = btnPath;
+	TitleInput.value = btnTitle;
+	TitleInput.select();
+	let t = new Date (parseInt(dateAdded, 10));
+	DateAddedLabel.textContent = t.toLocaleString();
+	if (myType.endsWith("fldr")) { // No URL for folders
+	  isFolder = true;
+	  AddressLabel.hidden = true;
+	  AddressInput.hidden = true;
+	  AckInput.disabled = false;
+	}
+	else { // Bookmark popup, we have a URL
+	  isFolder = false;
+	  if (btnUrl != "about:blank") {
+		AddressInput.value = btnUrl;
 	  }
-	  else {
-		isPropPopup = false;
-	  }
-	  PathLabel.textContent = btnPath;
-	  TitleInput.value = btnTitle;
-	  TitleInput.select();
-	  let t = new Date (parseInt(dateAdded, 10));
-	  DateAddedLabel.textContent = t.toLocaleString();
-	  if (myType.endsWith("fldr")) { // No URL for folders
-		isFolder = true;
-		AddressLabel.hidden = true;
-		AddressInput.hidden = true;
+	  if (AddressInput.validity.valid) {
 		AckInput.disabled = false;
 	  }
-	  else { // Bookmark popup, we have a URL
-		isFolder = false;
-		if (btnUrl != "about:blank") {
-		  AddressInput.value = btnUrl;
-		}
-		if (AddressInput.validity.valid) {
-		  AckInput.disabled = false;
-		}
-	  }
-
-	  // General event handler for keyboard or mouse actions
-	  addEventListener("keydown", keyHandler, true);
-	  addEventListener('wheel', onWheel, {capture: true, passive: false}); // To disable zooming
-
-	  // Catch commited changes to each input box contents
-	  TitleInput.addEventListener("change", titleInputHandler);
-	  TitleInput.addEventListener("focus", selectTitleHandler);
-	  AddressInput.addEventListener("input", addressInputModifiedHandler);
-	  AddressInput.addEventListener("change", addressInputHandler);
-	  AddressInput.addEventListener("focus", selectAddressHandler);
-
-	  // Catch button clicks, and window close
-	  AckInput.addEventListener("click", ackInputHandler);
-	  CancelInput.addEventListener("click", cancelInputHandler);
-	  window.onbeforeunload = closeHandler; // Window close is like clicking Cancel button
-//	  window.onclose = closeHandler; // Window close is like clicking Cancel button
 	}
-  );
-});
+
+	// General event handler for keyboard or mouse actions
+	addEventListener("keydown", keyHandler, true);
+	addEventListener('wheel', onWheel, {capture: true, passive: false}); // To disable zooming
+
+	// Catch commited changes to each input box contents
+	TitleInput.addEventListener("change", titleInputHandler);
+	TitleInput.addEventListener("focus", selectTitleHandler);
+	AddressInput.addEventListener("input", addressInputModifiedHandler);
+	AddressInput.addEventListener("change", addressInputHandler);
+	AddressInput.addEventListener("focus", selectAddressHandler);
+
+	// Catch button clicks, and window close
+	AckInput.addEventListener("click", ackInputHandler);
+	CancelInput.addEventListener("click", cancelInputHandler);
+	window.onbeforeunload = closeHandler; // Window close is like clicking Cancel button
+//	window.onclose = closeHandler; // Window close is like clicking Cancel button
+  }
+);
