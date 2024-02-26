@@ -1,6 +1,12 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.124 25/02/2024 Improvements
+    - Corrected some setTimeout() calls to not generate a Content-Security-Policy error (typically, "the page’s
+      settings blocked the loading of a resource at eval (script-src)").
+    - Implemented a mechanism to self-clear local storage after 10 unsuccessful read attempts, to try to restart
+      with a cleaned up local storage and default values.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/295
 - 2.0.123 20/01/2024 Improvements
     - Removed the workaround for the popup position bug when running in FF version 109 and above, as it was corrected
       since that version. This accelerates the properties and history windows opening, by removing the intermediate
