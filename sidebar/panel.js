@@ -1252,7 +1252,9 @@ function triggerUpdate (is_updateSearchList = false) {
 	  clearTimeout(inputTimeout);
 	}
 	// Schedule a new one
-	inputTimeout = setTimeout(updateSearch, UpdateSearchDelay, is_updateSearchList);
+	inputTimeout = setTimeout(updateSearch, UpdateSearchDelay
+							  , is_updateSearchList // Parameter of updateSearch()
+							 );
   }
 }
 
@@ -1312,7 +1314,9 @@ function manageSearchTextHandler () {
   if (value.length > 0) {
 	if (!options.searchOnEnter) { // Auto trigger search when no more key typed in
 	  // Set timeout before triggering / updating search mode
-	  inputTimeout = setTimeout(updateSearch, InputKeyDelay, true);
+	  inputTimeout = setTimeout(updateSearch, InputKeyDelay
+	  							, true // Parameter of updateSearch()
+	  						   );
 	}
 	enableExecuteSearch();
   }

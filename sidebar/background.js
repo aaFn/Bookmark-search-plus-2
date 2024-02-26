@@ -358,9 +358,8 @@ function newSidebar (windowId) {
   }
   // In case it was open by a show bookmark action, and it was not yet ready, process now the show bookmark action
   if ((showInSidebarWId == windowId) && (showInSidebarBnId != undefined)) {
-	setTimeout(
-	  sendAddonMsgShowBkmk(showInSidebarWId, showInSidebarTabId, showInSidebarBnId)
-	  , 50 // Wait 50 ms
+	setTimeout(sendAddonMsgShowBkmk, 50 // Wait 50 ms
+			   , showInSidebarWId, showInSidebarTabId, showInSidebarBnId // Parameters of sendAddonMsgShowBkmk()
 	);
 	showInSidebarWId   = undefined;
 	showInSidebarTabId = undefined;

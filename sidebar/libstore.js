@@ -468,13 +468,34 @@ function retryReadFullLStore(resolve, reject, retries, isSidebar, waitMsg) {
 				}
 
 				if (retries > 0) {
-					setTimeout(
-						retryReadFullLStore(resolve, reject, retries, isSidebar, waitMsg), // Retry read
-						readRetryTimeout												   // after timeout
+					// Retry read after timeout
+					setTimeout(retryReadFullLStore,	readRetryTimeout
+							   , resolve, reject, retries, isSidebar, waitMsg // Parameters of retryReadFullLStore()
 					);
 				}
 				else {
-					reject(); // Send promise for anybody waiting ..
+					// We couldn't read the local store after all retries - It is probably corrupted
+					if (retries == 0) {	// Let's clear the local storage to attempt a start with default values
+						console.log("Attempting to clear local storage, which will reset all values to default !");
+						browser.storage.local.clear()
+						.then(
+							() => {
+								setTimeout(retryReadFullLStore,	readRetryTimeout
+										   , resolve, reject, retries, isSidebar, waitMsg // Parameters of retryReadFullLStore()
+								);
+						})
+						.catch( // Asynchronous, like .then
+							function(err) {
+								let msg = "Clear of  local storage failed : " + err + " - ending there :-(";
+								console.log(msg);
+								reject(); // Send promise for anybody waiting ..
+							}
+						);
+					}
+					else {
+						console.log("This was the ultimate try, after succesful clear of local storage - ending there :-(");
+						reject(); // Send promise for anybody waiting ..
+					}
 				}
 			}
 		);
@@ -496,7 +517,7 @@ function retryReadFullLStore(resolve, reject, retries, isSidebar, waitMsg) {
 function readFullLStore(isSidebar, waitMsg) {
 	let p = new Promise(
 		(resolve, reject) => {
-			retryReadFullLStore(resolve, reject, 10, isSidebar, waitMsg); // 10 retries
+			retryReadFullLStore(resolve, reject, 10, isSidebar, waitMsg); // 10 retries - After which a clear local storage will be attempted
 		}
 	);
 
