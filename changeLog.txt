@@ -1,6 +1,10 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.125 07/03/2024 Bugs
+    - Corrected a regression on refresh of most visited or of recent bookmark lists, where an exception was generated
+      by a missing code statement removed by accident in a previous version.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/299
 - 2.0.124 25/02/2024 Improvements
     - Corrected some setTimeout() calls to not generate a Content-Security-Policy error (typically, "the page’s
       settings blocked the loading of a resource at eval (script-src)").
