@@ -2370,6 +2370,7 @@ function bkmkReordered (bnId, reorderInfo) {
 	return;
 
   // We need the BN to get real info
+  let folderBN = curBNList[bnId];
   let children = folderBN.children;
   if (children != undefined) {
 	let childIds = reorderInfo.childIds;
