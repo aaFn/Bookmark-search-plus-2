@@ -1,6 +1,16 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.126 09/03/2024 Bugs
+    - Corrected a bug on importing from a saved BSP2 config, where the searchHeight option is stored as String, but an
+      Integer was expected, which resulted in an import failure when the rememberSizes option is true.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/300
+    - Corrected a bug where the BSP2 background task would only proceed the first option change, and not the others,
+      based on the false assumption that only 1 option can change at a time, not true when importing options.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/300
+    - Corrected a bug on importing from a saved BSP2 config, where the font size or space size would change, and no
+      sidebar reload would occur.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/300
 - 2.0.125 07/03/2024 Bugs
     - Corrected a regression on refresh of most visited or of recent bookmark lists, where an exception was generated
       by a missing code statement removed by accident in a previous version.
