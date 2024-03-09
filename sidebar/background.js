@@ -1177,9 +1177,13 @@ if (options.traceEnabled) {
 	  .then(
 		function () {
 		  let SFSChanged;
-//		  let FSChanged;
+		  let FSChange;
+		  let fontSize_option_new;
 		  let SSSChanged;
-//		  let SSChanged;
+		  let SSChange;
+		  let spaceSize_option_new;
+		  let actionReRead = false;
+		  let actionReload = false;
 		  if (pauseFavicons_option_old != options.pauseFavicons) {
 			if (options.pauseFavicons) {
 			  // Stop queued favicon fetching
@@ -1191,9 +1195,9 @@ if (options.traceEnabled) {
 			  scanBNTree(rootBN, faviconWorkerPostMessage);
 			}
 			// Signal to others the change in option
-			sendAddonMessage("savedOptions");
+			actionReRead = true;
 		  }
-		  else if (disableFavicons_option_old != options.disableFavicons) {
+		  if (disableFavicons_option_old != options.disableFavicons) {
 			// Stop queued favicon fetching
 			faviconWorkerPostMessage({data: ["stopfetching"]});
 
@@ -1203,37 +1207,39 @@ if (options.traceEnabled) {
 			saveBNList();
 
 			// Change to DFF requires a full reload of all sidebars
-			sendAddonMessage("reload");
+			actionReload = true;
 		  }
-		  else if ((SFSChanged = (setFontSize_option_old != options.setFontSize))
-			  	   || (fontSize_option_old != options.fontSize)
-		  		  ) {
-			if ((SFSChanged && !options.setFontSize
-							&& (fontSize_option_old != DfltFontSize)
-				)				// SFS changed state to unset, refresh only if FS changed
-				|| !SFSChanged	// Only the fontSize changed, which can happen only when SFS is set
-			   ) {
-			  // Change to FS requires a full reload of all sidebars
-			  sendAddonMessage("reload");
-			}
+		  SFSChanged = (setFontSize_option_old != options.setFontSize);
+		  fontSize_option_new = options.fontSize;
+		  FSChange = (SFSChanged &&
+					  ((setFontSize_option_old && (fontSize_option_old != DfltFontSize)) // If SFS changed to unset, refresh when previous FS was not the default
+						|| (!setFontSize_option_old && (fontSize_option_new != DfltFontSize)) // If SFS changed to set, refresh when new FS is not the default
+					  )
+					 )
+		  			 || (!SFSChanged && setFontSize_option_old && (fontSize_option_old != fontSize_option_new)) // If SFS didn't change and is set, refresh when FS changed
+		  			 ;  
+		  if (FSChange) {
+			// Change to FS requires a full reload of all sidebars
+			actionReload = true;
 		  }
-		  else if (setFontBold_option_old != options.setFontBold) {
+		  if (setFontBold_option_old != options.setFontBold) {
 			// Change to font weight requires a full reload of all sidebars
-			sendAddonMessage("reload");
+			actionReload = true;
 		  }
-		  else if ((SSSChanged = (setSpaceSize_option_old != options.setSpaceSize))
-			  	   || (spaceSize_option_old != options.spaceSize)
-		  		  ) {
-			if ((SSSChanged && !options.setSpaceSize
-							&& (spaceSize_option_old != DfltSpaceSize)
-				)				// SFS changed state to unset, refresh only if FS changed
-				|| !SSSChanged	// Only the fontSize changed, which can happen only when SFS is set
-			   ) {
-			  // Change to SS requires a full reload of all sidebars
-			  sendAddonMessage("reload");
-			}
+		  SSSChanged = (setSpaceSize_option_old != options.setSpaceSize);
+		  spaceSize_option_new = options.spaceSize;
+		  SSChange = (SSSChanged &&
+					  ((setSpaceSize_option_old && (spaceSize_option_old != DfltSpaceSize)) // If SSS changed to unset, refresh when previous SS was not the default
+						|| (!setSpaceSize_option_old && (spaceSize_option_new != DfltSpaceSize)) // If SSS changed to set, refresh when new SS is not the default
+					  )
+					 )
+		  			 || (!SSSChanged && setSpaceSize_option_old && (spaceSize_option_old != spaceSize_option_new)) // If SSS didn't change and is set, refresh when SS changed
+		  			 ;  
+		  if (SSChange) {
+			// Change to SS requires a full reload of all sidebars
+			actionReload = true;
 		  }
-		  else if (trashEnabled_option_old != options.trashEnabled) {
+		  if (trashEnabled_option_old != options.trashEnabled) {
 			// Create or delete the BSP2 trash folder, as required
 			if (options.trashEnabled) { // Create BSP2 trash folder, if not already existing (else trim it)
 			  createBSP2TrashFolder();
@@ -1241,36 +1247,42 @@ if (options.traceEnabled) {
 			else { // Delete BSP2 trash folder and all its content
 			  removeBSP2TrashFolder();
 			}
-			sendAddonMessage("savedOptions");
+			actionReRead = true;
 		  }
-		  else if ((enableCookies_option_old != options.enableCookies)
-			  	   || (enableFlipFlop_option_old != options.enableFlipFlop)
-			  	   || (advancedClick_option_old != options.advancedClick)
-			  	   || (showPath_option_old != options.showPath)
-			  	   || (closeSearch_option_old != options.closeSearch)
-			  	   || (openTree_option_old != options.openTree)
-				   || (noffapisearch_option_old != options.noffapisearch)
-			   	   || (searchOnEnter_option_old != options.searchOnEnter)
-			   	   || (deactivateSearchList_option_old != options.deactivateSearchList)
-			  	   || (reversePath_option_old != options.reversePath)
-			  	   || (closeSibblingFolders_option_old != options.closeSibblingFolders)
-			  	   || (rememberSizes_option_old != options.rememberSizes)
-			  	   || (searchHeight_option_old != options.searchHeight)
-				   || (trashVisible_option_old != options.trashVisible)
-			       || (traceEnabled_option_old != options.traceEnabled)
-			       || (matchTheme_option_old != options.matchTheme)
-			       || (setColors_option_old != options.setColors)
-			       || (options.setColors && ((textColor_option_old != options.textColor)
-			    	   						|| (bckgndColor_option_old != options.bckgndColor)
-			    	   					   )
-			    	  )
-			       || ((options.useAltFldr && (altFldrImg_option_old != options.altFldrImg))
-				  	   || (useAltFldr_option_old != options.useAltFldr)
-				  	  )
-			       || ((options.useAltNoFav && (altNoFavImg_option_old != options.altNoFavImg))
-				  	   || (useAltNoFav_option_old != options.useAltNoFav)
-				  	  )
-			      ) { // Those options only require a re-read and some minor actions
+		  if ((enableCookies_option_old != options.enableCookies)
+			  || (enableFlipFlop_option_old != options.enableFlipFlop)
+			  || (advancedClick_option_old != options.advancedClick)
+			  || (showPath_option_old != options.showPath)
+			  || (closeSearch_option_old != options.closeSearch)
+			  || (openTree_option_old != options.openTree)
+			  || (noffapisearch_option_old != options.noffapisearch)
+			  || (searchOnEnter_option_old != options.searchOnEnter)
+			  || (deactivateSearchList_option_old != options.deactivateSearchList)
+			  || (reversePath_option_old != options.reversePath)
+			  || (closeSibblingFolders_option_old != options.closeSibblingFolders)
+			  || (rememberSizes_option_old != options.rememberSizes)
+			  || (searchHeight_option_old != options.searchHeight)
+			  || (trashVisible_option_old != options.trashVisible)
+			  || (traceEnabled_option_old != options.traceEnabled)
+			  || (matchTheme_option_old != options.matchTheme)
+			  || (setColors_option_old != options.setColors)
+			  || (options.setColors && ((textColor_option_old != options.textColor)
+			   	   						|| (bckgndColor_option_old != options.bckgndColor)
+			   	   					   )
+				 )
+			  || ((options.useAltFldr && (altFldrImg_option_old != options.altFldrImg))
+				  || (useAltFldr_option_old != options.useAltFldr)
+				 )
+			  || ((options.useAltNoFav && (altNoFavImg_option_old != options.altNoFavImg))
+				  || (useAltNoFav_option_old != options.useAltNoFav)
+			  	 )
+			) { // Those options only require a re-read and some minor actions
+			actionReRead = true;
+		  }
+		  if (actionReload) { // Provoke a reload
+			sendAddonMessage("reload");
+		  }
+		  else if (actionReRead) { // Else simply require a re-read
 			sendAddonMessage("savedOptions");
 		  }
 		}

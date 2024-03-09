@@ -812,7 +812,6 @@ function exportOptions () {
  * replacing the previous ones.
  */
 async function importOptions () {
-console.log("here");
   let files = ImportSettingsInput.files;
   if (files.length == 1) {
 	let file = files.item(0);
@@ -844,7 +843,8 @@ console.log("here");
 		  }
 		}
 
-		// All correct now, accept options, display the new values on UI and an OK message, and save options
+		// All correct now, accept options, display the new values on UI and an OK message, save options
+		// which can provoke sidebars reload if their look & feel change due to new options.
 		options = newOptions;
 		restoreOptions();
 		ImportOkSpan.hidden = false;

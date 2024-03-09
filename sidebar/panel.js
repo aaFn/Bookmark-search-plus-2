@@ -1324,7 +1324,7 @@ function manageSearchTextHandler () {
 	inputTimeout = null; // We just cleared any last timeout, so set to null
 
 	// Remember search pane height if needed, before closing it
-	let sh = SearchResult.style.height; 
+	let sh = SearchResult.style.height; // Note that sh is a string ! (not an integer . e.g. "332px")
 	if (sh != "") { // The search result pane size is different
 	  				// from its default value set in the CSS
 	  				// which is 20% (as seen in Computed Style)
