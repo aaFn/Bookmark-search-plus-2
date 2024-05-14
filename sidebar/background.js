@@ -2771,7 +2771,7 @@ function tabSwitched (activeInfo) {
 			simpleUrl = tabUrl;
 		  }
 //		  browser.bookmarks.search({url: tabUrl})
-		  browser.bookmarks.search(decodeURI(simpleUrl)) // Search workaround to avoid exceptions on about:, file: ... URLs, cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1352835
+		  browser.bookmarks.search(decodeURIComponent(simpleUrl)) // Search workaround to avoid exceptions on about:, file: ... URLs, cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1352835
 		  .then(
 			function (a_BTN) { // An array of BookmarkTreeNode
 			  let len = a_BTN.length;
@@ -2894,7 +2894,7 @@ function tabModified (tabId, changeInfo, tabInfo) {
 		  simpleUrl = tabUrl;
 		}
 //		browser.bookmarks.search({url: tabUrl})
-		browser.bookmarks.search(decodeURI(simpleUrl)) // Search workaround to avoid exceptions on about:, file: ... URLs, cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1352835
+		browser.bookmarks.search(decodeURIComponent(simpleUrl)) // Search workaround to avoid exceptions on about:, file: ... URLs, cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1352835
 		.then(
 		  function (a_BTN) { // An array of BookmarkTreeNode
 			let len = a_BTN.length;

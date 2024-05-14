@@ -1162,7 +1162,7 @@ function updateSearch (is_updateSearchList = false) {
 	  else {
 		simpleUrl = value;
 	  }
-	  searching = browser.bookmarks.search(decodeURI(simpleUrl));
+	  searching = browser.bookmarks.search(decodeURIComponent(simpleUrl));
 	}
 	else {
 //console.log("Using BSP2 internal search algorithm");
