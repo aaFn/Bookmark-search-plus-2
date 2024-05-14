@@ -1,6 +1,10 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.127 14/05/2024 Improvements
+    - Change decodeURI() to decodeURIComponent() at front of any FF bookmark search, to further increase search results
+      completeness, and tab favicon matching on tab switching or modification (reminder, it seems that the FF API does not
+      interpret escape sequences, and so returns 0 result without this).
 - 2.0.126 09/03/2024 Bugs
     - Corrected a bug on importing from a saved BSP2 config, where the searchHeight option is stored as String, but an
       Integer was expected, which resulted in an import failure when the rememberSizes option is true.
@@ -214,7 +218,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
 - 2.0.109 16/07/2022 Improvements
     - Palliate to FF bookmark search API apparently failing and returning 0 results when too many "&" arguments, to
       improve search results completeness and tab favicon matching on tab switching or modification.
-    - Add a decodeUri() at front of any FF bookmark search, as it seems that the FF API does not interpret
+    - Add a decodeURI() at front of any FF bookmark search, as it seems that the FF API does not interpret
       escape sequences, and so return 0 result -> To improve search results completeness and tab favicon matching on
       tab switching or modification.
 - 2.0.108 09/07/2022 Bugs and Improvements
