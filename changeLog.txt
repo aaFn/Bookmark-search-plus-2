@@ -1,6 +1,22 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.129 09/08/2024 Bugs
+    - Corrected a regression on dragging empty folders, introduced in 2.0.128.
+- 2.0.128 03/08/2024 Improvements
+    - Added protections in code when dragging BSP2 bookmarks from one FF instance to another: the receiving BSP2 is
+      getting empty or null data transfers upon enter in some cases.
+    - Added support for dragging BSP2 bookmarks from one FF instance to another, and support for dragging one bookmark
+      from the native FF bookmark sidebar of another FF instance (cannot do more, nor support folders in that second
+      case, since FF is not sending all data as in past in the "text/x-moz-place" case - note that the native FF
+      bookmark sidebar has the same limitation and cannot do better).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/304
+    - Added display of full path for folders on hover in the standard navigation, in the second line of the bubble.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/297
+    - Changed the behavior of the option "On mouse hover above search result, show path to bookmark item instead of title + url"
+      to "On mouse hover above search result, show path to bookmark item **in addition** to title + url".
+      And changed the option text of course.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/291
 - 2.0.127 14/05/2024 Improvements
     - Change decodeURI() to decodeURIComponent() at front of any FF bookmark search, to further increase search results
       completeness, and tab favicon matching on tab switching or modification (reminder, it seems that the FF API does not
