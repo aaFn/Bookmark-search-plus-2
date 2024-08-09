@@ -493,6 +493,7 @@ let bkmkClipboard = []; // Unique list of copied or cut BookmarkNode(s), [] if e
 let isClipboardOpCut = undefined; // Boolean, false if copy operation ongoing, true if cut, undefined if empty clipboard
 let bkmkDragIds = []; // Unique list of dragged Bookmark Id(s), [] if empty
 let bkmkDrag = []; // Unique list of dragged BookmarkNode(s), [] if empty
+let dragObj = undefined; // Object being dragged, when this is a BSP2 drag 
 let expMenu = false; // Current state of the expanded menu (true = expanded)
 let canUndo = false; // To enable or disable the undo button on the expanded menu
 let canRedo = false; // To enable or disable the redo button on the expanded menu
@@ -620,11 +621,9 @@ function appendResult (BN) {
 	let p = pathspan.textContent = BN_path(BN.parentId);
 //	pathspan.draggable = false;
 
-	if (options.showPath) {
-	  div2.title = p;
-	}
-	else {
-	  div2.title = title;
+	div2.title = title;
+	if (options.showPath && (p != "")) {
+	  div2.title += "\n"+p;
 	}
 	cell.appendChild(div2);
   }
@@ -658,21 +657,18 @@ function appendResult (BN) {
 	if (!url.startsWith("place:")) {
 	  anchor.href = url;
 	}
-	if (options.showPath) {
-	  anchor.title = BN_path(BN.parentId);
-	  if (title == "") {
-		title = suggestDisplayTitle(url);
-	  }
-	  span.textContent = title;
+	if (title == "") {
+	  anchor.title = url;
+	  span.textContent = suggestDisplayTitle(url);
 	}
 	else {
-	  if (title == "") {
-		anchor.title = url;
-		span.textContent = suggestDisplayTitle(url);
-	  }
-	  else {
-		anchor.title = title+"\n"+url;
-		span.textContent = title;
+	  anchor.title = title+"\n"+url;
+	  span.textContent = title;
+	}
+	if (options.showPath) {
+	  let p = BN_path(BN.parentId);
+	  if (p != "") {
+		anchor.title += "\n"+p;
 	  }
 	}
 //	anchor.draggable = false;
@@ -1039,6 +1035,7 @@ function displayResults (a_BTN) {
 		  let BN = curBNList[BTN_id];
 		  if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
 			// Signal reload to background, and then redisplay to all
+console.log("Cannot find BTN_id "+BTN_id+" in displayResults(), triggering reloadFFAPI_auto");
 			sendAddonMessage("reloadFFAPI_auto");
 			break; // Break loop in case of error
 		  }
@@ -1756,6 +1753,11 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
 	cell.appendChild(div2);
 
 	span.textContent = div2.title = BN.title;
+	// For folders, also show the path to the folder in the second line of the title bubble, on mouse hover
+	let p = BN_path(BN.parentId);
+	if (p != "") {
+	  div2.title += "\n"+p;
+	}
 	cell.appendChild(div2);
   }
   else if (type == "separator") {		// Separator
@@ -1997,6 +1999,9 @@ function bkmkCreated (BN, index) {
 
  * Also modifies the global variable isOtherThanSeparatorRemoved, setting it to true if anything
  * else than a separator (= a bookmark or folder) is removed.
+ * And takes care of removing the cursor and selection if the removed row is the current cursor (note by the way that
+ * removing the HTML node which has the cursor focus implies that the panel loses the focus .. so any keyboard action
+ * after that is not going to BSP2 anymore .. can happen o na Del, Ctrl-Z, Ctrl-Y ...).
  */
 let isOtherThanSeparatorRemoved;
 function removeBkmks (row, cleanup) {
@@ -4156,6 +4161,32 @@ function handleRsltDragScroll (eventId, e) {
 }
 
 /*
+ * Convert a list (Array) of BookmarkNodes to a list (Array) of {type, title, url, children}, where children is a recursive list
+ * of same items.
+ *
+ * bkmkDrag = Array of BookmarkNodes
+ *
+ * Returns an Array of {title, url}
+ */
+function convertList (bkmkDrag) {
+  let bkmkList = [];
+  let len = bkmkDrag.length;
+  let item;
+  let type;
+  let j, children;
+  for (let i=0 ; i<len ; i++) {
+	j = bkmkDrag[i];
+	item = {type: (type = j.type), title: j.title, url: j.url};
+	if ((type == "folder") && ((children = j.children) != undefined) && (children.length > 0)) {
+	  item.children = convertList(children);
+	}
+	bkmkList.push(item);
+  }
+
+  return(bkmkList);
+}
+
+/*
  * Setup drag operation and contents
  *
  * selection = selection Object
@@ -4195,16 +4226,23 @@ function setDragTransfer (selection, dt) {
   // For a folder:		application/x-bookmark and text/x-moz-place-container,text/x-moz-url,text/plain,text/html
   // For a separator:	application/x-bookmark and text/x-moz-place-separator,text/plain,text/html
 
-  // Data for BSP2 bookmark object = unique list (Array) of bookmark ids
+  // Data for BSP2 bookmark object = {ffId: <root bkmk date, to detect drags coming from another FF instance>, list: <unique list (Array) of bookmark ids>,
+  //								  bkmkList: <unique converted list (Array) of {type, title, url, children}>, type: "application/x-bookmark" for cross FF drag & drop}
   // application/x-bookmark is for BSP2 internal drag & drops.
-  let json = JSON.stringify(bkmkDragIds);
+  let json = JSON.stringify(
+	{ffId: rootBN.dateAdded,
+	 list: bkmkDragIds,
+	 bkmkList: convertList(bkmkDrag),
+	 type: "application/x-bookmark"
+	}
+  );
   dt.setData("application/x-bookmark", dtSignature = json);
 //console.log("selectIds: "+selectIds);
 //console.log("bkmkDragIds: "+bkmkDragIds);
 //console.log("dtSignature: "+dtSignature);
 
   // Rest is:
-  // text/x-moz-place<-xxx> (native Bookmark sidebar):
+  // text/x-moz-place<-xxx> (native Bookmark sidebar, only 1 bookmark for now):
   // Native Bookmark data like  {"title":"Nouveau dossier","id":2238,"itemGuid":"VQ8ulNGyfXk0","instanceId":"jvwImUhXA2rV","parent":2099,"parentGuid":"CLSASmpIpBmQ",
   // 							 "dateAdded":1536393478662000,"lastModified":1536393478662000,"type":"text/x-moz-place-container"}
   //							{"title":"_  New bookmark","id":2350,"itemGuid":"JE2j0D-5tnpT","instanceId":"jvwImUhXA2rV","parent":2028,"parentGuid":"XmOZ-HAGbfEM",
@@ -4505,13 +4543,33 @@ function traceDt (dt) {
  * Check if we support drag and drop of the source element
  * 
  * dt = DataTransfer
+ * is_parentAwait =  boolean, signal that the parent function is doing an await on the function call
  * 
  * Return Boolean = true if supported, else false
  * Updates dtSignature, bkmkDragIds, bkmkDrag and noDropZone when not an internal drag (both isBkmkItemDragged and isRsltItemDragged false)
+ * 
+ * We're going to use here the fact that an async function remains full synchronous until it itself executes an await.
+ * At that point, it returns control to the parent function which will continue on its own if it is not itself an async function
+ * with an await on the call to the async function, and the async function will complete asynchronously. If the parent is using
+ * await on calling the async function, then it will synchronously wait for it to complete, and all will remain in order.
+ *  - cf. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function
+ * 
+ * So:
+ * - when the parent is not calling this function with an await, is_parentAwait will be undefined or false, and we won't
+ *   call any await inside that function body execution
+ * - when the parent code is calling that function with an await, is_parentAwait will be true, and we will allow using
+ *   await in that function body execution
+ * 
+ * Through this mechanism, the function will always execute synchronously .. this will emulate a "dynamic async" function
+ * and will avoid duplicating its code in one normal function, and one async function, to avoid double code maintenance. 
  */
-function checkDragType (dt) {
+async function checkDragType (dt, is_parentAwait) {
+//console.log("Start of checkDragType");
   // When the dragged element is one of our BSP2 bookmarks ,its dt.types will be
   //   dt.types        : application/x-bookmark,[text/uri-list,]text/plain
+  //		Data for BSP2 bookmark object = {ffId: <root bkmk date, to detect drags coming from another FF instance>, list: <unique list (Array) of bookmark ids>,
+  //										 type: "application/x-bookmark"}
+  //        application/x-bookmark is for BSP2 internal drag & drops.
   // When it is a native FF Bookmark, it will be
   //   dt.types        : text/x-moz-place
   //		with data like: {"title":"Nouveau dossier","id":2238,"itemGuid":"VQ8ulNGyfXk0","instanceId":"jvwImUhXA2rV","parent":2099,"parentGuid":"CLSASmpIpBmQ",
@@ -4561,29 +4619,42 @@ function checkDragType (dt) {
   let isSupported;
   let format, data;
   let types = dt.types;
-  if (types.includes(format = "application/x-bookmark")) { // BSP2 drag
-	// If not internal drag ()can be another BSP2 panel instance), update bkmkDragIds, bkmkDrag and noDropZone if needed
-	// (trigerred by different dtSignature)
-	if (!isBkmkItemDragged && !isRsltItemDragged && (dtSignature != (data = dt.getData(format)))) {
+  if (types.includes(format = "application/x-bookmark")
+  	  && ((data = dt.getData(format)) != "") // Protection against a BSP2 drag from another FF instance, can be "" on Drag Enter
+	 ) { // BSP2 drag
+	// If not internal drag (can be another BSP2 panel instance), update bkmkDragIds, bkmkDrag and noDropZone if needed
+	// -> triggered by a different dtSignature
+	if (!isBkmkItemDragged && !isRsltItemDragged && (dtSignature != data)) {
 //console.log("dtSignature: "+dtSignature+" - data: "+data);
 	  dtSignature = data;
-	  // Data for a BSP2 bookmark drag = unique list (Array) of bookmark ids
-	  bkmkDragIds = JSON.parse(data);
-	  // Build bkmkDrag and noDropzone
-	  bkmkDrag = [];
-	  noDropZone = new ZoneDesc ();
-	  let BN;
-	  let bnId;
-	  let len = bkmkDragIds.length;
-	  for (let i=0 ; i<len ; i++) {
-		BN = curBNList[bnId = bkmkDragIds[i]];
-		bkmkDrag.push(BN);
-		zoneAddBN(noDropZone, bnId, BN);
+	  // Data inside a BSP2 bookmark drag = unique list (Array) of bookmark ids
+	  dragObj = JSON.parse(data);
+	  if (dragObj.ffId != undefined) { // Coming from BSP2 ?
+		if (dragObj.ffId == rootBN.dateAdded) { // Check that this is coming from our FF instance .. else the bnId's will be unknown 
+		  bkmkDragIds = dragObj.list;
+		  // Build bkmkDrag and noDropzone
+		  bkmkDrag = [];
+		  noDropZone = new ZoneDesc ();
+		  let BN;
+		  let bnId;
+		  let len = bkmkDragIds.length;
+		  for (let i=0 ; i<len ; i++) {
+			BN = curBNList[bnId = bkmkDragIds[i]];
+			bkmkDrag.push(BN);
+			zoneAddBN(noDropZone, bnId, BN);
+		  }
+		}
+		else { // Coming from BSP2 in another FF instance
+		  // Do nothing for now, this will be handled later at drop time, to create new bookmarks
+		}
+		isSupported = true;
 	  }
 	}
-	isSupported = true;
+	else {
+	  isSupported = true;
+	}
   }
-  else if (types.includes(format = "text/x-moz-place")) { // Native FF Bookmark sidebar drag, of FF History drag
+  else if (types.includes(format = "text/x-moz-place")) { // Native FF Bookmark sidebar drag, or FF History drag
 	// Cannot be an internal drag, build signature to compare with stored one (only manipulate as String to be quick)
 	// Handle multiple items drag -- GECKO SPECIFIC !! -- No more supported as of FF71, didn't find an alternative yet :-(
 	let itemCount;
@@ -4617,6 +4688,7 @@ function checkDragType (dt) {
 	  let bnId;
 	  let j;
 	  let BN;
+	  dragObj = undefined;
 	  bkmkDragIds = [];
 	  bkmkDrag = [];
 	  let len = a_bookmark.length;
@@ -4624,13 +4696,49 @@ function checkDragType (dt) {
 		bnId = (j = a_bookmark[i]).itemGuid;
 		if (bnId == "") { // FF Histoy drag (presumably)
 //						{"title":"Suggestion","id":-1,"itemGuid":"","instanceId":"Fb4st0KZ4ASX","type":"text/x-moz-place","uri":"https://github.com/aaFn/Bookmark-search-plus-2/issues/237"}
-  		  bkmkDrag.push({title: j.title, url: j.uri});
+		  bkmkDrag.push({title: j.title, url: j.uri});
 		}
-		else { // FF native sidebar Bookmark drag (presumably)
+		else { // FF native sidebar Bookmark drag (presumably), but beware that this can come from another FF !
 		  BN = curBNList[bnId];
-		  if ((BN == undefined) && (bnId != MobileBookmarks)) { // Desynchro !! => reload bookmarks from FF API
-			// Signal reload to background, and then redisplay to all
-			sendAddonMessage("reloadFFAPI_auto");
+		  if ((BN == undefined) && (bnId != MobileBookmarks)) {
+			// Verify if the bookmark id is locally known.
+			// If yes, we have a desynchro. If no, this must come from another FF instance
+			// Note: this is assuming that 2 different FF instances cannot have common bookmark ids ..
+			//       This is probably false, but a sufficiently rare occurrence to proceed with that as an assmuption.
+
+			// Now, here is the is_parentAwait trick: this will be true only when called from bkmkDropHandler(),
+			// so only call the bookmarks.get() API call when it is true.
+			// When it is false (which is in the Drag handlers before bkmkDropHandler), then we won't do the verification,
+			// we won't update bkmkDrag, and we will leave dtSignature empty to make sure that we will go through this
+			// again at kmkDropHandler() time.
+			if (is_parentAwait == true) {
+			  try {
+				let a_BTN = await browser.bookmarks.get(bnId);
+				// If we get here, that means that bnId was found and that we have a desynchro !! => reload bookmarks from FF API
+				// Signal reload to background, and then redisplay to all
+console.log("Cannot find bnId "+bnId+" in checkDragType(), but it is locally known, so triggering reloadFFAPI_auto");
+				sendAddonMessage("reloadFFAPI_auto");
+			  }
+			  catch(err) {
+				// If we reach that partn, that means that bnId was not found locally, and must come from another FF instance
+				// with data like: {"title":"Nouveau dossier","id":2238,"itemGuid":"VQ8ulNGyfXk0","instanceId":"jvwImUhXA2rV","parent":2099,"parentGuid":"CLSASmpIpBmQ",
+				//                  "dateAdded":1536393478662000,"lastModified":1536393478662000,"type":"text/x-moz-place-container"}
+				//				   {"title":"_  New bookmark","id":2350,"itemGuid":"JE2j0D-5tnpT","instanceId":"jvwImUhXA2rV","parent":2028,"parentGuid":"XmOZ-HAGbfEM",
+				//					"dateAdded":1550944109935000,"lastModified":1551218607521000,"type":"text/x-moz-place","uri":"about:blank"}
+				//				   {"title":"","id":2239,"itemGuid":"gORenOTsYJdk","instanceId":"jvwImUhXA2rV","parent":2028,"parentGuid":"XmOZ-HAGbfEM",
+				//					"dateAdded":1536396421579000,"lastModified":1551022707690000,"type":"text/x-moz-place-separator"}
+				// Ignore separators .. there is no point in dragging them from another FF instance !
+				// Also ignore folders ... they are not transmitted with their content :-()
+				let type = j.type;
+				if (type == "text/x-moz-place") {
+console.log("Drag of a bookmark from another FF instance = title: "+j.title+", url: "+j.uri);
+				  bkmkDrag.push({title: j.title, url: j.uri});
+				}
+			  }
+			}
+			else { // Not in the good context to make an await call
+			  dtSignature = [];
+			}
 		  }
 		  else {
 			uniqueListAddBN(bnId, BN, bkmkDragIds, bkmkDrag);
@@ -4665,6 +4773,7 @@ function checkDragType (dt) {
 	isSupported = false;	
   }
 
+//console.log("End of checkDragType - "+isSupported);
   return(isSupported);
 }
 
@@ -4949,11 +5058,13 @@ function bkmkDragEnterHandler (e) {
 //console.log("Drag enter event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
   // Handle drag scrolling inhibition
   handleBkmkDragScroll(EnterEvent, e);
+//console.log("Before checkDragType - bkmkDragEnterHandler");
   if (((target.className == undefined)  // When on Text, className and classList are undefined.
 	   || (target.className.length > 0)
 	  )
 	  && checkDragType(dt)
     ) {
+//console.log("After checkDragType 1 - bkmkDragEnterHandler");
 	// Get the enclosing row and bkmkitem_x inside it which we will highlight
 	// Note: when the mouse is over the lifts, an HTMLDivElement is returned
 	let row = getDragToRow(target);
@@ -4984,6 +5095,7 @@ function bkmkDragEnterHandler (e) {
 	highlightRemove(e);
 	dt.dropEffect = "none"; // Signal drop not allowed
   }
+//console.log("After checkDragType 2 - bkmkDragEnterHandler");
 }
 
 /*
@@ -5001,11 +5113,14 @@ function bkmkDragOverHandler (e) {
 //console.log("Drag over event: "+e.type+" target: "+target+" id: "+target.id+" class: "+target.classList);
   // Handle drag scrolling inhibition
   handleBkmkDragScroll(OverEvent, e);
+//console.log("Before checkDragType - bkmkDragOverHandler");
   if (((target.className == undefined)  // When on Text, className and classList are undefined.
 	   || (target.className.length > 0)
 	  )
+	  && (dt != null)
 	  && checkDragType(dt)
     ) {
+//console.log("After checkDragType 1 - bkmkDragOverHandler");
 	// Get the enclosing row
 	// Note: when the mouse is over the lifts, an HTMLDivElement is returned
 	let row = getDragToRow(target);
@@ -5036,6 +5151,7 @@ function bkmkDragOverHandler (e) {
 	highlightRemove(e);
 	dt.dropEffect = "none"; // Signal drop not allowed
   }
+//console.log("After checkDragType 2 - bkmkDragOverHandler");
 }
 
 /*
@@ -5050,12 +5166,14 @@ function bkmkDragLeaveHandler (e) {
   // Handle drag scrolling inhibition
   handleBkmkDragScroll(LeaveEvent, e);
   let targetType = Object.prototype.toString.call(target).slice(8, -1);
+//console.log("Before checkDragType - bkmkDragLeaveHandler");
   if ((targetType != "HTMLDocument") // When we drop on a dropEffect=none zone (drop not fired, but leave or exit)
 	  && ((target.className == undefined)  // When on Text, className and classList are undefined.
 	 	  || (target.className.length > 0)
 		 )
 	  && checkDragType(dt)
     ) {
+//console.log("After checkDragType 1 - bkmkDragLeaveHandler");
 	// Get the enclosing row
 	// Note: when the mouse is over the lifts, an HTMLDivElement is returned
 	let row = getDragToRow(target);
@@ -5073,6 +5191,7 @@ function bkmkDragLeaveHandler (e) {
   else {
 	dt.dropEffect = "none"; // Signal drop not allowed
   }
+//console.log("After checkDragType 2 - bkmkDragLeaveHandler");
   highlightRemove(e);
 }
 
@@ -5088,12 +5207,14 @@ function bkmkDragExitHandler (e) {
   // Handle drag scrolling inhibition
   handleBkmkDragScroll(ExitEvent, e);
   let targetType = Object.prototype.toString.call(target).slice(8, -1);
+//console.log("Before checkDragType - bkmkDragExitHandler");
   if ((targetType != "HTMLDocument") // When we drop on a dropEffect=none zone (drop not fired, but leave or exit)
 	  && ((target.className == undefined)  // When on Text, className and classList are undefined.
 	 	  || (target.className.length > 0)
 		 )
 	  && checkDragType(dt)
     ) {
+//console.log("After checkDragType 1 - bkmkDragExitHandler");
 	// Get the enclosing row
 	// Note: when the mouse is over the lifts, an HTMLDivElement is returned
 	let row = getDragToRow(target);
@@ -5111,6 +5232,7 @@ function bkmkDragExitHandler (e) {
   else {
 	dt.dropEffect = "none"; // Signal drop not allowed
   }
+//console.log("After checkDragType 2 - bkmkDragExitHandler");
   highlightRemove(e);
 }
 
@@ -5133,7 +5255,7 @@ function createBookmark (BTN) {
 }
 
 /*
- * Upon Folder creation menu event, open Window to let the user enter values in fields
+ * Create bookmarks from a converted list, coming from BSP in another FF instance
  * 
  * BTN is of type BookmarkTreeNode (promise from browser.bookmarks.create())
  */
@@ -5142,6 +5264,38 @@ function createFolder (BTN) {
   openPropPopup("new", BTN.id, path, BTN.type, BTN.title, undefined, BTN.dateAdded);
 
   // Don't call refresh search, it is already called through bkmkCreatedHandler
+}
+
+/*
+ * Create bookmarks from converted list of {type, title, url, children}, where children is a recursive list of same items,
+ * at the designated place.
+ * 
+ * tgtBN_id = String identifying the folder inside which to insert
+ * bnIndex = position in target folder folder where to insert (undefined if append at end)
+ * bkmkList = recursive list of {type, title, url, children}
+ */
+async function createFromConvertedList (tgtBN_id, bnIndex, bkmkList) {
+  let len = bkmkList.length;
+  let j;
+  let type;
+  let children;
+  let createdObj, BTN;
+  for (let i=0 ; i<len ; i++) {
+	// Create new bookmark item, and its children recursively, if any
+	j = bkmkList[i];
+    if (bnIndex == undefined) {
+	  createdObj = await createBkmkItem_async(tgtBN_id, undefined, j.title, j.url, (type = j.type));
+	}
+	else {
+	  createdObj = await createBkmkItem_async(tgtBN_id, bnIndex++, j.title, j.url, (type = j.type));
+	}
+	BTN = createdObj.BTN;
+	if (type == "folder") {
+	  if ((children = j.children) != undefined) {
+		await createFromConvertedList(BTN.id, undefined, children);
+	  }
+	}
+  }
 }
 
 /*
@@ -5166,11 +5320,13 @@ console.log("dt.types        : "+dt.types);
 */
   // Stop scrolling inhibition
   resetBkmkDragScroll();
+//console.log("Before await checkDragType - bkmkDropHandler");
   if (((target.className == undefined)  // When on Text, className and classList are undefined.
 	   || (target.className.length > 0)
 	  )
-	  && checkDragType(dt)
+	  && await checkDragType(dt, true)  // Signal to checkDragType() that we are in an async context with an await on the call
     ) {
+//console.log("After await checkDragType 1 - bkmkDropHandler");
 	// Highlight one last time to make sure we get latest insert position, then remove highlight,
 	// in particular to handle case of FF native bookmark sidebar originated drag, droppping inside
 	// noDropZone which is only active at the moment of Drop because it doesn't give the dragged data
@@ -5221,58 +5377,62 @@ console.log("dt.types        : "+dt.types);
 	  if (types.includes(type = "application/x-bookmark")	// Move or copy the dragged bookmark
 		  || types.includes(type = "text/x-moz-place")		// Dragging a native Bookmark to us, or an FF History entry
 		 ) {
-		if (bkmkDragIds.length == 0) { // FF History drag
+		if (bkmkDragIds.length == 0) { // FF History drag, or FF/BSP2 drag coming from another FF instance
 		  let tgtBN_id = (is_infolder ? BN_id : BN.parentId);
-		  let len = bkmkDrag.length;
-		  let j;
-		  let creating;
-		  for (let i=0 ; i<len ; i++) {
-			// Create new bookmark item and open properties if Alt key is pressed at same time than drop
-			j = bkmkDrag[i];
-			creating = createBkmkItem(tgtBN_id, bnIndex, j.title, j.url, "bookmark");
-			if (is_altKey) { // Open the Properties window after creation to edit new bookmark item
-			  creating.then(createBookmark);
+		  if ((dragObj != undefined) && (dragObj.ffId != undefined)) { // Coming from BSP2
+			// Data for BSP2 bookmark object = {ffId: <root bkmk date, to detect drags coming from another FF instance>, list: <unique list (Array) of bookmark ids>,
+			//								  bkmkList: <unique converted list (Array) of {type, title, url, children}>, type: "application/x-bookmark" for cross FF drag & drop}
+			if (dragObj.ffId != rootBN.dateAdded) { // If coming from another FF instance 
+			  await createFromConvertedList(tgtBN_id, bnIndex, dragObj.bkmkList);
+			}
+		  }
+		  else { // FF History drag
+			let len = bkmkDrag.length;
+			let j;
+			let BTN;
+			for (let i=0 ; i<len ; i++) {
+			  // Create new bookmark item and open properties if Alt key is pressed at same time than drop
+			  j = bkmkDrag[i];
+			  BTN = await createBkmkItem_async(tgtBN_id, bnIndex++, j.title, j.url, "bookmark");
+			  if (is_altKey) { // Open the Properties window after creation to edit new bookmark item
+				createBookmark(BTN);
+			  }
 			}
 		  }
 		}
-		else { // BSP2 bookmark or FF native sideba bookmark drag
+		else { // BSP2 bookmark or FF native sidebar bookmark drag
 		  if (is_ctrlKey) { // Copy
-			copyBkmk(bkmkDragIds, bkmkDrag, (is_infolder ? BN_id : BN.parentId), bnIndex);
+			await copyBkmk(bkmkDragIds, bkmkDrag, (is_infolder ? BN_id : BN.parentId), bnIndex);
 		  }
 		  else { // Move
-			moveBkmk(bkmkDragIds, bkmkDrag, (is_infolder ? BN_id : BN.parentId), bnIndex);
+			await moveBkmk(bkmkDragIds, bkmkDrag, (is_infolder ? BN_id : BN.parentId), bnIndex);
 		  }
 		}
 	  }
 	  else if (types.includes(type = "text/x-moz-text-internal")) { // Dragging one or multiple tabs to us
-		let gettingTabs;
 		// Handle multiple items drag -- GECKO SPECIFIC !! -- No more supported as of FF71
 		// Workaround: use highlighted tabs in the query, as it seems we can retrieve  all the tabs being dragged
 		// in returned a_tabs
 		// Use lastFocusedWindow: true instead of windowId: myWindowId, to allow dragging from other FF windows
-		gettingTabs = browser.tabs.query({lastFocusedWindow: true, highlighted: true});
-		gettingTabs.then(
-		  function (a_tabs) {
-			// Create all highlighted (= supposed dragged) tabs, in reverse order to keep current position
-			// Note: working even when appending at end of folder .. it seems like when queueing multiple requests
-			//       to the API, this is transforming to the last known index in folder at time of queueing (bug ?)
-			let droppedTab;
-			let tgtBN_id = (is_infolder ? BN_id : BN.parentId);
-			let len = a_tabs.length;
+		let a_tabs = await browser.tabs.query({lastFocusedWindow: true, highlighted: true});
+		// Create all highlighted (= supposed dragged) tabs, in reverse order to keep current position
+		// Note: working even when appending at end of folder .. it seems like when queueing multiple requests
+		//       to the API, this is transforming to the last known index in folder at time of queueing (bug ?)
+		let droppedTab;
+		let tgtBN_id = (is_infolder ? BN_id : BN.parentId);
+		let len = a_tabs.length;
 //console.log("tabs length: "+len);
-			for (let i=len-1 ; i>=0 ; i--) {
-			  droppedTab =  a_tabs[i];
-			  // Create new bookmark at insertion point
-			  let title = droppedTab.title;
-			  let url = droppedTab.url;
-			  // Create new bookmark item and open properties if Alt key is pressed at same time than drop
-			  let creating = createBkmkItem(tgtBN_id, bnIndex, title, url, "bookmark");
-			  if (is_altKey) { // Open the Properties window after creation to edit new bookmark item
-				creating.then(createBookmark);
-			  }
-			}
+		for (let i=len-1 ; i>=0 ; i--) {
+		  droppedTab =  a_tabs[i];
+		  // Create new bookmark at insertion point
+		  let title = droppedTab.title;
+		  let url = droppedTab.url;
+		  // Create new bookmark item and open properties if Alt key is pressed at same time than drop
+		  let BTN = await createBkmkItem_async(tgtBN_id, bnIndex, title, url, "bookmark");
+		  if (is_altKey) { // Open the Properties window after creation to edit new bookmark item
+			createBookmark(BTN);
 		  }
-		);
+		}
 /*
 		let url;
 		let itemCount;
@@ -5486,9 +5646,9 @@ console.log("tabs length: "+len);
 		  title = title.slice(splitIndex+1);
 		}
 		// Create new bookmark item and open properties if Alt key is pressed at same time than drop
-		let creating = createBkmkItem((is_infolder ? BN_id : BN.parentId), bnIndex, title, url, "bookmark");
+		let BTN = await createBkmkItem_async((is_infolder ? BN_id : BN.parentId), bnIndex, title, url, "bookmark");
 		if (is_altKey) { // Open the Properties window after creation to edit new bookmark item
-		  creating.then(createBookmark);
+		  createBookmark(BTN);
 		}
 	  }
 	  e.preventDefault(); // We accepted the drop
@@ -5500,6 +5660,7 @@ console.log("tabs length: "+len);
   else {
 	dt.dropEffect = "none"; // Signal drop not allowed (if it has any cancellation effect ..)
   }
+//console.log("After await checkDragType 2 - bkmkDropHandler");
 }
 
 /*
@@ -5516,7 +5677,7 @@ async function copyBkmk (a_id, a_BN, parentId, index = undefined) {
 	  let message = await browser.runtime.sendMessage(
 			{source: "sidebar:"+myWindowId,
 			 content: "copyBkmk",
-			 a_id: a_id, // Only send a_HN, a_µBN will be rebuilt on the background side
+			 a_id: a_id, // Only send a_id, a_BN will be rebuilt on the background side
 			 parentId: parentId,
 			 index: index
 			}
@@ -6399,7 +6560,7 @@ function menuNewBkmkItem (tgtBN_id, bkmkType, is_openProp = true) {
 }
 
 /*
- * Fill system clpboard with copied data
+ * Fill system clipboard with copied data
  * 
  * a_BN = array of BookmarkNodes to place in system clipboard
  *
@@ -7097,6 +7258,7 @@ function handleMsgResponse (message) {
 	  bsp2TrashFldrBNId = message.bsp2TrashFldrBNId;
 	  initCanUndo = message.canUndo;
 	  initCanRedo = message.canRedo;
+	  rootBN = curBNList[Root];
 
 	  f_initializeNext(); // initialize2()
 	}

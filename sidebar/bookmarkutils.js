@@ -119,23 +119,16 @@ async function createBkmkItem_async (parentId, insertIndex, title, url, type, to
   // Queue the creation for recognition if requested
   let is_separatorAndFF56 = (beforeFF57 && (type == "separator"));
   let createHistRef;
-  if ((toHN != undefined) && !is_separatorAndFF56) { // Do not queue separators if FF56, since not yet supported
+  if ((toHN != undefined) && !is_separatorAndFF56) { // Call from background .. Do not queue separators if FF56, since not yet supported
 	createHistRef = curCreateHistQueue.queueMultiOrReversionCreation(insertIndex, parentId, title, type, url, toHN);
   }
 
   // Execute creation
-  let creating;
+  let newBTN; // Created bookmark node
   if (insertIndex == undefined) { // Create in a folder, at end
 	if (beforeFF57) {
-	  if (is_separatorAndFF56) { // Cannot create separators in FF 56
-		creating = new Promise (
-		  (resolve, reject) => {
-			resolve(); // Send promise for anybody waiting ..
-		  }
-		);
-	  }
-	  else {
-		creating = browser.bookmarks.create(
+	  if (!is_separatorAndFF56) { // Cannot create separators in FF 56
+		newBTN = await browser.bookmarks.create(
 		  {parentId: parentId,
 		   title: title,
 		   url: url
@@ -144,7 +137,7 @@ async function createBkmkItem_async (parentId, insertIndex, title, url, type, to
 	  }
 	}
 	else {
-	  creating = browser.bookmarks.create(
+	  newBTN = await browser.bookmarks.create(
 		{parentId: parentId,
 		 title: title,
 		 type: type,
@@ -155,15 +148,8 @@ async function createBkmkItem_async (parentId, insertIndex, title, url, type, to
   }
   else { // Create before or after a bookmark item
 	if (beforeFF57) {
-	  if (is_separatorAndFF56) { // Cannot create separators in FF 56
-		creating = new Promise (
-		  (resolve, reject) => {
-			resolve(); // Send promise for anybody waiting ..
-		  }
-		);
-	  }
-	  else {
-		creating = browser.bookmarks.create(
+	  if (!is_separatorAndFF56) { // Cannot create separators in FF 56
+		newBTN = await browser.bookmarks.create(
 		  {index: insertIndex,
 		   parentId: parentId,
 		   title: title,
@@ -173,7 +159,7 @@ async function createBkmkItem_async (parentId, insertIndex, title, url, type, to
 	  }
 	}
 	else {
-	  creating = browser.bookmarks.create(
+	  newBTN = await browser.bookmarks.create(
 		{index: insertIndex,
 		 parentId: parentId,
 		 title: title,
@@ -185,9 +171,8 @@ async function createBkmkItem_async (parentId, insertIndex, title, url, type, to
   }
 
   // Wait for creation to complete, and send information for recognition if required
-  let newBTN = await creating; // Created BookmarkTreeNode
   let newHN;
-  if (createHistRef != undefined) {
+  if (createHistRef != undefined) { // Call from background .. 
 	newHN = await curCreateHistQueue.multiOrReversionCreationComplete(createHistRef, newBTN.id);
   }
 

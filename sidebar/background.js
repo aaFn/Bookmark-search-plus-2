@@ -961,6 +961,7 @@ function reloadFFAPI (is_autoDetected) {
   bsp2TrashFldrBNId = undefined;
   bsp2TrashFldrBN = undefined;
 
+  console.log("A reloadFFAPI() was triggered, is_autoDetected="+is_autoDetected);
   browser.bookmarks.getTree()
   .then(storeAndConvertTree, onRejected)
   .catch( // Asynchronous, like .then
@@ -3308,6 +3309,7 @@ function storeAndConvertTree (a_BTN) {
   trace("Tree build duration: "+(treeBuildDuration = (endTreeBuildTime - endTreeLoadTime))+" ms", true);
 
   // Remember most recent and most visisted BookmarkNodes, and then complete things
+  rootBN = curBNList[Root];
   if (mostVisitedBNId != undefined)
 	mostVisitedBN = curBNList[mostVisitedBNId];
   if (recentTagBNId != undefined)

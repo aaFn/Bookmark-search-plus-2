@@ -316,7 +316,7 @@ class CreateHistQueue {
 		// Attach the new bookmark HN on the pointed at HN
 		historyListAttachCreate(curHNList, HN, hist.toHN);
 
-		// Call resolve with the provided HN to passs it through the promise on any waiting part
+		// Call resolve with the provided HN to pass it through the promise on any waiting part
 		hist.resolve(HN);
 
 		// Note: there is no CreateEntry on this CreateHist object, as it was cleaned up on creation completion 
