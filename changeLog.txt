@@ -1,6 +1,16 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.130 22/09/2024 Improvements
+    - Now apply the FF active theme to the whole of Bookmark history, when the option is set.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/311
+    - Added a mechanism to display fatal error messages in a popup. First used when we cannot load local storage,
+      nor clear it (typically with error messages like "IndexedDB UnknownErr: ActorsParent.cpp:575"), so that the user
+      knows about the error and to explain a way to repair with uninstall/reinstall.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/313
+    - Reduced the number of retries to load from local storage, before attempting a clear, to 5, to get sooner to the fatal
+      error. Anyway, if after 5 times it does not work, then it will fail also on next attempts, from experience.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/313
 - 2.0.129 09/08/2024 Bugs
     - Corrected a regression on dragging empty folders, introduced in 2.0.128.
 - 2.0.128 03/08/2024 Improvements
