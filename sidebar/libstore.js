@@ -68,6 +68,13 @@ const OptionsList = { // OptionDesc (storeName, type, dflt)
 	traceEnabled: new OptionDesc ("traceEnabled_option", "Boolean", false)
 };
 
+const ErrorLoadMsg = "Could not load state from local storage, nor clear the local storage, from inside the add-on.\n"
+					+"This typically happens when the local storage for the add-on is corrupted.\n"
+					+"Verify the browser console for more details on the error.\n"
+					+"In such cases, the only way to solve the issue is to uninstall the add-on, and to reinstall it.\n"
+					+"This will force a reset of the local storage and remove the corruption, but will also lose all configured options, favicons ..\n"
+					+"Note that you can export and restore (import) the options, from within the BSP2 options page.";
+
 /*
  * Global variables, seen by other instances (var)
  */
@@ -197,7 +204,7 @@ function refreshOptionsLStore() {
 						console.log("lineNumber: " + err.lineNumber);
 					}
 
-					reject(); // Send promise for anybody waiting ..
+					reject(err); // Send promise for anybody waiting ..
 				}
 			);
 		}
@@ -245,7 +252,7 @@ function readFoldersLStore(waitMsg) {
 						console.log("lineNumber: " + err.lineNumber);
 					}
 
-					reject(); // Send promise for anybody waiting ..
+					reject(err); // Send promise for anybody waiting ..
 				}
 			);
 		}
@@ -486,15 +493,15 @@ function retryReadFullLStore(resolve, reject, retries, isSidebar, waitMsg) {
 						})
 						.catch( // Asynchronous, like .then
 							function(err) {
-								let msg = "Clear of  local storage failed : " + err + " - ending there :-(";
+								let msg = "Clear of local storage failed : " + err + " - ending there :-(";
 								console.log(msg);
-								reject(); // Send promise for anybody waiting ..
+								reject(ErrorLoadMsg); // Send promise for anybody waiting ..
 							}
 						);
 					}
-					else {
-						console.log("This was the ultimate try, after succesful clear of local storage - ending there :-(");
-						reject(); // Send promise for anybody waiting ..
+					else { // Negative
+						console.log("This was the ultimate try, after a successful clear of local storage - ending there :-(");
+						reject(ErrorLoadMsg); // Send promise for anybody waiting ..
 					}
 				}
 			}
@@ -517,7 +524,7 @@ function retryReadFullLStore(resolve, reject, retries, isSidebar, waitMsg) {
 function readFullLStore(isSidebar, waitMsg) {
 	let p = new Promise(
 		(resolve, reject) => {
-			retryReadFullLStore(resolve, reject, 10, isSidebar, waitMsg); // 10 retries - After which a clear local storage will be attempted
+			retryReadFullLStore(resolve, reject, 5, isSidebar, waitMsg); // 5 retries - After which a clear local storage will be attempted
 		}
 	);
 

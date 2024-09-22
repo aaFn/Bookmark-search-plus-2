@@ -1755,11 +1755,11 @@ function getStyleRule (cssRules, selectorText) {
 }
 
 /*
- * Set cssRules background colors to a given value
+ * Set cssRules background colors of the main pane to a given value
  * 
  * prop = a String holding color value to apply. If null or undefined, goes back to default
  */
-function setBackgroundColors (cssRules, prop) {
+function setPaneBackgroundColors (cssRules, prop) {
   let cssStyleRule;
   let style;
 
@@ -1782,11 +1782,11 @@ function setBackgroundColors (cssRules, prop) {
 }
 
 /*
- * Set cssRules text colors to a given value
+ * Set cssRules text colors of the main pane to a given value
  * 
  * prop = a String holding color value to apply. If null or undefined, goes back to default
  */
-function setTextColors (cssRules, prop) {
+function setPaneTextColors (cssRules, prop) {
   let cssStyleRule;
   let style;
 
@@ -1841,6 +1841,100 @@ function setTextColors (cssRules, prop) {
 }
 
 /*
+ * Set cssRules background colors of the part at right of the main pane to a given value
+ * 
+ * prop1 = a String holding color value to apply. If null or undefined, goes back to default
+ * prop2 = a String holding color value to apply to the div separating border. If null or undefined, goes back to default
+ * prop3 = a String holding color value to apply to the border of rules. If null or undefined, goes back to default
+ */
+function setRestBackgroundColors (cssRules, prop1, prop2, prop3) {
+  let cssStyleRule;
+  let style;
+
+  if ((prop1 == undefined) || (prop1 == null)) {
+	prop1 = "#F0F0F0";
+	prop2 = "#E0E0E0";
+	prop3 = "#A0A0A0";
+  }
+
+  cssStyleRule = getStyleRule(cssRules, "#displayopt");
+  style = cssStyleRule.style; // A CSSStyleDeclaration object
+  style.setProperty("background-color", prop1);
+  style.setProperty("border-color", prop1);
+  style.setProperty("border-right-color", prop2);
+
+  cssStyleRule = getStyleRule(cssRules, "#pane");
+  style = cssStyleRule.style; // A CSSStyleDeclaration object
+  style.setProperty("border-color", prop1);
+
+  cssStyleRule = getStyleRule(cssRules, "#node");
+  style = cssStyleRule.style; // A CSSStyleDeclaration object
+  style.setProperty("background-color", prop1);
+  style.setProperty("border-color", prop1);
+  style.setProperty("border-bottom-color", prop2);
+
+  cssStyleRule = getStyleRule(cssRules, "#actions");
+  style = cssStyleRule.style; // A CSSStyleDeclaration object
+  style.setProperty("background-color", prop1);
+  style.setProperty("border-color", prop1);
+  style.setProperty("border-top-color", prop2);
+
+  cssStyleRule = getStyleRule(cssRules, "#alog");
+  style = cssStyleRule.style; // A CSSStyleDeclaration object
+  style.setProperty("background-color", prop1);
+
+  cssStyleRule = getStyleRule(cssRules, ".ndrrule");
+  style = cssStyleRule.style; // A CSSStyleDeclaration object
+  style.setProperty("border-top-color", prop3);
+  style.setProperty("border-bottom-color", prop3);
+
+  cssStyleRule = getStyleRule(cssRules, ".ndfield1");
+  style = cssStyleRule.style; // A CSSStyleDeclaration object
+  style.setProperty("border-color", prop3);
+
+  cssStyleRule = getStyleRule(cssRules, ".ndfield2");
+  style = cssStyleRule.style; // A CSSStyleDeclaration object
+  style.setProperty("border-color", prop3);
+}
+
+/*
+ * Set cssRules text colors of of the part at right of the main pane to a given value
+ * 
+ * prop = a String holding color value to apply. If null or undefined, goes back to default
+ */
+function setRestTextColors (cssRules, prop) {
+  let cssStyleRule;
+  let style;
+
+  if ((prop != undefined) && (prop != null)) {
+	cssStyleRule = getStyleRule(cssRules, "#displayopt");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.setProperty("color", prop);
+
+	cssStyleRule = getStyleRule(cssRules, "#node");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.setProperty("color", prop);
+
+	cssStyleRule = getStyleRule(cssRules, "#actions");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.setProperty("color", prop);
+  }
+  else {
+	cssStyleRule = getStyleRule(cssRules, "#displayopt");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.removeProperty("color");
+
+	cssStyleRule = getStyleRule(cssRules, "#node");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.removeProperty("color");
+
+	cssStyleRule = getStyleRule(cssRules, "#actions");
+	style = cssStyleRule.style; // A CSSStyleDeclaration object
+	style.removeProperty("color");
+  }
+}
+
+/*
  * Set back panel colors to default
  */
 function resetPanelColors () {
@@ -1849,8 +1943,10 @@ function resetPanelColors () {
   let ss = a_ss[0];
   let cssRules = ss.cssRules;
 
-  setBackgroundColors(cssRules, undefined);
-  setTextColors(cssRules, undefined);
+  setPaneBackgroundColors(cssRules, undefined);
+  setPaneTextColors(cssRules, undefined);
+  setRestBackgroundColors(cssRules, undefined, undefined, undefined);
+  setRestTextColors(cssRules, undefined);
 }
 
 /*
@@ -1870,8 +1966,10 @@ function setPanelColors (wTheme) {
 	let ss = a_ss[0];
 	let cssRules = ss.cssRules;
 
-	setBackgroundColors(cssRules, propColors.sidebar);
-	setTextColors(cssRules, propColors.sidebar_text);
+	setPaneBackgroundColors(cssRules, propColors.sidebar);
+	setPaneTextColors(cssRules, propColors.sidebar_text);
+	setRestBackgroundColors(cssRules, propColors.ntp_background, propColors.toolbar_bottom_separator, propColors.popup_border);
+	setRestTextColors(cssRules, propColors.ntp_text);
   }
 }
 
@@ -1886,8 +1984,8 @@ function setPanelColorsTB (tc, bc) {
   let ss = a_ss[0];
   let cssRules = ss.cssRules;
 
-  setBackgroundColors(cssRules, bc);
-  setTextColors(cssRules, tc);
+  setPaneBackgroundColors(cssRules, bc);
+  setPaneTextColors(cssRules, tc);
 }
 
 /*

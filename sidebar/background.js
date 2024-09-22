@@ -74,6 +74,8 @@ const CvtCtx2 = CvtCanvas2.getContext("2d");
  * Global variables, seen by foreground instances (var)
  */
 var ready = false; // Set to true when background initialization is done
+var error = false; // Set to true when background initialization gets a fatal error, e.g. not able to read local store
+var errorMsg = "";
 var platformOs;
 let isLinux = false; // To indicate we are under Linux, used for workaround on commands "suggested_key"
 //Retrieve Platform
@@ -1443,11 +1445,20 @@ if (options.traceEnabled) {
 		}
 	  );
 	}
-	else if (ready && msg.startsWith("getBackground")) { // Asked to resend ready message .. if we are ready
-	  sendResponse(
-		{content: "Ready"		
-		}
-	  );
+	else if (msg.startsWith("getBackground")) { // Asked to resend ready message .. if we are ready
+	  if (ready) {
+		sendResponse(
+		  {content: "Ready"		
+		  }
+		);
+	  }
+	  else if (error) {
+		sendResponse(
+		  {content: "Error",
+		   msg: errorMsg		
+		  }
+		);
+	  }
 	}
 	else if (msg.startsWith("recordHistoryMulti")) { // Record a multiple operation in hitory
 	  let hn = recordHistoryMulti(request.operation, request.id_list, request.newParentId, request.newIndex);
@@ -3569,7 +3580,7 @@ readFullLStore(false, trace)
 		  console.log(msg);
 		  if (err != undefined) {
 			let fn = err.fileName;
-			if (fn == undefined)   fn = err.filename; // Not constant :-( Some errors have filename, and others have fileName 
+			if (fn == undefined)   fn = err.filename; // Not constant :-(. Some errors have filename, and others have fileName
 			console.log("fileName:   "+fn);
 			console.log("lineNumber: "+err.lineNumber);
 		  }
@@ -3590,6 +3601,16 @@ readFullLStore(false, trace)
 	  console.log("fileName:   "+fn);
 	  console.log("lineNumber: "+err.lineNumber);
 	}
+
+	// We are blocked and cannot continue, display an error message popup on the sidebar
+	error = true;
+	errorMsg = err;
+	sendAddonMsgComplex({
+	   source: "background",
+	   content: "Error",
+	   msg: errorMsg
+	  }
+	);
   }
 );
 

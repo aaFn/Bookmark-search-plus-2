@@ -7230,6 +7230,13 @@ function noDefaultAction (e) {
 }
 
 /*
+ * Display a notification popup with an error message
+ */
+function displayError (msg) {
+  alert(msg);
+}
+
+/*
  * Handle responses or errors when talking with background
  */
 let f_initializeNext;
@@ -7270,6 +7277,9 @@ if (options.traceEnabled) {
 }
 		f_initializeNext(); // initializePriv()
 	  }
+	}
+	else if (msg == "Error") { // Display a popup with the sent error msg
+	  displayError(msg.msg);
 	}
   }
 }
@@ -7462,6 +7472,9 @@ function handleAddonMessage (request, sender, sendResponse) {
 		  }
 		  f_initializeNext();
 		}
+	  }
+	  else if (msg == "Error") { // Display a popup with the sent error msg
+		displayError(msg.msg);
 	  }
 	  else if (msg.startsWith("savedOptions")) { // Option page changed something to options, reload them
 		// Look at what changed
@@ -8876,6 +8889,13 @@ if (options.traceEnabled) {
 }
 			initialize2();
 		  }
+  		  else if (backgroundPage.error) {
+			let msg = backgroundPage.errorMsg;
+ if (options.traceEnabled) {
+  console.log("Background is subject to a fatal error : "+msg);
+}
+  			displayError(msg);
+  		  }
 		  else { // Wait for Background to complete initialization
 if (options.traceEnabled) {
   console.log("Waiting on Background 1");
