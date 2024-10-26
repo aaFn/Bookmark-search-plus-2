@@ -1109,6 +1109,7 @@ function updateSearchList (text) {
  * 
  * is_updateSearchList = Boolean, if true, provoke an update of the search list of terms
  */
+let cursorScopedSearchBN;
 function updateSearch (is_updateSearchList = false) {
   // Triggered by timeout (or Enter key), so now clear the id
   inputTimeout = null;
@@ -1161,7 +1162,7 @@ function updateSearch (is_updateSearchList = false) {
 	  }
 	  searching = browser.bookmarks.search(decodeURIComponent(simpleUrl));
 	}
-	else {
+	else { // Let's use our own search function
 //console.log("Using BSP2 internal search algorithm");
 	  searching = new Promise ( // Do it asynchronously as that can take time ...
 		(resolve) => {
@@ -1201,18 +1202,19 @@ function updateSearch (is_updateSearchList = false) {
 			  a_BN = searchCurBNList(a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch);
 			}
 			else { // Use the recursive form
-			  let BN;
-			  if (cursor.cell == null) { // Start from Root
-				BN = rootBN;
-			  }
-			  else { // Retrieve BN of cell in cursor
-				BN = curBNList[cursor.bnId];
-				// Protection
-				if (BN == undefined) {
-				  BN = rootBN;
+			  if (cursorScopedSearchBN == undefined) { // New scoped search
+				if (cursor.cell == null) { // Start from Root
+				  cursorScopedSearchBN = rootBN;
+				}
+				else { // Retrieve BN of cell in cursor
+				  cursorScopedSearchBN = curBNList[cursor.bnId];
+				  // Protection
+				  if (cursorScopedSearchBN == undefined) {
+					cursorScopedSearchBN = rootBN;
+				  }
 				}
 			  }
-			  a_BN = searchBNRecur(BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch,
+			  a_BN = searchBNRecur(cursorScopedSearchBN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch,
 								   (options.searchScope == "subfolder") // Go down to subfolders, or only current folder ?
 								  );
 			}
@@ -1290,6 +1292,7 @@ function selectSearchTextHandler () {
 }
 
 /*
+ * Called each time a character is changed in the Searchbox.
  * Manage searches in the Searchbox:
  * - handle visibility and state (enabled / disabled) of the text cancel button
  * - handle appearance of a search result area, and display search results, after a timeout
@@ -1302,6 +1305,9 @@ function manageSearchTextHandler () {
   if (inputTimeout != null) {
 	clearTimeout(inputTimeout);
   }
+
+  // If a scoped search was active, reset its cursor since the Searchbox content changed
+  cursorScopedSearchBN = undefined;
 
   /*
    * Set the cancel text image, and enable or disable it based on:
@@ -1369,7 +1375,7 @@ function clearSearchTextHandler () {
 
   // Fire event on searchText to handle things properly
   let event = new InputEvent ("input");
-  SearchTextInput.dispatchEvent(event);
+  SearchTextInput.dispatchEvent(event); // This will call manageSearchTextHandler()
   SearchTextInput.focus(); // Keep focus on it ...
 }
 
@@ -1455,16 +1461,23 @@ function setSearchOptions () {
   SearchButtonInput.className = cn;
   if (options.searchScope == "all") {
 	MGlassImgStyle.backgroundImage = 'url("/icons/butsearch.png"';
+	cursorScopedSearchBN = undefined; // Ensure no remnant of a previous value if we were in scoped search just before
 	SScopeAllInput.checked = true;
   }
   else if (options.searchScope == "subfolder") {
 	MGlassImgStyle.backgroundImage = 'url("/icons/butsearchsub.png"';
-	SScopeSubfolderInput.checked = true;
+	if (!SScopeSubfolderInput.checked) { // Scoped search value is changing, but not from this window
+	  cursorScopedSearchBN = undefined; // Ensure no remnant of a previous value if we were in scoped search just before
+	  SScopeSubfolderInput.checked = true;
+	}
 	buttonTitleScope = SScopeSubfolderInput.nextSibling.nextSibling.textContent;
   }
   else {
 	MGlassImgStyle.backgroundImage = 'url("/icons/butsearchfldnosub.png"';
-	SScopeFolderonlyInput.checked = true;
+	if (!SScopeFolderonlyInput.checked) { // Scoped search value is changing, but not from this window
+	  cursorScopedSearchBN = undefined; // Ensure no remnant of a previous value if we were in scoped search just before
+	  SScopeFolderonlyInput.checked = true;
+	}
 	buttonTitleScope = SScopeFolderonlyInput.nextSibling.nextSibling.textContent;
   }
 
@@ -1549,6 +1562,7 @@ function resetSearchHandler () {
   options.searchScope  = "all";
   options.searchMatch  = "words";
   options.searchFilter = "all";
+  cursorScopedSearchBN = undefined; // Ensure no remnant of a previous value if we were in scoped search just before
   saveSearchOptions();
 }
 
@@ -1569,16 +1583,19 @@ function setSFieldUrlOnlyHandler () {
 
 function setSScopeAllHandler () {
   options.searchScope = "all";
+  cursorScopedSearchBN = undefined; // Ensure no remnant of a previous value if we were in scoped search just before
   saveSearchOptions();
 }
 
 function setSScopeSubfolderHandler () {
   options.searchScope = "subfolder";
+  cursorScopedSearchBN = undefined; // Ensure no remnant of a previous value if we were in scoped search just before
   saveSearchOptions();
 }
 
 function setSScopeFolderonlyHandler () {
   options.searchScope = "folderonly";
+  cursorScopedSearchBN = undefined; // Ensure no remnant of a previous value if we were in scoped search just before
   saveSearchOptions();
 }
 
@@ -2001,7 +2018,7 @@ function bkmkCreated (BN, index) {
  * else than a separator (= a bookmark or folder) is removed.
  * And takes care of removing the cursor and selection if the removed row is the current cursor (note by the way that
  * removing the HTML node which has the cursor focus implies that the panel loses the focus .. so any keyboard action
- * after that is not going to BSP2 anymore .. can happen o na Del, Ctrl-Z, Ctrl-Y ...).
+ * after that is not going to BSP2 anymore .. can happen on a Del, Ctrl-Z, Ctrl-Y ...).
  */
 let isOtherThanSeparatorRemoved;
 function removeBkmks (row, cleanup) {
@@ -2022,10 +2039,14 @@ function removeBkmks (row, cleanup) {
 //	clearCellHighlight(cursor, lastSelOp, selection.selectIds);
 	cancelCursorSelection(cursor, selection);
   }
+  if ((cursorScopedSearchBN != undefined) && (cursorScopedSearchBN.bnId == BN_id)) {
+	// Clear the scoped search cursor if the bookmark is deleted
+	cursorScopedSearchBN = undefined;
+  }
   if (row.dataset.type == "folder") {
 	isOtherThanSeparatorRemoved = true;
 
-	// Delete node and cleanup if needed
+	// Cleanup cur<xxx>List if needed
 	if (cleanup) {
 	  delete curFldrOpenList[BN_id];
 	  delete curRowList[BN_id];
@@ -2034,8 +2055,18 @@ function removeBkmks (row, cleanup) {
 
 	// Delete children if any
 	while ((nextRow != null) && (parseInt(nextRow.dataset.level, 10) > level)) {
+	  if (cursor.cell == nextRow.firstElementChild) {
+		// Clear cursor if that is amongst the deleted rows to avoid
+		// problems later when moving cursor
+		cancelCursorSelection(cursor, selection);
+	  }
+	  BN_id = nextRow.dataset.id;
+	  if ((cursorScopedSearchBN != undefined) && (cursorScopedSearchBN.bnId == BN_id)) {
+		// Clear the scoped search cursor if the bookmark is deleted
+		cursorScopedSearchBN = undefined;
+	  }
+	  // Cleanup cur<xxx>List if needed
 	  if (cleanup) {
-		BN_id = nextRow.dataset.id;
 		if (nextRow.dataset.type == "folder") {
 		  delete curFldrOpenList[BN_id];
 		}
@@ -2051,7 +2082,7 @@ function removeBkmks (row, cleanup) {
 	if (row.dataset.type == "bookmark")
 	  isOtherThanSeparatorRemoved = true;
 
-	// Delete node and cleanup if needed
+	// Cleanup cur<xxx>List if needed
 	if (cleanup) {
 	  delete curRowList[BN_id];
 	}

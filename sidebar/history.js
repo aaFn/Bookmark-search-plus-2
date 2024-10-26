@@ -961,10 +961,11 @@ function handleMultipleTwistieClick (row, twistie) {
 	twistie.classList.replace("twistieao", "twistieac");
 
     // Hide all bkmkitem_m? rows
-	let bkmkitem;
+	let bkmkitem, className;
 	while ((row = row.nextElementSibling) != null) {
 	  bkmkitem = row.firstElementChild.firstElementChild;
-	  if (!bkmkitem.className.startsWith("bkmkitem_m"))
+	  className = bkmkitem.className;
+	  if (!className.startsWith("bkmkitem_m") || (className.length > 11)) // Detect bkmkitem_mlst !
 		break; // Stop when we encounter something else thatn a multiple item
 	  row.hidden = true;
 	}
@@ -975,11 +976,12 @@ function handleMultipleTwistieClick (row, twistie) {
 	twistie.classList.replace("twistieac", "twistieao");
 
 	// Unhide all bkmkitem_m? rows
-	let bkmkitem;
+	let bkmkitem, className;
 	while ((row = row.nextElementSibling) != null) {
 	  bkmkitem = row.firstElementChild.firstElementChild;
-	  if (!bkmkitem.className.startsWith("bkmkitem_m"))
-		break; // Stop when we encounter something else thatn a multiple item
+	  className = bkmkitem.className;
+	  if (!className.startsWith("bkmkitem_m") || (className.length > 11)) // Detect bkmkitem_mlst !
+		break; // Stop when we encounter something else than a multiple item
 	  row.hidden = false;
 	}
   }
