@@ -1,6 +1,15 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.131 26/10/2024 Bugs and Improvements
+    - Corrected a bug in the Bookmark history window where expanding/closing a multiple selection list was also
+      expanding/closing the next multiple selection list(s) starting immediately after.
+    - Improved the behavior of scoped searches to make them more consistent and stable: only change when the scoped search
+      option is changed/reset, or when the content of the searchbox changes, or when the scoped bookmark is deleted.
+      No change when another folder is cut and moved to another, for example.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/315
+    - Improved the cleanup of current cursor when a row holding the cursor is deleted by deleting a parent folder
+      in another FF window.
 - 2.0.130 22/09/2024 Improvements
     - Now apply the FF active theme to the whole of Bookmark history, when the option is set.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/311
