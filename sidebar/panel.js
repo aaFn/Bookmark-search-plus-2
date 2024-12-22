@@ -621,7 +621,13 @@ function appendResult (BN) {
 	let p = pathspan.textContent = BN_path(BN.parentId);
 //	pathspan.draggable = false;
 
-	div2.title = title;
+	let url = BN.url;
+	if (url != undefined) { // Can happen for example with special folders
+	  div2.title = title+"\n"+url;
+	}
+	else {
+	  div2.title = title;
+	}
 	if (options.showPath && (p != "")) {
 	  div2.title += "\n"+p;
 	}
@@ -1025,25 +1031,33 @@ function displayResults (a_BTN) {
 	for (let j=0 ; j<len; j++) {
 	  i = a_BTN[j];
 	  let url = i.url;
-//trace("Matching BTN.id: "+i.id+" "+i.title+" "+url);
-	  if ((url == undefined)           // folder (or separator ...)
-		  || !url.startsWith("place:") // "place:" results behave strangely .. (they have no title !!)
-		 ) {
+//	  if ((url == undefined)           // folder (or separator ...)
+//		  || !url.startsWith("place:") // "place:" results behave strangely .. (they have no title !!)
+//		 ) {
 		// Append to the search result table
 		let BTN_id = i.id;
 		if ((i.type != "separator") && (BTN_id != TagsFolder) && (BTN_id != MobileBookmarks)) { // Do not display separators nor Tags nor MobileBookmarks folders in search results
 		  let BN = curBNList[BTN_id];
 		  if (BN == undefined) { // Desynchro !! => reload bookmarks from FF API
-			// Signal reload to background, and then redisplay to all
-console.log("Cannot find BTN_id "+BTN_id+" in displayResults(), triggering reloadFFAPI_auto");
-			sendAddonMessage("reloadFFAPI_auto");
-			break; // Break loop in case of error
+			console.log("Cannot find BTN_id="+BTN_id+" title="+i.title+" url="+i.url+" in displayResults() !");
+			// Note: the FF API search with a specific string can return some smart bookmarks not listed in the full list !
+			//       This is the case of:
+			//       title=History url=place:type=3&sort=4
+			//       title=Downloads url=place:transition=7&sort=4
+			//       title=Tags url=place:type=6&sort=1
+			// So do not fail on them !
+			if (!url.startsWith("place:")) {
+			  // Signal reload to background, and then redisplay to all
+			  console.log("Triggering reloadFFAPI_auto");
+			  sendAddonMessage("reloadFFAPI_auto");
+			  break; // Break loop in case of error
+			}
 		  }
-		  if ((options.trashEnabled && options.trashVisible) || (BN.inBSP2Trash != true)) { // Don't display BSP2 trash folder results except on debug
+		  else if ((options.trashEnabled && options.trashVisible) || (BN.inBSP2Trash != true)) { // Don't display BSP2 trash folder results except on debug
 			appendResult(BN);
 		  }
 		}
-	  }
+//	  }
 	}
   }
   // Stop waiting icon and display the search result table
@@ -1767,9 +1781,16 @@ function insertBookmarkBN (BN, index = -1, children = undefined) {
 	if (level > 0) {
 	  div2.style.marginLeft = (LevelIncrementPx * level)+"px";
 	}
-	cell.appendChild(div2);
 
-	span.textContent = div2.title = BN.title;
+	let title = BN.title;
+	let url = BN.url;
+	if (url != undefined) { // Can happen for example with special folders
+	  div2.title = title+"\n"+url;
+	  span.textContent = title;
+	}
+	else {
+	  span.textContent = div2.title = title;
+	}
 	// For folders, also show the path to the folder in the second line of the title bubble, on mouse hover
 	let p = BN_path(BN.parentId);
 	if (p != "") {
@@ -4650,7 +4671,10 @@ async function checkDragType (dt, is_parentAwait) {
   let isSupported;
   let format, data;
   let types = dt.types;
-  if (types.includes(format = "application/x-bookmark")
+  if (types.length == 0) { // Note: protected rows won't have any dt.types set
+	isSupported = false;	
+  }
+  else if (types.includes(format = "application/x-bookmark")
   	  && ((data = dt.getData(format)) != "") // Protection against a BSP2 drag from another FF instance, can be "" on Drag Enter
 	 ) { // BSP2 drag
 	// If not internal drag (can be another BSP2 panel instance), update bkmkDragIds, bkmkDrag and noDropZone if needed
@@ -5351,6 +5375,12 @@ console.log("dt.types        : "+dt.types);
 */
   // Stop scrolling inhibition
   resetBkmkDragScroll();
+  // Highlight one last time to make sure we get latest insert position, then remove highlight,
+  // in particular to handle case of FF native bookmark sidebar originated drag, droppping inside
+  // noDropZone which is only active at the moment of Drop because it doesn't give the dragged data
+  // before :-( !
+  let insertPos = highlightInsert(e);
+  highlightRemove(e);
 //console.log("Before await checkDragType - bkmkDropHandler");
   if (((target.className == undefined)  // When on Text, className and classList are undefined.
 	   || (target.className.length > 0)
@@ -5358,13 +5388,6 @@ console.log("dt.types        : "+dt.types);
 	  && await checkDragType(dt, true)  // Signal to checkDragType() that we are in an async context with an await on the call
     ) {
 //console.log("After await checkDragType 1 - bkmkDropHandler");
-	// Highlight one last time to make sure we get latest insert position, then remove highlight,
-	// in particular to handle case of FF native bookmark sidebar originated drag, droppping inside
-	// noDropZone which is only active at the moment of Drop because it doesn't give the dragged data
-	// before :-( !
-	let insertPos = highlightInsert(e);
-	highlightRemove(e);
-
 	// Get the enclosing row
 	// Note: when the mouse is over the lifts, an HTMLDivElement is returned
 	let row = getDragToRow(target);

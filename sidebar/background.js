@@ -568,7 +568,7 @@ function refreshChildren (BN, a_BN) {
 	let len1 = children.length;
 	identical = (len1 == len2); // Identical until a difference is found
 	let child;
-	for (let i=0 ; i<len1 ; i++) {
+	for (let i=0 ; i<len1 ; i++) { // Go through the full list to build list1Del[], list1Common[], list1Target[], list2Common[]
 	  child = children[i];
 	  childId = child.id;
 	  a_result = findBN(a_BN, child);
@@ -615,7 +615,7 @@ function refreshChildren (BN, a_BN) {
 	}
 	if (list1Common.length > 0) { // At this stage, the number of children is what remains in common
 	  // Same size on remaining children and childIds
-	  bkmkReorderedHandler(bnId, {childIds: list1Common}, false); // No record in hostory
+	  bkmkReorderedHandler(bnId, {childIds: list1Common}, false); // No record in history
 	}
 
 	// Phase 3: insert missing elements from a_BN
@@ -634,6 +634,33 @@ function refreshChildren (BN, a_BN) {
 		  content: "bkmkCreated",
 		  newtree: BN_serialize(i),
 		  index: j
+		});
+	  }
+	}
+  }
+}
+
+/*
+ * Empty a formerly active special folder (RecentBkmks, MostVisited)
+ * 
+ * BN = BookmarkNode of special foder to empty
+ * refreshDisplay = flag to indicate to send a signal to sidebars on delete
+ */
+function emptySpecialFolder (BN, refreshDisplay = true) {
+  if (BN.children != undefined) {
+	let children = BN.children;
+	let len = children.length;
+	let bnId = BN.id;
+	for (let i=0 ; i<len ; i++) {
+	  BN_delete(children[0], bnId);
+
+	  // Signal to sidebars to make them remove things from display (must work with Private window sidebars
+	  // also, which have their own separate copy of curBNList).
+	  if (refreshDisplay && ready) { // Only send the signal when completeBookmarks() has run
+		sendAddonMsgComplex({
+		  source: "background",
+		  content: "bkmkRemoved",
+		  bnId: bnId
 		});
 	  }
 	}
@@ -2022,7 +2049,6 @@ function buildTree (BTN, level, inBSP2Trash = undefined) {
 	trace("---------------", true);
   }
 */
-//  let node = curBNList[BTN_id] = BN_create(BTN, level, faviconWorker);
   let node = curBNList[BTN_id] = BN_create(BTN, level, faviconWorkerPostMessage);
   if (inBSP2Trash == true) { // Set flag on the BN + a trashDate corresponding to now
 	node.inBSP2Trash = true;
@@ -2126,6 +2152,9 @@ function bkmkCreatedHandler (id, BTN) {
   // We need the parent to calculate the real offset of insertion
   let parentId = BTN.parentId;
   let parentBN = curBNList[parentId];
+  if (parentBN == undefined) {
+	console.log("id="+id+" title="+BTN.title+" has unknown parentId="+parentId);
+  }
   let index = BTN.index;
 //let t1 = (new Date()).getTime();
 //trace(t1+" Create event on: "+id+" type: "+BTN.type+" parentId: "+parentId+" index: "+index);
@@ -2183,13 +2212,27 @@ function bkmkCreatedHandler (id, BTN) {
   // - Then re-create of all bookmarks one by one. This includes the special folders like Most Visited,
   //   Recent Tags or Recently Bookmarked.
   if (id == recentBkmkBNId) {
-	recentBkmkBN = BN;
-	// Notify open sidebars of (possibly new) id
-	sendAddonMsgComplex({
-	  source: "background",
-	  content: "recentBkmkBNId",
-	  bnId: recentBkmkBNId
-	});
+	if (BN.inBSP2Trash) { // Do not remember instances in BSP2 trash
+	  // Restore the previous special folder Id pointer if any
+	  if (recentBkmkBN == undefined) {
+		recentBkmkBNId = undefined;
+	  }
+	  else {
+		recentBkmkBNId = recentBkmkBN.id;
+	  }
+	}
+	else {
+	  if (recentBkmkBN != undefined) { // Empty the previous special folder if it had content
+		emptySpecialFolder(recentBkmkBN);
+	  }
+	  recentBkmkBN = BN;
+	  // Notify open sidebars of (possibly new) id
+	  sendAddonMsgComplex({
+		source: "background",
+		content: "recentBkmkBNId",
+		bnId: recentBkmkBNId
+	  });
+	} 
   }
   // Refresh list of recent bookmarks (always)
   triggerRecentRefreshBkmks();
@@ -2197,26 +2240,51 @@ function bkmkCreatedHandler (id, BTN) {
   // If we receive creation of the Most recent special folder (typically on restore bookmarks),
   // then rebuild pointer and refresh its content also
   if (id == mostVisitedBNId) {
-	mostVisitedBN = BN;
-	triggerRefreshMostVisited();
-	// Notify open sidebars of (possibly new) id
-	sendAddonMsgComplex({
-	  source: "background",
-	  content: "mostVisitedBNId",
-	  bnId: mostVisitedBNId
-	});
+	if (BN.inBSP2Trash) { // Do not remember instances in BSP2 trash
+	  // Restore the previous special folder Id pointer if any
+	  if (mostVisitedBN == undefined) {
+		mostVisitedBNId = undefined;
+	  }
+	  else {
+		mostVisitedBNId = mostVisitedBN.id;
+	  }
+	}
+	else {
+	  if (mostVisitedBN != undefined) { // Empty the previous special folder if it had content
+		emptySpecialFolder(mostVisitedBN);
+	  }
+	  mostVisitedBN = BN;
+	  triggerRefreshMostVisited();
+	  // Notify open sidebars of (possibly new) id
+	  sendAddonMsgComplex({
+		source: "background",
+		content: "mostVisitedBNId",
+		bnId: mostVisitedBNId
+	  });
+	}
   }
 
   // If we receive creation of the Recent tags special folder (typically on restore bookmarks),
   // then rebuild pointer
   if (id == recentTagBNId) {
-	recentTagBN = BN;
-	// Notify open sidebars of (possibly new) id
-	sendAddonMsgComplex({
-	  source: "background",
-	  content: "recentTagBNId",
-	  bnId: recentTagBNId
-	});
+	if (BN.inBSP2Trash) { // Do not remember instances in BSP2 trash
+	  // Restore the previous special folder Id pointer if any
+	  if (recentTagBN == undefined) {
+		recentTagBNId = undefined;
+	  }
+	  else {
+		recentTagBNId = recentTagBN.id;
+	  }
+	}
+	else {
+	  recentTagBN = BN;
+	  // Notify open sidebars of (possibly new) id
+	  sendAddonMsgComplex({
+		source: "background",
+		content: "recentTagBNId",
+		bnId: recentTagBNId
+	  });
+	}
   }
 }
 

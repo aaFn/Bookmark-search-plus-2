@@ -434,17 +434,17 @@ function BN_delete (BN, parentId = undefined, real = true, bnList = curBNList, r
 	decrCounters(BN, type); // Keep counters up to date
 	delete bnList[bnId];
 	// Maintain global shortcut Id/pointers up to date
-	if (bnId == recentBkmkBNId) {
-	  recentBkmkBNId = undefined;
-	  recentBkmkBN = undefined;
-	}
-	else if (bnId == mostVisitedBNId) {
+	if (bnId == mostVisitedBNId) {
 	  mostVisitedBNId = undefined;
 	  mostVisitedBN = undefined;
 	}
 	else if (bnId == recentTagBNId) {
 	  recentTagBNId = undefined;
 	  recentTagBN = undefined;
+	}
+	else if (bnId == recentBkmkBNId) {
+	  recentBkmkBNId = undefined;
+	  recentBkmkBN = undefined;
 	}
 	else if (bnId == bsp2TrashFldrBNId) {
 	  bsp2TrashFldrBNId = undefined;
@@ -658,15 +658,18 @@ function BN_create (BTN, level, faviconWorker, parentBN = undefined) {
 	  type = "folder"; // Convert to folder
 	  uri = "/icons/specfavicon.png";
 	  fetchedUri = true;
-	  protect = true;
+	  protect = true; // Protect the special folder so that we cannot drag & drop in
 	  if (url.includes(MostVisitedSort)) {
 		mostVisitedBNId = BTN_id;
+		// Setting mostVisitedBN will be made in bkmkCreatedHandler()
 	  }
 	  else if (url.includes(RecentTagSort)) {
 		recentTagBNId = BTN_id; 
+		// Setting recentTagBN will be made in bkmkCreatedHandler()
 	  }
 	  else if (url.includes(RecentBkmkSort)) {
 		recentBkmkBNId = BTN_id;
+		// Setting recentBkmkdBN will be made in bkmkCreatedHandler()
 	  }
 	  else { // Unknown or non supported place: case ...
 		title = url;
@@ -877,17 +880,17 @@ function BN_search (BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlS
 	a_result.push(BN);
   }
   if (is_recur && (BN.type == "folder")) {
-	let children = BN.children;
-	if (children != undefined) {
-	  let url;
-	  let i;
-	  let len = children.length;
-	  for (let j=0 ; j<len ; j++) {
-		i = children[j];
-		if ((i.type != "separator")
-			&& (((url = i.url) == undefined) || !url.startsWith("place:"))  // Ignore special bookmarks
-		   ) {
-		  BN_search(i, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch, a_result, is_recur)
+	let url = BN.url;
+	if ((url == undefined) || !url.startsWith("place:")) { // Do not search inside special folders
+	  let children = BN.children;
+	  if (children != undefined) {
+		let i;
+		let len = children.length;
+		for (let j=0 ; j<len ; j++) {
+		  i = children[j];
+		  if (i.type != "separator") {
+			BN_search(i, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch, a_result, is_recur)
+		  }
 		}
 	  }
 	}
@@ -1017,7 +1020,6 @@ function searchCurBNList (a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUr
 	if ((i != 0) && (i != Root) && !i.startsWith("place:")) { // Do not match with Root, nor with most visited nor recent bookmarks
 	  BN = curBNList[i];
 	  if ((BN.type != "separator")
-		  && (((url = BN.url) == undefined) || !url.startsWith("place:"))  // Ignore special bookmarks
 		  && BN_match(BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch)
 		 ) {
 		a_result.push(BN);
@@ -1043,8 +1045,8 @@ function searchBNRecur (BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, is
   if (BN.type != "folder") { // Parent must be a folder ..
 	BN = curBNList[BN.parentId];
   }
-  let url;
-  if (((url = BN.url) == undefined) || !url.startsWith("place:")) { // Ignore special bookmarks
+  let url = BN.url;
+  if ((url == undefined) || !url.startsWith("place:")) { // Do not search inside special bookmarks
 	let children = BN.children;
 	if (children != undefined) {
 	  let i;
@@ -1052,7 +1054,6 @@ function searchBNRecur (BN, a_matchStr, matchRegExp, isRegExp, isTitleSearch, is
 	  for (let j=0 ; j<len ;j++) {
 		i = children[j];
 		if ((i.type != "separator")
-			&& (((url = i.url) == undefined) || !url.startsWith("place:"))  // Ignore special bookmarks
 		   ) {
 		  BN_search (i, a_matchStr, matchRegExp, isRegExp, isTitleSearch, isUrlSearch, a_result, is_recur);
 		}
@@ -1156,20 +1157,27 @@ console.log("Removing an undue BSP2 trash folder instance "+bnId);
 		}
 	  }
 	  else if (url.startsWith("place:")) { // Remember pointers at special folders ..
-//BN.type = "bookmark";
 		if (doStats)
 		  countBookmarks++;
-		if (url.includes(RecentBkmkSort)) {
-		  recentBkmkBNId = bnId;
-		  recentBkmkBN = BN;
-		}
-		else if (url.includes(MostVisitedSort)) {
-		  mostVisitedBNId = bnId;
-		  mostVisitedBN = BN;
-		}
-		else if (url.includes(RecentTagSort)) {
-		  recentTagBNId = bnId;
-		  recentTagBN = BN;
+		if (BN.inBSP2Trash != true) { // Do not remember instances in BSP2 trash 
+		  if (url.includes(MostVisitedSort)) {
+			if ((mostVisitedBN != undefined) && (mostVisitedBN != BN)){ // Empty the previous special folder if it had content
+			  emptySpecialFolder(mostVisitedBN, false); // No display refresh at scan time
+			}
+			mostVisitedBNId = bnId;
+			mostVisitedBN = BN;
+		  }
+		  else if (url.includes(RecentTagSort)) {
+			recentTagBNId = bnId;
+			recentTagBN = BN;
+		  }
+		  else if (url.includes(RecentBkmkSort)) {
+			if ((recentBkmkBN != undefined) && (recentBkmkBN != BN)) { // Empty the previous special folder if it had content
+			  emptySpecialFolder(recentBkmkBN, false); // No display refresh at scan time
+			}
+			recentBkmkBNId = bnId;
+			recentBkmkBN = BN;
+		  }
 		}
 	  }
 	}
@@ -1215,21 +1223,31 @@ console.log("Removing an undue BSP2 trash folder instance "+bnId);
 	else if (url.startsWith("about:")) { // Change nothing also, except if protect is set unduly
 	  BN.protect = bnId.startsWith("place:"); 
 	}
-	else if (migration_spfldr && url.startsWith("place:")) { // Change nothing also, but transform (and remember pointers) ..
-	  // These are now special folders, still counted as bookmarks
+//	else if (migration_spfldr && url.startsWith("place:")) { // If we come from a version with no special folders, transform (and remember pointers) ..
+	else if (url.startsWith("place:")) { // In case we have a special bookmark not yet converted to special folders, transform (and remember pointers) ..
+	  // Migration from old format = these are now special folders, still counted as bookmarks
 	  BN.type = "folder";
 	  BN.fetchedUri = true; // Tell to use special favicon instead of standard folder favicon
-	  if (url.includes(MostVisitedSort)) {
-		mostVisitedBNId = bnId;
-		mostVisitedBN = BN;
-	  }
-	  else if (url.includes(RecentTagSort)) {
-		recentTagBNId = bnId;
-		recentTagBN = BN;
-	  }
-	  else if (url.includes(RecentBkmkSort)) {
-		recentBkmkBNId = bnId;
-		recentBkmkBN = BN;
+	  BN.protect = true; // Protect the special folder so that we cannot drag & drop inside it
+	  if (BN.inBSP2Trash != true) { // Do not remember instances in BSP2 trash 
+	  	if (url.includes(MostVisitedSort)) {
+		  if ((mostVisitedBN != undefined) && (mostVisitedBN != BN)) { // Empty the previous special folder if it had content
+			emptySpecialFolder(mostVisitedBN, false); // No display refresh at scan time
+		  }
+		  mostVisitedBNId = bnId;
+		  mostVisitedBN = BN;
+		}
+		else if (url.includes(RecentTagSort)) {
+		  recentTagBNId = bnId;
+		  recentTagBN = BN;
+		}
+		else if (url.includes(RecentBkmkSort)) {
+		  if ((recentBkmkBN != undefined) && (recentBkmkBN != BN)) { // Empty the previous special folder if it had content
+			emptySpecialFolder(recentBkmkBN, false); // No display refresh at scan time
+		  }
+		  recentBkmkBNId = bnId;
+		  recentBkmkBN = BN;
+		}
 	  }
 	}
 	else if (options.disableFavicons) {
