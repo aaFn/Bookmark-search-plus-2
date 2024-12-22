@@ -1,6 +1,21 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.132 22/12/2024 Bugs and Improvements
+    - Added traces on bookmark creation for bookmarks with unknown parentId (can happen when restoring bookmarks from
+      a backup where the "Mobile Bookmarks" folder (id=mobile______) was existing, and is not existing in the restored to
+      Firefox).
+    - Systematically convert "place:" smart bookmarks into special folders now, and not just in case of migration from
+      an old data set.
+    - In case a special "place:" folder (= smart bookmark in FF) is in the BSP2 trash, do not point at it, nor remember it.
+    - Better handle the case of multiple special "place:" special folders, at creation of a new one, or when reloading from
+      FF API, and in particular remove the content of former instances, only keep the last instance in the bookmark tree as
+      the one to dynamically use as "smart bookmark" special folder in BSP2.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/266 
+    - On hover, display the URL for folders which have an URL (e.g. special folders corresponding to smart bookmarks).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/266 
+    - Corrected a bug where dragging and dropping a protected object would leave an insert line highlighted at the
+      point where it is dropped, when the drop is cancelled because this is a protected object.
 - 2.0.131 26/10/2024 Bugs and Improvements
     - Corrected a bug in the Bookmark history window where expanding/closing a multiple selection list was also
       expanding/closing the next multiple selection list(s) starting immediately after.
@@ -1644,8 +1659,8 @@ Please find here the release notes, TODO's, and some limitations I know of today
       preparing for visual perf improvement with asynchronous/background load and display,
       an improvement to come later.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/6
-- 2.0.2	04/04/2018: Reduce console logging to only error cases when retrieving favicons
-- 2.0.1	04/04/2018: Initial release version
+- 2.0.2	04/02/2018: Reduce console logging to only error cases when retrieving favicons
+- 2.0.1	04/02/2018: Initial release version
 
 
 LIMitations / TODO's:
