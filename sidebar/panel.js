@@ -6540,14 +6540,15 @@ function menuOpenAllInTabs (BN_id, is_shiftKey) {
  * Handle new bookmark item action on context menu
  * 
  * tgtBN_id = String identifying the bookmark item before which or inside which to insert
- * bkmkType = integer, described by constants below
+ * bkmkType = integer, type of bookmark to create, described by constants below
  * is_openProp = boolean, true if we have to open the Property window
+ * is_createInside = boolean, true if we have to create outside of a folder, when the target is a folder
  */
-const NEWB       = 0;
-const NEWF       = 1;
-const NEWS       = 2;
-const NEWBCURTAB = 3;
-function menuNewBkmkItem (tgtBN_id, bkmkType, is_openProp = true) {
+const NEWB       = 0; // Create a new bookmark
+const NEWF       = 1; // Create a new folder
+const NEWS       = 2; // Create a new separator
+const NEWBCURTAB = 3; // Create a new bookmark from current tab
+function menuNewBkmkItem (tgtBN_id, bkmkType, is_openProp = true, is_createOutside = false) {
   let tgtBN = curBNList[tgtBN_id];
 
   // Create new bookmark just before if BN is a separator or a bookmark,
@@ -6562,7 +6563,7 @@ function menuNewBkmkItem (tgtBN_id, bkmkType, is_openProp = true) {
 	let creating;
 	switch (bkmkType) {
 	  case NEWB:
-		if (tgtBN_type == "folder") {
+		if (tgtBN_type == "folder" && !is_createOutside) {
 		  creating = createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), "New bookmark", "about:blank", "bookmark");
 		}
 		else {
@@ -6573,7 +6574,7 @@ function menuNewBkmkItem (tgtBN_id, bkmkType, is_openProp = true) {
 		}
 		break;
 	  case NEWF:
-		if (tgtBN_type == "folder") {
+		if (tgtBN_type == "folder" && !is_createOutside) {
 		  creating = createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), "New folder", undefined, "folder");
 		}
 		else {
@@ -6584,7 +6585,7 @@ function menuNewBkmkItem (tgtBN_id, bkmkType, is_openProp = true) {
 		}
 		break;
 	  case NEWS:
-		if (tgtBN_type == "folder") {
+		if (tgtBN_type == "folder" && !is_createOutside) {
 		  createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), undefined, undefined, "separator");
 		}
 		else {
@@ -6597,7 +6598,7 @@ function menuNewBkmkItem (tgtBN_id, bkmkType, is_openProp = true) {
 		  function (a_tabs) {
 			let tab = a_tabs[0];
 //console.log(tab.title+" - "+tab.url);
-			if (tgtBN_type == "folder") {
+			if (tgtBN_type == "folder" && !is_createOutside) {
 			  creating = createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), tab.title, tab.url, "bookmark");
 			}
 			else {
@@ -6911,28 +6912,28 @@ function clickHandler (e) {
 	  menuAction = true;
 	  let row = bookmarksTable.rows[getMenuRowIndex(target)];
 	  // Retrieve bookmark item in that row
-	  menuNewBkmkItem(row.dataset.id, NEWBCURTAB, e.ctrlKey);
+	  menuNewBkmkItem(row.dataset.id, NEWBCURTAB, e.ctrlKey, e.shiftKey);
 	}
 	else if (classList.contains("menunewb")) { // Create a new bookmark
 	  // Can only be on bookmarks table row
 	  menuAction = true;
 	  let row = bookmarksTable.rows[getMenuRowIndex(target)];
 	  // Retrieve bookmark item in that row
-	  menuNewBkmkItem(row.dataset.id, NEWB);
+	  menuNewBkmkItem(row.dataset.id, NEWB, true, e.shiftKey);
 	}
 	else if (classList.contains("menunewf")) { // Create a new folder
 	  // Can only be on bookmarks table row
 	  menuAction = true;
 	  let row = bookmarksTable.rows[getMenuRowIndex(target)];
 	  // Retrieve bookmark item in that row
-	  menuNewBkmkItem(row.dataset.id, NEWF);
+	  menuNewBkmkItem(row.dataset.id, NEWF, true, e.shiftKey);
 	}
 	else if (classList.contains("menunews")) { // Create a new separator
 	  // Can only be on bookmarks table row
 	  menuAction = true;
 	  let row = bookmarksTable.rows[getMenuRowIndex(target)];
 	  // Retrieve bookmark item in that row
-	  menuNewBkmkItem(row.dataset.id, NEWS);
+	  menuNewBkmkItem(row.dataset.id, NEWS, false, e.shiftKey);
 	}
 	else if (classList.contains("menucut")) { // Cut a bookmark item into bkmkClipboard
 	  // Retrieve parent context menu, the rowIndex and row on which it is
@@ -7124,19 +7125,19 @@ function onClickedContextMenuHandler (info, tab) {
 		break;
 	  case "bsp2newbtab":
 		// Bookmark current tab here
-		menuNewBkmkItem(bnId, NEWBCURTAB, (info.modifiers.indexOf("Ctrl") >= 0));
+		menuNewBkmkItem(bnId, NEWBCURTAB, (info.modifiers.indexOf("Ctrl") >= 0), (info.modifiers.indexOf("Shift") >= 0));
 		break;
 	  case "bsp2newb":
 		// New bookmark
-		menuNewBkmkItem(bnId, NEWB);
+		menuNewBkmkItem(bnId, NEWB, true, (info.modifiers.indexOf("Shift") >= 0));
 		break;
 	  case "bsp2newf":
 		// New folder
-		menuNewBkmkItem(bnId, NEWF);
+		menuNewBkmkItem(bnId, NEWF, true, (info.modifiers.indexOf("Shift") >= 0));
 		break;
 	  case "bsp2news":
 		// New separator
-		menuNewBkmkItem(bnId, NEWS);
+		menuNewBkmkItem(bnId, NEWS, false, (info.modifiers.indexOf("Shift") >= 0));
 		break;
 	  case "bsp2cut":
 		// Cut selection to clipboard
