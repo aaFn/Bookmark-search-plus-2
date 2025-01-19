@@ -1,6 +1,13 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.133 19/01/2025 Improvements
+    - Added comments in the options panel that alternate icons should ideally be 16x16 in size, to avoid resizing
+      (and possible blurring or non-homothetic scaling due to resizing).
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/322
+    - Added a function to create a new bookmark/folder/separator before a folder on context menu action, when the
+      shift key is pressed at the same time.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/320
 - 2.0.132 22/12/2024 Bugs and Improvements
     - Added traces on bookmark creation for bookmarks with unknown parentId (can happen when restoring bookmarks from
       a backup where the "Mobile Bookmarks" folder (id=mobile______) was existing, and is not existing in the restored to
