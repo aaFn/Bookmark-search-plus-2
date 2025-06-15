@@ -1,6 +1,10 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.134 27/04/2025 Improvements
+    - Slight performance improvement of initial display of the panel, by 5% to 10%.
+      Same for the build and display of Search results.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/330
 - 2.0.133 19/01/2025 Improvements
     - Added comments in the options panel that alternate icons should ideally be 16x16 in size, to avoid resizing
       (and possible blurring or non-homothetic scaling due to resizing).
@@ -1678,62 +1682,6 @@ LIMitations / TODO's:
 - TODO: I have no Mac nor Open/FreeBSD, so cannot verify how this is behaving under them, and if
   there are also variations / different bugs there. I am hoping that since these are all
   BSD UNIX, this is similar or not far from Linux. Have to rely solely on user feedback
-  for that piece.
-
-- TODO: Android (and Chrome OS also ?). Are mobile users going to have that many bookmarks and
-  install + make use of that extension ? Again, will wait for user feedback.
-
-- TODO: Ignore favicon links when they are in comments when retrieving favicons from a page
-  (since I am using a quick parser of my own, it is not semantical, and therefore it is misled
-   when there are such rel= links inside comments <!-- -->, as it takes them for real).
-   This is a rare case, but it happens.
-   For example: https://sol-resine.ooreka.fr/comprendre/resine-sol-garage
-   or https://www.netgear.com/support/product/dg834gv3.aspx
- 
-- TODO: Be able to select and manipulate multiple bookmark items with Shift+arrow-up/down,
-  Shift-hold+click and Ctrl-hold+click.
-
-
-
-- LIM: When retrieving favicons, it seems that following redirects in fetch() is not perfect,
-  and so we end up with network errors where the normal browser on such a page gets to some
-  other page and finds a favicon.
-  Tried {redirect: "follow"} without success :-(
-
-- LIM: Did not find a way in Web Extension API's to open modal dialogs for "New bookmark.." and
-  "New folder.." actions on context menus.
-  So these are normal popups. Hope this won't be too much trouble. 
-
-- LIM: No access to the sqlite db of favicons. So I had to code myself the fetch of favicons
-  from pages, and then save them into local storage for next time the sidebar is loaded.
-  This could make initial load of the add-on quite active, and so I spaced retrieval actions
-  so as to not overload the normal browser process.
-  On next loads after initial, things are retrieved from local storage, so this is fast.
-  Note: the web retrieval process is not based on 'http://www.google.com/s2/favicons?domain_url='
-    as some other add-ons do, as I it can be seen as a privacy issue leaking info to google.
-    Instead, I am retrieving the favicon URL from inside the bookmarked HTML page with my own
-    quick parser as said above.
-
-- LIM: No management / display of bookmark tags, keywords, or description field, as Firefox does
-  not expose those fields through its Web Extension API's.
-  See https://bugzilla.mozilla.org/show_bug.cgi?id=1225916 (vote for this bug!)
-
-- LIM: No way to synchronize the folders open state with the native FF bookmarks sidebar,
-  or with the "All bookmarks" window, as this is not exposed by the Web Extension API's.
-
-- LIM: In FF integrated context menu mode (FF >= 64), it is not possible for now to highlight
-  default actions in bold. In such a mode, so they are chown betwen "<" and ">".
-  Note that the native FF bookmark sidebar does not highlight default actions (anymore ?).
-
-- LIM: The add-on works with FF56, however:
-LIMitations / TODO's:
----------------------
-- TODO: Internationalization (i18n) of the UI with users who want to help.
-  Currently only English available.
-
-- TODO: I have no Mac nor Open/FreeBSD, so cannot verify how this is behaving under them, and if
-  there are also variations / different bugs there. I am hoping that since these are all
-  BSD UNIX, this is similar or not far from Linux. Have to rely solely on user feedback
   for those operating systems.
 
 - TODO: Android (and Chrome OS also?). Are mobile users going to have that many bookmarks and
@@ -1758,7 +1706,11 @@ LIMitations / TODO's:
   "New folder.." actions on context menus.
   So these are normal popups. Hope this won't be too much trouble. 
 
-- LIM: No access to the sqlite db of favicons. So I had to code myself the fetch of favicons
+- LIM: it is not possible to get auto-focus on the search box when opening BSP2 sidebar
+https://bugzilla.mozilla.org/show_bug.cgi?id=1502713
+
+- LIM: No access to the sqlite db of favicons (see https://bugzilla.mozilla.org/show_bug.cgi?id=1315616,
+  vote for this bug !). So I had to code myself the fetch of favicons
   from pages, and then save them into local storage for next time the sidebar is loaded.
   This could make initial load of the add-on quite active, and so I spaced retrieval actions
   so as to not overload the normal browser process.
@@ -1776,61 +1728,7 @@ LIMitations / TODO's:
   or with the "All bookmarks" window, as this is not exposed by the Web Extension API's.
 
 - LIM: In FF integrated context menu mode (FF >= 64), it is not possible for now to highlight
-  default actions in bold. In such a mode, so they are shown between "<" and ">".
-  Note that the native FF bookmark sidebar does not highlight default actions (anymore ?).
-
-- LIM: The add-on works with FF56, however:
-LIMitations / TODO's:
----------------------
-- TODO: Internationalization (i18n) of the UI with users who want to help.
-  Currently only English available.
-
-- TODO: I have no Mac nor Open/FreeBSD, so cannot verify how this is behaving under them, and if
-  there are also variations / different bugs there. I am hoping that since these are all
-  BSD UNIX, this is similar or not far from Linux. Have to rely solely on user feedback
-  for those operating systems.
-
-- TODO: Android (and Chrome OS also?). Are mobile users going to have that many bookmarks and
-  install + make use of that extension? Again, will wait for user feedback.
-
-- TODO: Ignore favicon links when they are in comments when retrieving favicons from a page.  
-  (Since I am using a quick parser of my own, it is not semantical, and therefore it is misled
-   when there are such `rel=` links inside comments `<!--` `-->`, as it doesn't understand
-   those links are commented out).  
-   This is a rare case, but it happens.  
-   For example: https://sol-resine.ooreka.fr/comprendre/resine-sol-garage  
-   and https://www.netgear.com/support/product/dg834gv3.aspx
- 
-
-
-- LIM: When retrieving favicons, it seems that following redirects in fetch() is not perfect,
-  and so we end up with network errors, while the normal browser on such a page gets to some
-  other page and finds a favicon.
-  Tried {redirect: "follow"} without success :-(
-
-- LIM: Did not find a way in Web Extension API's to open modal dialogs for "New bookmark.." and
-  "New folder.." actions on context menus.
-  So these are normal popups. Hope this won't be too much trouble. 
-
-- LIM: No access to the sqlite db of favicons. So I had to code myself the fetch of favicons
-  from pages, and then save them into local storage for next time the sidebar is loaded.
-  This could make initial load of the add-on quite active, and so I spaced retrieval actions
-  so as to not overload the normal browser process.
-  On next loads after initial, things are retrieved from local storage, so this is fast.
-  Note: the web retrieval process is not based on 'http://www.google.com/s2/favicons?domain_url='
-    as some other add-ons do, as I it can be seen as a privacy issue leaking info to google.
-    Instead, I am retrieving the favicon URL from inside the bookmarked HTML page with my own
-    quick parser as said above.
-
-- LIM: No management / display of bookmark tags, keywords, or description field, as Firefox does
-  not expose those fields through its Web Extension API's.
-  See https://bugzilla.mozilla.org/show_bug.cgi?id=1225916 (vote for this bug!)
-
-- LIM: No way to synchronize the folders open state with the native FF bookmarks sidebar,
-  or with the "All bookmarks" window, as this is not exposed by the Web Extension API's.
-
-- LIM: In FF integrated context menu mode (FF >= 64), it is not possible for now to highlight
-  default actions in bold. In such a mode, so they are shown between "<" and ">".
+  default actions in bold. So they are shown between "<" and ">".
   Note that the native FF bookmark sidebar does not highlight default actions (anymore ?).
 
 - LIM: The add-on works with FF56, however:
