@@ -1,6 +1,10 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.135 15/06/2025 Bugs
+    - Corrected a regression due to a left over of some test code for perfs analysis in 2.0.134, which could cause
+      a clicked folder to go in closed state when the option "Only 1 open folder at a time" was enabled.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/332
 - 2.0.134 27/04/2025 Improvements
     - Slight performance improvement of initial display of the panel, by 5% to 10%.
       Same for the build and display of Search results.
