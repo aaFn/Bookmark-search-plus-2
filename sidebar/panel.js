@@ -2887,8 +2887,6 @@ function handleFolderClick (twistie, is_forceNoClose = false) {
 		// Check if it was open or not
 		twistie = prev_row.firstElementChild.firstElementChild.firstElementChild;
 		is_open = twistie.classList.contains("twistieao");
-//bnId = prev_row.dataset.id;
-//is_open = curFldrOpenList[bnId];
 		// Make the new level visible only if the previous one was visible
 		if (is_open && (last_open_level == cur_level - 1))
 		  last_open_level = cur_level;
@@ -2908,7 +2906,6 @@ function handleFolderClick (twistie, is_forceNoClose = false) {
 	  // Check if current row is an open folder
 	  twistie = row.firstElementChild.firstElementChild.firstElementChild;
 	  is_open = twistie.classList.contains("twistieao");
-	  curFldrOpenList[BN_id] = false;
 	  if (is_open) { // Yes, close it
 		twistie.classList.replace("twistieao", "twistieac");
 		bnId = row.dataset.id;
