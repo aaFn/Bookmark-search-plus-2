@@ -1016,7 +1016,7 @@ function displayResults (a_BTN) {
 //  resultsFragment = document.createDocumentFragment();
   resultsTable = document.createElement("table");
   resultsTable.id = "resultstable";
-  SearchResult.appendChild(resultsTable); // Display the search results table + reflow
+//  SearchResult.appendChild(resultsTable); // Display the search results table + reflow
 //  resultsFragment.appendChild(resultsTable);
 
   let len = a_BTN.length;
@@ -1060,9 +1060,10 @@ function displayResults (a_BTN) {
 //	  }
 	}
   }
-  // Stop waiting icon and display the search result table
+  // Stop waiting icon
   WaitingSearch.hidden = true;
 //  SearchResult.appendChild(resultsFragment); // Display the search results table + reflow
+  SearchResult.appendChild(resultsTable); // Display the search results table + reflow
 }
 
 /*
@@ -1362,7 +1363,7 @@ function manageSearchTextHandler () {
 	}
 	disableCancelSearch();
 
-	// Discard the results table if any
+	// Discard the results table if any. Note: SearchResult is already hidden at this stage
 	if (resultsTable != null) {
 	  SearchResult.removeChild(resultsTable);
 	  resultsTable = null;
@@ -2817,6 +2818,7 @@ function handleFolderClick (twistie, is_forceNoClose = false) {
   let row = twistie.parentElement.parentElement.parentElement;
   let BN_id = row.dataset.id;
   let level = parseInt(row.dataset.level, 10);
+
 //  trace("Row: "+row+" level: "+level);
 
   if (twistie.classList.contains("twistieao")) { // Hide all children (having level > row level)
@@ -2885,7 +2887,8 @@ function handleFolderClick (twistie, is_forceNoClose = false) {
 		// Check if it was open or not
 		twistie = prev_row.firstElementChild.firstElementChild.firstElementChild;
 		is_open = twistie.classList.contains("twistieao");
-
+//bnId = prev_row.dataset.id;
+//is_open = curFldrOpenList[bnId];
 		// Make the new level visible only if the previous one was visible
 		if (is_open && (last_open_level == cur_level - 1))
 		  last_open_level = cur_level;
@@ -2905,6 +2908,7 @@ function handleFolderClick (twistie, is_forceNoClose = false) {
 	  // Check if current row is an open folder
 	  twistie = row.firstElementChild.firstElementChild.firstElementChild;
 	  is_open = twistie.classList.contains("twistieao");
+	  curFldrOpenList[BN_id] = false;
 	  if (is_open) { // Yes, close it
 		twistie.classList.replace("twistieao", "twistieac");
 		bnId = row.dataset.id;
@@ -8028,6 +8032,7 @@ function completeDisplay () {
   WaitingImg.hidden = true; // Stop displaying the waiting glass
 //  if (options.delayLoad)
 //	Bookmarks.appendChild(docFragment); // Display the table of bookmarks + reflow
+  Bookmarks.appendChild(bookmarksTable);
   endDisplayTime = (new Date ()).getTime();
   trace("Display duration: "+(endDisplayTime - endGetTreetime)+" ms", true);
   trace("Total duration: "+(endDisplayTime - startTime)+" ms", true);
@@ -8772,12 +8777,14 @@ function initialize2 () {
   // Create a Document Fragment to go faster (work is in memory only, no reflow.
   // It will get appended at end, when last bookmark item is created
   // Well, as a matter of fact, this is slightly longer by 10% ... I guess because doing it
-  //  while not yet displaying ...
+  //  while not yet fully displaying BSP2 ...
+  //  So just create the element, work on it, and append it later, this seems to be
+  //  slightly the fastest of all (by 5% to 10%, sometimes a little more). 
   WaitMsg.textContent = "Prepare tree display..";
 //  docFragment = document.createDocumentFragment();
   bookmarksTable = document.createElement("table");
 //  docFragment.appendChild(bookmarksTable);
-  Bookmarks.appendChild(bookmarksTable);
+//  Bookmarks.appendChild(bookmarksTable);
 
   highest_open_level = 0;
   let children = rootBN.children;

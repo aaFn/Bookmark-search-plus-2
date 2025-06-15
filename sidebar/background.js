@@ -3129,7 +3129,7 @@ console.log("menu shown on <"+bnId+"> with contexts=["+contexts+"] menuIds=["+me
 */
 
   if (is_onBkmk && (bnId != undefined) && (bnId.length > 0)) {
-	// Check if we are in BSP2 sidebar or not
+	// Check if we are in BSP2 sidebar or not - IGNORED = shown at all times now
 //	let is_inBSP2Sidebar = false;
 //	len = menuIds.length;
 //	for (let i=0 ; i<len ; i++) {

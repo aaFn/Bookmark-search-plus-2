@@ -404,7 +404,6 @@ tbody {
   border-bottom: solid 2px transparent;
   margin-top: -2px;
   margin-bottom: -2px;
-  cursor: default;
 }
 
 .rbkmkitem_f {
@@ -422,13 +421,13 @@ tbody {
 
 .bkmkitem_s {
   flex: auto;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
   border-top: solid 2px transparent;
   border-bottom: solid 2px transparent;
   margin-top: -2px;
   margin-bottom: -2px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
 }
 
 .favseparator {
