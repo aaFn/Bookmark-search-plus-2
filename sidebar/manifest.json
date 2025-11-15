@@ -1,0 +1,60 @@
+{
+  "manifest_version": 2,
+
+  "name": "Bookmark search plus 2",
+  "short_name": "BSP2",
+  "description": "Displays and filters bookmarks on search string, show parent folders.",
+  "author": "aaFn",
+
+  "version": "2.0.136",
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "bookmarksearchplus2@aafn.org",
+      "strict_min_version": "58.0"
+    }
+  },
+
+  "icons": {
+    "38": "icons/star2.png"
+  },
+
+  "background": {
+    "scripts": ["sidebar/OptionDesc.js", "sidebar/libstore.js", "sidebar/libimage.js", "sidebar/BookmarkNode.js",
+                "sidebar/HistoryNode.js", "sidebar/CreateHistQueue.js", "sidebar/bookmarkutils.js", "sidebar/favicon.js",
+                "sidebar/contextmenu.js", "sidebar/background.js"
+               ]
+  },
+
+  "sidebar_action": {
+    "default_icon": "icons/star2.png",
+    "default_title" : "Bookmark search plus 2",
+    "default_panel": "sidebar/panel.html"
+  },
+
+  "browser_action": {
+    "browser_style": false,
+    "default_icon": "icons/star2.png",
+    "default_title": "Bookmark search plus 2"
+  },
+
+  "permissions": ["<all_urls>", "storage", "unlimitedStorage", "tabs", "bookmarks", "history",
+                  "browserSettings", "topSites", "menus", "menus.overrideContext", "theme"],
+
+  "options_ui": {
+    "page": "sidebar/options.html",
+    "browser_style": true
+  },
+
+  "web_accessible_resources": ["icons/*.png", "sidebar/*.html*"],
+
+  "commands": {
+    "_execute_sidebar_action": {
+      "suggested_key": {
+        "default": "Ctrl+Q",
+        "linux": "Ctrl+Shift+B",
+        "mac": "Alt+B"
+      }
+    }
+  }
+}
