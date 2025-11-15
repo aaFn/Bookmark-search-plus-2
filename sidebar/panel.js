@@ -5899,7 +5899,7 @@ function keyHandler (e) {
 	}
   }
   else if (target.id == "searchtext") {
-	if (key == "Enter") { // Enter in search input box should execute new search or go to first search result if any
+	if ((key == "Enter") || (key == "ArrowDown")) { // Enter or Arrow down in search input box should execute new search or go to first search result if any
 	  if (sboxState == SBoxChanging) { // If new content in search box, execute search in parallel
 		triggerUpdate(true);
 	  }
@@ -6594,18 +6594,28 @@ function menuNewBkmkItem (tgtBN_id, bkmkType, is_openProp = true, is_createOutsi
 		}
 		break;
 	  case NEWBCURTAB:
-		browser.tabs.query({windowId: myWindowId, active: true})
+//		browser.tabs.query({windowId: myWindowId, active: true})
+		browser.tabs.query({windowId: myWindowId, highlighted: true})
 		.then (
 		  function (a_tabs) {
-			let tab = a_tabs[0];
+			let len = a_tabs.length;
+			let tab;
+			if ((tgtBN_type == "folder") && !is_createOutside) {
+			  for (let i=0 ; i<len ; i++) {
+				tab = a_tabs[i];
 //console.log(tab.title+" - "+tab.url);
-			if (tgtBN_type == "folder" && !is_createOutside) {
-			  creating = createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), tab.title, tab.url, "bookmark");
+				creating = createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), tab.title, tab.url, "bookmark");
+			  }
 			}
 			else {
-			  creating = createBkmkItem(tgtBN.parentId, BN_getIndex(tgtBN), tab.title, tab.url, "bookmark");
+			  let index = BN_getIndex(tgtBN);
+			  for (let i=0 ; i<len ; i++) {
+				tab = a_tabs[i];
+//console.log(tab.title+" - "+tab.url);
+				creating = createBkmkItem(tgtBN.parentId, index++, tab.title, tab.url, "bookmark");
+			  }
 			}
-			if (is_openProp) { // Open the Properties window after creation to edit new bookmark item
+			if ((len == 1) && is_openProp) { // Open the Properties window after creation to edit new bookmark item, only if 1 item is selected (= current)
 			  creating.then(createBookmark);
 			}
 		  }

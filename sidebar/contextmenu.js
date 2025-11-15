@@ -91,7 +91,7 @@ ContextMenu["bsp2sep2"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bs
 	type: "separator"
 };
 ContextMenu["bsp2newbtab"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_bprotf] = {
-	title: "Bookmark Tab &Here"
+	title: "Bookmark Tab(s) &Here"
 };
 ContextMenu["bsp2newb"+Menu_bbkmk+Menu_bresbkmk+Menu_bfldr+Menu_bresfldr+Menu_bsep+Menu_bprotf] = {
 	title: "New &Bookmark..."
