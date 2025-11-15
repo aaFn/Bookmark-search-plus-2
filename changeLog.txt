@@ -1,6 +1,11 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.136 15/11/2025 Improvements
+    - Now handle multiple selected/highlighted tabs when doing "Bookmark Tab(s) Here" in the conctext menu.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/334
+    - Added handling of Down Arrow in the Search box, to jump to the first result in the result pane if there is
+      one, like "Enter".
 - 2.0.135 15/06/2025 Bugs
     - Corrected a regression due to a left over of some test code for perfs analysis in 2.0.134, which could cause
       a clicked folder to go in closed state when the option "Only 1 open folder at a time" was enabled.
