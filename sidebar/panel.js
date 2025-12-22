@@ -8473,9 +8473,18 @@ function resetPanelColors () {
  */
 function setPanelColors (wTheme) {
   let propColors = wTheme.colors;
-  if ((propColors == undefined) || (propColors == null)) { // No colors part => reset to default
-														   // (can also happen when active theme is default)
-	resetPanelColors();
+  if ((propColors == undefined) || (propColors == null)) { // No colors part => try to follow FF values by using its CSS variables
+														   //   cf. https://bugzilla.mozilla.org/show_bug.cgi?id=1435216
+														   //   and https://searchfox.org/firefox-main/source/browser/themes/shared/browser-colors.css
+														   // (typically happens when active theme is default)
+//	resetPanelColors();
+// Retrieve the CSS rules to modify
+	let a_ss = document.styleSheets;
+	let ss = a_ss[0];
+	let cssRules = ss.cssRules;
+
+	setBackgroundColors(cssRules, "-moz-sidebar");
+	setTextColors(cssRules, "-moz-sidebartext");
   }
   else {
 	// Retrieve the CSS rules to modify
