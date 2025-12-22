@@ -42,8 +42,7 @@
                   "browserSettings", "topSites", "menus", "menus.overrideContext", "theme"],
 
   "options_ui": {
-    "page": "sidebar/options.html",
-    "browser_style": true
+    "page": "sidebar/options.html"
   },
 
   "web_accessible_resources": ["icons/*.png", "sidebar/*.html*"],
