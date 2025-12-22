@@ -1,6 +1,11 @@
 Release notes:
 --------------
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.137 22/12/2025 Improvements
+    - Removed browser_style in options_ui in the add-on manifest, since no more supported in future Manifest v3.
+    - Workaround for an FF regression on default dark theme + found a way to better reflect system defaults,
+      even when dark.
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/344
 - 2.0.136 15/11/2025 Improvements
     - Now handle multiple selected/highlighted tabs when doing "Bookmark Tab(s) Here" in the conctext menu.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/334
@@ -523,7 +528,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
 - 2.0.87 26/01/2021: Bugs & Improvements
     - Corrected an exception on undefined variable in code on drag & drop event handling (no visible effect, but cleaner code).
     - Do not execute action of opening bookmarks in current tab when BSP2 is in tab mode, to avoid inadvertently losing focus
-      on BSP2 (except if explicitely demanded through the context menu, or by key modifiers like Alt).
+      on BSP2 (except if explicitly demanded through the context menu, or by key modifiers like Alt).
         https://github.com/aaFn/Bookmark-search-plus-2/issues/171
     - Made the Bookmark History retention duration configurable in days on the BSP2 options page (default = 30).
         https://github.com/aaFn/Bookmark-search-plus-2/issues/168
@@ -805,7 +810,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       can act on the property window aspect.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/123
 - 2.0.69 01/01/2020: Bugs & Improvements
-    - Improved compability with browsers before FF62.
+    - Improved compatibility with browsers before FF62.
     - Cleaner event handling on mouse button actions.
     - Aligned order of possible actions in context menus between different objects, to follow a consitent
       order (keeping default action first though, when there is one).
@@ -821,7 +826,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
     - Corrected a regression where BSP2 version bubble was not showing while hovering mouse over the magnifying
       glass button, when running on FF version 66 and below.
 - 2.0.68 02/12/2019: Improvements
-    - Added suppport for FF themes on text and background colors of BSP2. Activate by a special option
+    - Added support for FF themes on text and background colors of BSP2. Activate by a special option
       to read and follow current FF theme.
     - Added option to override text and background colors in the BSP2 sidebar (disabled by the match
       FF theme option).
