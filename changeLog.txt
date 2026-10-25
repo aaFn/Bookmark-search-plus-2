@@ -4,7 +4,7 @@ Release notes:
 
 Please find here the release notes, TODO's, and some limitations I know of today.
 - 2.0.139 25/10/2026 Improvements
-    - When bookmarking multiple selected tabs, respect the order of tabs in the selection to insert new bookmarks in
+    - When book-marking multiple selected tabs, respect the order of tabs in the selection to insert new bookmarks in
       the same order.
 - 2.0.138 24/12/2025 Improvements
     - Set the strict_min_version to 128.0 instead of 58.0, as per discussion in
