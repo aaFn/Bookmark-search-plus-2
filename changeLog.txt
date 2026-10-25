@@ -1,6 +1,14 @@
 Release notes:
 --------------
+(North Americans: The dates in the following list are in format DD/MM/YYYY.)
+
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.139 25/10/2026 Improvements
+    - When bookmarking multiple selected tabs, respect the order of tabs in the selection to insert new bookmarks in
+      the same order.
+- 2.0.138 24/12/2025 Improvements
+    - Set the strict_min_version to 128.0 instead of 58.0, as per discussion in
+        https://github.com/aaFn/Bookmark-search-plus-2/issues/346#issuecomment-3690155641
 - 2.0.137 22/12/2025 Improvements
     - Removed browser_style in options_ui in the add-on manifest, since no more supported in future Manifest v3.
     - Workaround for an FF regression on default dark theme + found a way to better reflect system defaults,

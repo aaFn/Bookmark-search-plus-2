@@ -6,7 +6,7 @@
   "description": "Displays and filters bookmarks on search string, show parent folders.",
   "author": "aaFn",
 
-  "version": "2.0.137",
+  "version": "2.0.139",
 
   "browser_specific_settings": {
     "gecko": {
@@ -14,7 +14,7 @@
 	  "data_collection_permissions": {
 		"required": ["none"]
 	  },
-	  "strict_min_version": "58.0"
+	  "strict_min_version": "128.0"
     }
   },
 
