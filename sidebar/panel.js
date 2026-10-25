@@ -6601,7 +6601,7 @@ function menuNewBkmkItem (tgtBN_id, bkmkType, is_openProp = true, is_createOutsi
 			let len = a_tabs.length;
 			let tab;
 			if ((tgtBN_type == "folder") && !is_createOutside) {
-			  for (let i=0 ; i<len ; i++) {
+			  for (let i=len-1 ; i>=0 ; i--) {
 				tab = a_tabs[i];
 //console.log(tab.title+" - "+tab.url);
 				creating = createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), tab.title, tab.url, "bookmark");
