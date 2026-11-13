@@ -6543,7 +6543,7 @@ function menuOpenAllInTabs (BN_id, is_shiftKey) {
  * tgtBN_id = String identifying the bookmark item before which or inside which to insert
  * bkmkType = integer, type of bookmark to create, described by constants below
  * is_openProp = boolean, true if we have to open the Property window
- * is_createInside = boolean, true if we have to create outside of a folder, when the target is a folder
+ * is_createOutside = boolean, true if we have to create outside of a folder, when the target is a folder
  */
 const NEWB       = 0; // Create a new bookmark
 const NEWF       = 1; // Create a new folder
@@ -6597,14 +6597,15 @@ function menuNewBkmkItem (tgtBN_id, bkmkType, is_openProp = true, is_createOutsi
 //		browser.tabs.query({windowId: myWindowId, active: true})
 		browser.tabs.query({windowId: myWindowId, highlighted: true})
 		.then (
-		  function (a_tabs) {
+		  async function (a_tabs) {
 			let len = a_tabs.length;
 			let tab;
+			let created;
 			if ((tgtBN_type == "folder") && !is_createOutside) {
-			  for (let i=len-1 ; i>=0 ; i--) {
+			  for (let i=0 ; i<len ; i++) {
 				tab = a_tabs[i];
 //console.log(tab.title+" - "+tab.url);
-				creating = createBkmkItem(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), tab.title, tab.url, "bookmark");
+				created = await createBkmkItem_async(tgtBN_id, (options.appendAtFldrEnd ? undefined : 0), tab.title, tab.url, "bookmark");
 			  }
 			}
 			else {
@@ -6612,11 +6613,11 @@ function menuNewBkmkItem (tgtBN_id, bkmkType, is_openProp = true, is_createOutsi
 			  for (let i=0 ; i<len ; i++) {
 				tab = a_tabs[i];
 //console.log(tab.title+" - "+tab.url);
-				creating = createBkmkItem(tgtBN.parentId, index++, tab.title, tab.url, "bookmark");
+				created = await createBkmkItem_async(tgtBN.parentId, index++, tab.title, tab.url, "bookmark");
 			  }
 			}
 			if ((len == 1) && is_openProp) { // Open the Properties window after creation to edit new bookmark item, only if 1 item is selected (= current)
-			  creating.then(createBookmark);
+			  createBookmark(created.BTN);
 			}
 		  }
 		);
