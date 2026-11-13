@@ -3,6 +3,9 @@ Release notes:
 (North Americans: The dates in the following list are in format DD/MM/YYYY.)
 
 Please find here the release notes, TODO's, and some limitations I know of today.
+- 2.0.140 13/11/2026 Improvements
+    - Still some disorder when book-marking multiple selected tabs, changed the code forcing serialization with async/await
+      to fully respect the order of selected tabs and insert the new bookmarks in the same order.
 - 2.0.139 25/10/2026 Improvements
     - When book-marking multiple selected tabs, respect the order of tabs in the selection to insert new bookmarks in
       the same order.
@@ -103,7 +106,7 @@ Please find here the release notes, TODO's, and some limitations I know of today
       by a missing code statement removed by accident in a previous version.
         https://github.com/aaFn/Bookmark-search-plus-2/issues/299
 - 2.0.124 25/02/2024 Improvements
-    - Corrected some setTimeout() calls to not generate a Content-Security-Policy error (typically, "the page’s
+    - Corrected some setTimeout() calls to not generate a Content-Security-Policy error (typically, "the page s
       settings blocked the loading of a resource at eval (script-src)").
     - Implemented a mechanism to self-clear local storage after 10 unsuccessful read attempts, to try to restart
       with a cleaned up local storage and default values.
@@ -1698,13 +1701,10 @@ Please find here the release notes, TODO's, and some limitations I know of today
 
 LIMitations / TODO's:
 ---------------------
+LIMitations / TODO's:
+---------------------
 - TODO: Internationalization (i18n) of the UI with users who want to help.
   Currently only English available.
-
-- TODO: I have no Mac nor Open/FreeBSD, so cannot verify how this is behaving under them, and if
-  there are also variations / different bugs there. I am hoping that since these are all
-  BSD UNIX, this is similar or not far from Linux. Have to rely solely on user feedback
-  for those operating systems.
 
 - TODO: Android (and Chrome OS also?). Are mobile users going to have that many bookmarks and
   install + make use of that extension? Again, will wait for user feedback.
@@ -1718,6 +1718,11 @@ LIMitations / TODO's:
    and https://www.netgear.com/support/product/dg834gv3.aspx
  
 
+
+- LIM: I have no Mac nor Open/FreeBSD, so cannot verify how this is behaving under them, and if
+  there are also variations / different bugs there. I am hoping that since these are all
+  BSD UNIX, this is similar or not far from Linux. Have to rely solely on user feedback
+  for those operating systems.
 
 - LIM: When retrieving favicons, it seems that following redirects in fetch() is not perfect,
   and so we end up with network errors, while the normal browser on such a page gets to some
